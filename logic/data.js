@@ -50,36 +50,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 var _this = this;
 exports.__esModule = true;
 var levelup_1 = require("levelup");
-var level_js_1 = require("level-js");
+var leveldown_1 = require("leveldown");
 var P = require("p-iteration");
-var vs = require("vreath");
-var native = vs.con.constant.native;
-var unit = vs.con.constant.unit;
-var state_db = levelup_1["default"](level_js_1["default"]('state_trie'));
-var lock_db = levelup_1["default"](level_js_1["default"]('lock_trie'));
+var vr = require("vreath");
+var native = vr.con.constant.native;
+var unit = vr.con.constant.unit;
+var state_db = levelup_1["default"](leveldown_1["default"]('state_trie'));
+var lock_db = levelup_1["default"](leveldown_1["default"]('lock_trie'));
 var Trie = /** @class */ (function (_super) {
     __extends(Trie, _super);
     function Trie() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     return Trie;
-}(vs.trie));
+}(vr.trie));
 exports.state_trie_ins = function (root) {
     try {
-        return new vs.trie(state_db, root);
+        return new vr.trie(state_db, root);
     }
     catch (e) {
         console.log(e);
-        return new vs.trie(state_db);
+        return new vr.trie(state_db);
     }
 };
 exports.lock_trie_ins = function (root) {
     try {
-        return new vs.trie(lock_db, root);
+        return new vr.trie(lock_db, root);
     }
     catch (e) {
         console.log(e);
-        return new vs.trie(lock_db);
+        return new vr.trie(lock_db);
     }
 };
 var output_keys = function (tx) {
@@ -90,13 +90,13 @@ var output_keys = function (tx) {
 };
 var pays = function (tx, chain) {
     if (tx.meta.kind === "request") {
-        var requester = vs.crypto.genereate_address(native, vs.crypto.merge_pub_keys(tx.meta.pub_key));
+        var requester = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(tx.meta.pub_key));
         return [requester];
     }
     else if (tx.meta.kind === "refresh") {
-        var req_tx = vs.tx.find_req_tx(tx, chain);
-        var requester = vs.crypto.genereate_address(native, vs.crypto.merge_pub_keys(req_tx.meta.pub_key));
-        var refresher = vs.crypto.genereate_address(native, vs.crypto.merge_pub_keys(tx.meta.pub_key));
+        var req_tx = vr.tx.find_req_tx(tx, chain);
+        var requester = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(req_tx.meta.pub_key));
+        var refresher = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(tx.meta.pub_key));
         return [requester, refresher];
     }
     else
@@ -137,7 +137,7 @@ exports.get_tx_statedata = function (tx, chain, S_Trie) { return __awaiter(_this
                                     getted = _a.sent();
                                     token = key.split(':')[1];
                                     if (getted == null)
-                                        return [2 /*return*/, result.concat(vs.state.create_state(0, key, token, 0))];
+                                        return [2 /*return*/, result.concat(vr.state.create_state(0, key, token, 0))];
                                     else
                                         return [2 /*return*/, result.concat(getted)];
                                     return [2 /*return*/];
@@ -155,7 +155,7 @@ exports.get_tx_statedata = function (tx, chain, S_Trie) { return __awaiter(_this
                                 case 1:
                                     getted = _a.sent();
                                     if (getted == null)
-                                        return [2 /*return*/, result.concat(vs.state.create_state(0, key, native, 0))];
+                                        return [2 /*return*/, result.concat(vr.state.create_state(0, key, native, 0))];
                                     else
                                         return [2 /*return*/, result.concat(getted)];
                                     return [2 /*return*/];
@@ -165,8 +165,8 @@ exports.get_tx_statedata = function (tx, chain, S_Trie) { return __awaiter(_this
             case 3:
                 pay_states = _a.sent();
                 concated = base_states.concat(output_states).concat(pay_states);
-                hashes_1 = concated.map(function (state) { return vs.crypto.object_hash(state); });
-                return [2 /*return*/, concated.filter(function (val, i) { return hashes_1.indexOf(vs.crypto.object_hash(val)) === i; })];
+                hashes_1 = concated.map(function (state) { return vr.crypto.object_hash(state); });
+                return [2 /*return*/, concated.filter(function (val, i) { return hashes_1.indexOf(vr.crypto.object_hash(val)) === i; })];
             case 4:
                 e_1 = _a.sent();
                 console.log(e_1);
@@ -186,7 +186,7 @@ exports.get_tx_lockdata = function (tx, chain, L_Trie) { return __awaiter(_this,
                     if (tx.meta.kind === "request")
                         return tx;
                     else
-                        return vs.tx.find_req_tx(tx, chain);
+                        return vr.tx.find_req_tx(tx, chain);
                 })();
                 keys = target.meta.bases.filter(function (val, i, array) { return array.indexOf(val) === i; });
                 return [4 /*yield*/, P.reduce(keys, function (array, key) { return __awaiter(_this, void 0, void 0, function () {
@@ -194,7 +194,7 @@ exports.get_tx_lockdata = function (tx, chain, L_Trie) { return __awaiter(_this,
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0:
-                                    if (vs.crypto.verify_address(key))
+                                    if (vr.crypto.verify_address(key))
                                         return [2 /*return*/, array];
                                     return [4 /*yield*/, L_Trie.get(key)];
                                 case 1:
@@ -234,11 +234,11 @@ exports.get_block_statedata = function (block, chain, S_Trie) { return __awaiter
         switch (_a.label) {
             case 0:
                 _a.trys.push([0, 6, , 7]);
-                native_validator = vs.crypto.genereate_address(native, vs.crypto.merge_pub_keys(block.meta.validatorPub));
+                native_validator = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(block.meta.validatorPub));
                 return [4 /*yield*/, S_Trie.get(native_validator)];
             case 1:
-                native_validator_state = (_a.sent()) || vs.state.create_state(0, native_validator, native);
-                txs = block.txs.map(function (tx) { return vs.tx.pure2tx(tx, block); });
+                native_validator_state = (_a.sent()) || vr.state.create_state(0, native_validator, native);
+                txs = block.txs.map(function (tx) { return vr.tx.pure2tx(tx, block); });
                 return [4 /*yield*/, P.reduce(txs, function (result, tx) { return __awaiter(_this, void 0, void 0, function () { var _a, _b; return __generator(this, function (_c) {
                         switch (_c.label) {
                             case 0:
@@ -249,19 +249,19 @@ exports.get_block_statedata = function (block, chain, S_Trie) { return __awaiter
                     }); }); }, [])];
             case 2:
                 tx_states = _a.sent();
-                return [4 /*yield*/, S_Trie.filter(function (key, state) { return vs.state.isState(state) && state.kind === "state" && state.token === unit; })];
+                return [4 /*yield*/, S_Trie.filter(function (key, state) { return vr.state.isState(state) && state.kind === "state" && state.token === unit; })];
             case 3:
                 unit_gets_obj_1 = _a.sent();
                 all_units = Object.keys(unit_gets_obj_1).map(function (key) { return unit_gets_obj_1[key]; });
                 return [4 /*yield*/, S_Trie.get(native)];
             case 4:
-                native_token = (_a.sent()) || vs.state.create_info(0, native);
+                native_token = (_a.sent()) || vr.state.create_info(0, native);
                 return [4 /*yield*/, S_Trie.get(unit)];
             case 5:
-                unit_token = (_a.sent()) || vs.state.create_info(0, unit);
+                unit_token = (_a.sent()) || vr.state.create_info(0, unit);
                 concated = tx_states.concat(native_validator_state).concat(all_units).concat(native_token).concat(unit_token);
-                hashes_2 = concated.map(function (s) { return vs.crypto.object_hash(s); });
-                return [2 /*return*/, concated.filter(function (val, i) { return hashes_2.indexOf(vs.crypto.object_hash(val)) === i; })];
+                hashes_2 = concated.map(function (s) { return vr.crypto.object_hash(s); });
+                return [2 /*return*/, concated.filter(function (val, i) { return hashes_2.indexOf(vr.crypto.object_hash(val)) === i; })];
             case 6:
                 e_3 = _a.sent();
                 console.log(e_3);
@@ -277,7 +277,7 @@ exports.get_block_lockdata = function (block, chain, L_Trie) { return __awaiter(
         switch (_a.label) {
             case 0:
                 _a.trys.push([0, 4, , 5]);
-                txs = block.txs.map(function (tx) { return vs.tx.pure2tx(tx, block); });
+                txs = block.txs.map(function (tx) { return vr.tx.pure2tx(tx, block); });
                 return [4 /*yield*/, P.reduce(txs, function (result, tx) { return __awaiter(_this, void 0, void 0, function () { var _a, _b; return __generator(this, function (_c) {
                         switch (_c.label) {
                             case 0:
@@ -288,15 +288,15 @@ exports.get_block_lockdata = function (block, chain, L_Trie) { return __awaiter(
                     }); }); }, [])];
             case 1:
                 tx_loc = _a.sent();
-                return [4 /*yield*/, L_Trie.get(vs.crypto.genereate_address(native, vs.crypto.merge_pub_keys(block.meta.validatorPub)))];
+                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(block.meta.validatorPub)))];
             case 2:
                 native_validator = _a.sent();
-                return [4 /*yield*/, L_Trie.get(vs.crypto.genereate_address(unit, vs.crypto.merge_pub_keys(block.meta.validatorPub)))];
+                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(unit, vr.crypto.merge_pub_keys(block.meta.validatorPub)))];
             case 3:
                 unit_validator = _a.sent();
                 concated = tx_loc.concat(native_validator).concat(unit_validator).filter(function (lock) { return lock != null; });
-                hashes_3 = concated.map(function (l) { return vs.crypto.object_hash(l); });
-                return [2 /*return*/, concated.filter(function (val, i) { return hashes_3.indexOf(vs.crypto.object_hash(val)) === i; })];
+                hashes_3 = concated.map(function (l) { return vr.crypto.object_hash(l); });
+                return [2 /*return*/, concated.filter(function (val, i) { return hashes_3.indexOf(vr.crypto.object_hash(val)) === i; })];
             case 4:
                 e_4 = _a.sent();
                 console.log(e_4);

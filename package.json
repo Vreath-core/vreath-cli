@@ -12,11 +12,15 @@
     "@oclif/config": "^1.10.3",
     "@oclif/plugin-help": "^2.1.4",
     "@types/express": "^4.16.0",
+    "@types/leveldown": "^4.0.0",
     "@types/levelup": "^3.1.0",
+    "@types/request": "^2.48.1",
     "body-parser": "^1.18.3",
     "express": "^4.16.4",
-    "level-js": "^3.0.0",
+    "leveldown": "^4.0.1",
     "levelup": "^3.1.1",
+    "mathjs": "^5.4.0",
+    "request": "^2.88.0",
     "tslib": "^1.9.3",
     "vreath": "github:Vreath-core/ts-vreath-core"
   },
@@ -44,7 +48,8 @@
   ],
   "homepage": "https://github.com/Vreath-core/vreath-cli",
   "keywords": [
-    "oclif"
+    "blockchain",
+    "blockchain"
   ],
   "license": "MIT",
   "main": "lib/index.js",

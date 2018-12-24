@@ -1,0 +1,27 @@
+{
+    "hash": "8a34f846225c8c034fbf36c954999d28b74a5802d6bfd09c1d9f8fc11be596c0",
+    "validatorSign": [
+        "19681d280c80af2af0744f4ab19dfc38018c70db0022c88c382ec02c1ae846c426b0d22823ea2af616361044ff2a666d6851917a92ed4cf54d79db3c221c302f"
+    ],
+    "meta": {
+        "kind": "key",
+        "version": 0,
+        "network_id": 1,
+        "chain_id": 1,
+        "validator": "Vr:native:040a3cb467ce0ee2097c8a7ef8817f221790c48f8b82cad58c4eedcb15511073",
+        "height": 0,
+        "previoushash": "cd372fb85148700fa88095e3492d3f9f5beb43e555e5ff26d95f5a6adc36f8e6",
+        "timestamp": 1545629491469,
+        "pos_diff": 1,
+        "validatorPub": [
+            "0234d5f4af3126a2183b633b0f9869512bcc01e4650251695ba33a7448c6091212"
+        ],
+        "stateroot": "a0c0fe7cdabbc259745c59b4e33b6fa2fb13d535f53d63f91e3301755742b5cf",
+        "lockroot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "tx_root": "cd372fb85148700fa88095e3492d3f9f5beb43e555e5ff26d95f5a6adc36f8e6",
+        "fee_sum": 0,
+        "extra": "Vreath bring cryptocurrency to everyone."
+    },
+    "txs": [],
+    "raws": []
+}

@@ -3,6 +3,8 @@ vreath-cli
 
 CLI wallet for Vreath
 
+(This is under development!)
+
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/vreath-cli.svg)](https://npmjs.org/package/vreath-cli)
 [![Downloads/week](https://img.shields.io/npm/dw/vreath-cli.svg)](https://npmjs.org/package/vreath-cli)
@@ -30,6 +32,7 @@ USAGE
 <!-- commands -->
 * [`vreath-cli hello [FILE]`](#vreath-cli-hello-file)
 * [`vreath-cli help [COMMAND]`](#vreath-cli-help-command)
+* [`vreath-cli start`](#vreath-cli-start)
 
 ## `vreath-cli hello [FILE]`
 
@@ -67,4 +70,15 @@ OPTIONS
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v2.1.4/src/commands/help.ts)_
+
+## `vreath-cli start`
+
+start server
+
+```
+USAGE
+  $ vreath-cli start
+```
+
+_See code: [src/commands/start.ts](https://github.com/Vreath-core/vreath-cli/blob/v0.0.1/src/commands/start.ts)_
 <!-- commandsstop -->

@@ -37,26 +37,26 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 var _this = this;
 exports.__esModule = true;
 var express = require("express");
-var vs = require("vreath");
+var vr = require("vreath");
 var fs = require("fs");
 var util_1 = require("util");
 var logic = require("../../logic/data");
 var router = express.Router();
 exports["default"] = router.post('/tx', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
-    var tx, version, net_id, chain_id, pool, _a, _b, chain, _c, _d, roots, _e, _f, S_Trie, StateData, L_Trie, LockData, e_1;
+    var tx, version, net_id, chain_id, pool, _a, _b, chain, _c, _d, roots, _e, _f, S_Trie, StateData, L_Trie, LockData, new_pool, e_1;
     return __generator(this, function (_g) {
         switch (_g.label) {
             case 0:
-                _g.trys.push([0, 8, , 9]);
+                _g.trys.push([0, 9, , 10]);
                 tx = req.body;
-                if (!vs.tx.isTx(tx))
+                if (!vr.tx.isTx(tx))
                     res.send('invalid tx');
                 version = tx.meta.version || 0;
                 net_id = tx.meta.network_id || 0;
                 chain_id = tx.meta.chain_id || 0;
-                if (!(version < vs.con.constant.compatible_version || net_id != vs.con.constant.my_net_id || chain_id != vs.con.constant.my_chain_id)) return [3 /*break*/, 1];
+                if (!(version < vr.con.constant.compatible_version || net_id != vr.con.constant.my_net_id || chain_id != vr.con.constant.my_chain_id)) return [3 /*break*/, 1];
                 res.send('unsupported　version');
-                return [3 /*break*/, 7];
+                return [3 /*break*/, 8];
             case 1:
                 _b = (_a = JSON).parse;
                 return [4 /*yield*/, util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8')];
@@ -78,16 +78,19 @@ exports["default"] = router.post('/tx', function (req, res) { return __awaiter(_
                 return [4 /*yield*/, logic.get_tx_lockdata(tx, chain, L_Trie)];
             case 6:
                 LockData = _g.sent();
-                vs.pool.tx2pool(pool, tx, chain, StateData, LockData);
+                new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
+                return [4 /*yield*/, util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8')];
+            case 7:
+                _g.sent();
                 res.status(200).send('success');
-                _g.label = 7;
-            case 7: return [3 /*break*/, 9];
-            case 8:
+                _g.label = 8;
+            case 8: return [3 /*break*/, 10];
+            case 9:
                 e_1 = _g.sent();
                 console.log(e_1);
                 res.status(404).send('error');
-                return [3 /*break*/, 9];
-            case 9: return [2 /*return*/];
+                return [3 /*break*/, 10];
+            case 10: return [2 /*return*/];
         }
     });
 }); });
