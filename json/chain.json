@@ -1,13 +1,13 @@
 {
-    "hash": "8a34f846225c8c034fbf36c954999d28b74a5802d6bfd09c1d9f8fc11be596c0",
+    "hash": "2a12ca0d9dad266fca9be699a410d99860ac4d24397520cde1a229b40a23642c",
     "validatorSign": [
-        "19681d280c80af2af0744f4ab19dfc38018c70db0022c88c382ec02c1ae846c426b0d22823ea2af616361044ff2a666d6851917a92ed4cf54d79db3c221c302f"
+        "902683e69a80185af0b3d1d001a0894970e9d5351b12b1143bff9e991637eef4609ac1ab4fbba1040febfe29d983afeebf0a14b50e1370eccc1065bc69ec1779"
     ],
     "meta": {
         "kind": "key",
         "version": 0,
-        "network_id": 1,
-        "chain_id": 1,
+        "network_id": 75,
+        "chain_id": 75,
         "validator": "Vr:native:040a3cb467ce0ee2097c8a7ef8817f221790c48f8b82cad58c4eedcb15511073",
         "height": 0,
         "previoushash": "cd372fb85148700fa88095e3492d3f9f5beb43e555e5ff26d95f5a6adc36f8e6",

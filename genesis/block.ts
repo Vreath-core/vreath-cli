@@ -21,7 +21,8 @@ const gen_meta:vr.BlockMeta = {
 }
 
 const gen_hash = vr.crypto.object_hash(gen_meta);
-const gen_sign = '19681d280c80af2af0744f4ab19dfc38018c70db0022c88c382ec02c1ae846c426b0d22823ea2af616361044ff2a666d6851917a92ed4cf54d79db3c221c302f';
+const gen_sign = '902683e69a80185af0b3d1d001a0894970e9d5351b12b1143bff9e991637eef4609ac1ab4fbba1040febfe29d983afeebf0a14b50e1370eccc1065bc69ec1779'
+console.log(gen_sign);
 
 export const genesis_block:vr.Block = {
     hash:gen_hash,
@@ -30,3 +31,4 @@ export const genesis_block:vr.Block = {
     txs:[],
     raws:[]
 }
+console.log(genesis_block)
