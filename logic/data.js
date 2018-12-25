@@ -228,13 +228,19 @@ exports.get_tx_lockdata = function (tx, chain, L_Trie) { return __awaiter(_this,
     });
 }); };
 exports.get_block_statedata = function (block, chain, S_Trie) { return __awaiter(_this, void 0, void 0, function () {
-    var native_validator, native_validator_state, txs, tx_states, unit_gets_obj_1, all_units, native_token, unit_token, concated, hashes_2, e_3;
+    var validatorPub, native_validator, native_validator_state, txs, tx_states, all_units, native_token, unit_token, concated, hashes_2, e_3;
     var _this = this;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 _a.trys.push([0, 6, , 7]);
-                native_validator = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(block.meta.validatorPub));
+                validatorPub = (function () {
+                    if (block.meta.kind === 'key')
+                        return block.meta.validatorPub;
+                    else
+                        return vr.block.search_key_block(chain).meta.validatorPub;
+                })();
+                native_validator = vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(validatorPub));
                 return [4 /*yield*/, S_Trie.get(native_validator)];
             case 1:
                 native_validator_state = (_a.sent()) || vr.state.create_state(0, native_validator, native);
@@ -249,10 +255,9 @@ exports.get_block_statedata = function (block, chain, S_Trie) { return __awaiter
                     }); }); }, [])];
             case 2:
                 tx_states = _a.sent();
-                return [4 /*yield*/, S_Trie.filter(function (key, state) { return vr.state.isState(state) && state.kind === "state" && state.token === unit; })];
+                return [4 /*yield*/, S_Trie.filter(function (state) { return vr.state.isState(state) && state.kind === "state" && state.token === unit; })];
             case 3:
-                unit_gets_obj_1 = _a.sent();
-                all_units = Object.keys(unit_gets_obj_1).map(function (key) { return unit_gets_obj_1[key]; });
+                all_units = _a.sent();
                 return [4 /*yield*/, S_Trie.get(native)];
             case 4:
                 native_token = (_a.sent()) || vr.state.create_info(0, native);
@@ -271,7 +276,7 @@ exports.get_block_statedata = function (block, chain, S_Trie) { return __awaiter
     });
 }); };
 exports.get_block_lockdata = function (block, chain, L_Trie) { return __awaiter(_this, void 0, void 0, function () {
-    var txs, tx_loc, native_validator, unit_validator, concated, hashes_3, e_4;
+    var txs, tx_loc, validatorPub, native_validator, unit_validator, concated, hashes_3, e_4;
     var _this = this;
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -288,10 +293,16 @@ exports.get_block_lockdata = function (block, chain, L_Trie) { return __awaiter(
                     }); }); }, [])];
             case 1:
                 tx_loc = _a.sent();
-                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(block.meta.validatorPub)))];
+                validatorPub = (function () {
+                    if (block.meta.kind === 'key')
+                        return block.meta.validatorPub;
+                    else
+                        return vr.block.search_key_block(chain).meta.validatorPub;
+                })();
+                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(native, vr.crypto.merge_pub_keys(validatorPub)))];
             case 2:
                 native_validator = _a.sent();
-                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(unit, vr.crypto.merge_pub_keys(block.meta.validatorPub)))];
+                return [4 /*yield*/, L_Trie.get(vr.crypto.genereate_address(unit, vr.crypto.merge_pub_keys(validatorPub)))];
             case 3:
                 unit_validator = _a.sent();
                 concated = tx_loc.concat(native_validator).concat(unit_validator).filter(function (lock) { return lock != null; });

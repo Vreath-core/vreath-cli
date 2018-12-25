@@ -115,12 +115,15 @@ export const get_tx_lockdata = async (tx:vr.Tx,chain:vr.Block[],L_Trie:Trie)=>{
 
 export const get_block_statedata = async (block:vr.Block,chain:vr.Block[],S_Trie:Trie)=>{
     try{
-        const native_validator = vr.crypto.genereate_address(native,vr.crypto.merge_pub_keys(block.meta.validatorPub));
+        const validatorPub = (()=>{
+            if(block.meta.kind==='key') return block.meta.validatorPub;
+            else return vr.block.search_key_block(chain).meta.validatorPub;
+        })()
+        const native_validator = vr.crypto.genereate_address(native,vr.crypto.merge_pub_keys(validatorPub));
         const native_validator_state:vr.State = await S_Trie.get(native_validator) || vr.state.create_state(0,native_validator,native);
         const txs = block.txs.map(tx=>vr.tx.pure2tx(tx,block));
         const tx_states:vr.State[] = await P.reduce(txs,async (result:vr.State[],tx:vr.Tx)=>result.concat(await get_tx_statedata(tx,chain,S_Trie)),[]);
-        const unit_gets_obj:{[key:string]:vr.State} = await S_Trie.filter((key,state:vr.State)=>vr.state.isState(state)&&state.kind==="state"&&state.token===unit);
-        const all_units = Object.keys(unit_gets_obj).map(key=>unit_gets_obj[key]);
+        const all_units:vr.State[] = await S_Trie.filter((state:vr.State)=>vr.state.isState(state)&&state.kind==="state"&&state.token===unit);
         const native_token = await S_Trie.get(native) || vr.state.create_info(0,native);
         const unit_token = await S_Trie.get(unit) || vr.state.create_info(0,unit);
         const concated = tx_states.concat(native_validator_state).concat(all_units).concat(native_token).concat(unit_token);
@@ -137,8 +140,12 @@ export const get_block_lockdata = async (block:vr.Block,chain:vr.Block[],L_Trie:
     try{
         const txs = block.txs.map(tx=>vr.tx.pure2tx(tx,block));
         const tx_loc:vr.Lock[] = await P.reduce(txs,async (result:vr.Lock[],tx:vr.Tx)=>result.concat(await get_tx_lockdata(tx,chain,L_Trie)),[]);
-        const native_validator:vr.Lock = await L_Trie.get(vr.crypto.genereate_address(native,vr.crypto.merge_pub_keys(block.meta.validatorPub)));
-        const unit_validator:vr.Lock = await L_Trie.get(vr.crypto.genereate_address(unit,vr.crypto.merge_pub_keys(block.meta.validatorPub)));
+        const validatorPub = (()=>{
+            if(block.meta.kind==='key') return block.meta.validatorPub;
+            else return vr.block.search_key_block(chain).meta.validatorPub;
+        })()
+        const native_validator:vr.Lock = await L_Trie.get(vr.crypto.genereate_address(native,vr.crypto.merge_pub_keys(validatorPub)));
+        const unit_validator:vr.Lock = await L_Trie.get(vr.crypto.genereate_address(unit,vr.crypto.merge_pub_keys(validatorPub)));
         const concated = tx_loc.concat(native_validator).concat(unit_validator).filter(lock=>lock!=null);
         const hashes = concated.map(l=>vr.crypto.object_hash(l));
         return concated.filter((val,i)=>hashes.indexOf(vr.crypto.object_hash(val))===i);

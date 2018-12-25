@@ -35,8 +35,8 @@ export default router.post('/block',async (req,res)=>{
                     else return vr.block.accept_micro_block(block,chain,StateData,LockData);
                 })();
                 await P.forEach(accepted[0], async (state:vr.State)=>{
-                    if(state.kind==='state') S_Trie.put(state.owner,state);
-                    else S_Trie.put(state.token,state);
+                    if(state.kind==='state') await S_Trie.put(state.owner,state);
+                    else await S_Trie.put(state.token,state);
                 });
 
                 await P.forEach(accepted[1], async (lock:vr.Lock)=>{

@@ -19,11 +19,11 @@ export const sleep = (msec:number)=>{
 
 const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
-    const requested_bases:string[] = Object.keys(await L_Trie.filter((key,val)=>{
+    const requested_bases:string[] = (await L_Trie.filter((val:vr.Lock)=>{
         const getted:vr.Lock = val;
         if(getted!=null&&getted.state==="already") return true;
         else return false;
-    }));
+    })).map(l=>l.address);
     const not_same = pool_txs.reduce((result:vr.Tx[],tx)=>{
         const bases = result.reduce((r:string[],t)=>{
             if(t.meta.kind==="request") return r.concat(t.meta.bases);
@@ -50,19 +50,19 @@ const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
 }
 
 
-export const make_blocks = async (chain:vr.Block[],my_pubs:string[],stateroot:string,lockroot:string,extra:string,pool:vr.Pool,S_Trie:Trie,L_Trie:Trie)=>{
+export const make_blocks = async (chain:vr.Block[],my_pubs:string[],stateroot:string,lockroot:string,extra:string,pool:vr.Pool,private_key:string,public_key:string,S_Trie:Trie,L_Trie:Trie)=>{
     try{
         const pre_key_block = vr.block.search_key_block(chain);
         const pre_micro_blocks = vr.block.search_micro_block(chain,pre_key_block);
         if(vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub)!=vr.crypto.merge_pub_keys(my_pubs)||pre_micro_blocks.length>=vr.con.constant.max_blocks){
-            const key_block = vr.block.create_key_block(chain,my_pubs,stateroot,lockroot,extra);
+            const key_block = vr.block.create_key_block(chain,my_pubs,stateroot,lockroot,extra,public_key,private_key);
             const StateData = await data.get_block_statedata(key_block,chain,S_Trie);
             if(!vr.block.verify_key_block(key_block,chain,stateroot,lockroot,StateData)) throw new Error('fail to create valid block');
             return key_block;
         }
         else{
             const txs = await choose_txs(pool,L_Trie);
-            const micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra);
+            const micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra,private_key,public_key);
             const StateData = await data.get_block_statedata(micro_block,chain,S_Trie);
             const LockData = await data.get_block_lockdata(micro_block,chain,L_Trie);
             if(!vr.block.verify_micro_block(micro_block,chain,stateroot,lockroot,StateData,LockData)){

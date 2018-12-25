@@ -71,13 +71,12 @@ exports.sleep = function (msec) {
     });
 };
 var choose_txs = function (pool, L_Trie) { return __awaiter(_this, void 0, void 0, function () {
-    var pool_txs, requested_bases, _a, _b, not_same, size_sum, sorted, choosed;
-    return __generator(this, function (_c) {
-        switch (_c.label) {
+    var pool_txs, requested_bases, not_same, size_sum, sorted, choosed;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
             case 0:
                 pool_txs = Object.keys(pool).map(function (key) { return pool[key]; });
-                _b = (_a = Object).keys;
-                return [4 /*yield*/, L_Trie.filter(function (key, val) {
+                return [4 /*yield*/, L_Trie.filter(function (val) {
                         var getted = val;
                         if (getted != null && getted.state === "already")
                             return true;
@@ -85,7 +84,7 @@ var choose_txs = function (pool, L_Trie) { return __awaiter(_this, void 0, void 
                             return false;
                     })];
             case 1:
-                requested_bases = _b.apply(_a, [_c.sent()]);
+                requested_bases = (_a.sent()).map(function (l) { return l.address; });
                 not_same = pool_txs.reduce(function (result, tx) {
                     var bases = result.reduce(function (r, t) {
                         if (t.meta.kind === "request")
@@ -120,7 +119,7 @@ var choose_txs = function (pool, L_Trie) { return __awaiter(_this, void 0, void 
         }
     });
 }); };
-exports.make_blocks = function (chain, my_pubs, stateroot, lockroot, extra, pool, S_Trie, L_Trie) { return __awaiter(_this, void 0, void 0, function () {
+exports.make_blocks = function (chain, my_pubs, stateroot, lockroot, extra, pool, private_key, public_key, S_Trie, L_Trie) { return __awaiter(_this, void 0, void 0, function () {
     var pre_key_block, pre_micro_blocks, key_block, StateData, txs, micro_block_1, StateData, LockData, invalid_tx_hashes_1, pool_1, _a, _b, new_pool, e_1;
     var _this = this;
     return __generator(this, function (_c) {
@@ -130,7 +129,7 @@ exports.make_blocks = function (chain, my_pubs, stateroot, lockroot, extra, pool
                 pre_key_block = vr.block.search_key_block(chain);
                 pre_micro_blocks = vr.block.search_micro_block(chain, pre_key_block);
                 if (!(vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub) != vr.crypto.merge_pub_keys(my_pubs) || pre_micro_blocks.length >= vr.con.constant.max_blocks)) return [3 /*break*/, 2];
-                key_block = vr.block.create_key_block(chain, my_pubs, stateroot, lockroot, extra);
+                key_block = vr.block.create_key_block(chain, my_pubs, stateroot, lockroot, extra, public_key, private_key);
                 return [4 /*yield*/, data.get_block_statedata(key_block, chain, S_Trie)];
             case 1:
                 StateData = _c.sent();
@@ -140,7 +139,7 @@ exports.make_blocks = function (chain, my_pubs, stateroot, lockroot, extra, pool
             case 2: return [4 /*yield*/, choose_txs(pool, L_Trie)];
             case 3:
                 txs = _c.sent();
-                micro_block_1 = vr.block.create_micro_block(chain, stateroot, lockroot, txs, extra);
+                micro_block_1 = vr.block.create_micro_block(chain, stateroot, lockroot, txs, extra, private_key, public_key);
                 return [4 /*yield*/, data.get_block_statedata(micro_block_1, chain, S_Trie)];
             case 4:
                 StateData = _c.sent();

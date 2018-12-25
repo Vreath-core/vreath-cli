@@ -100,11 +100,19 @@ exports["default"] = router.post('/block', function (req, res) { return __awaite
                 })();
                 return [4 /*yield*/, P.forEach(accepted[0], function (state) { return __awaiter(_this, void 0, void 0, function () {
                         return __generator(this, function (_a) {
-                            if (state.kind === 'state')
-                                S_Trie_1.put(state.owner, state);
-                            else
-                                S_Trie_1.put(state.token, state);
-                            return [2 /*return*/];
+                            switch (_a.label) {
+                                case 0:
+                                    if (!(state.kind === 'state')) return [3 /*break*/, 2];
+                                    return [4 /*yield*/, S_Trie_1.put(state.owner, state)];
+                                case 1:
+                                    _a.sent();
+                                    return [3 /*break*/, 4];
+                                case 2: return [4 /*yield*/, S_Trie_1.put(state.token, state)];
+                                case 3:
+                                    _a.sent();
+                                    _a.label = 4;
+                                case 4: return [2 /*return*/];
+                            }
                         });
                     }); })];
             case 8:

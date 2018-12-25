@@ -19,6 +19,6 @@ const L_Trie = data.lock_trie_ins('');
     console.log(L_Trie.now_root());
 })();*/
 exports.genesis_roots = {
-    stateroot: 'a0c0fe7cdabbc259745c59b4e33b6fa2fb13d535f53d63f91e3301755742b5cf',
+    stateroot: '5ce80f1d76ef0618b36653706fac78414a3e470c64a70e7d8ab5363da5d04158',
     lockroot: '56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421'
 };
