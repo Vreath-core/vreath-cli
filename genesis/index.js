@@ -1,5 +1,5 @@
 "use strict";
-exports.__esModule = true;
+Object.defineProperty(exports, "__esModule", { value: true });
 var state_1 = require("./state");
 exports.pub = state_1.genesis_pub;
 exports.state = state_1.genesis_state;

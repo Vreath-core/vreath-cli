@@ -1,8 +1,15 @@
 "use strict";
-exports.__esModule = true;
-var vr = require("vreath");
-var state_1 = require("./state");
-var gen_meta = {
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const vr = __importStar(require("vreath"));
+const state_1 = require("./state");
+const gen_meta = {
     kind: 'key',
     version: vr.con.constant.my_version,
     network_id: vr.con.constant.my_net_id,
@@ -19,8 +26,8 @@ var gen_meta = {
     fee_sum: 0,
     extra: 'Vreath bring cryptocurrency to everyone.'
 };
-var gen_hash = vr.crypto.object_hash(gen_meta);
-var gen_sign = '8762f2d1162be7a24389ba1c45b46f6ca969da31e5bf4c4a6a2608e311b012d96c3fa4ca4991ac90c193e3f5ac6bc1d36547c6bf1bd15645d182b1e2d175b3b4';
+const gen_hash = vr.crypto.object_hash(gen_meta);
+const gen_sign = '8762f2d1162be7a24389ba1c45b46f6ca969da31e5bf4c4a6a2608e311b012d96c3fa4ca4991ac90c193e3f5ac6bc1d36547c6bf1bd15645d182b1e2d175b3b4';
 exports.genesis_block = {
     hash: gen_hash,
     validatorSign: [gen_sign],
