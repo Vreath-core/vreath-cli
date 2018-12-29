@@ -97,9 +97,9 @@ export const get_tx_lockdata = async (tx:vr.Tx,chain:vr.Block[],L_Trie:Trie)=>{
                     address:key,
                     state:'yet',
                     height:0,
-                    block_hash:'',
+                    block_hash:vr.crypto.hash(''),
                     index:0,
-                    tx_hash:''
+                    tx_hash:vr.crypto.hash('')
                 }
                 return array.concat(new_loc);
             }

@@ -39,7 +39,7 @@ const staking = async (private_key) => {
         if (unit_validator_state == null || unit_validator_state.amount === 0)
             throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const block = await works.make_blocks(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
+        const block = await works.make_block(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
         const StateData = await data.get_block_statedata(block, chain, S_Trie);
         const LockData = await data.get_block_lockdata(block, chain, L_Trie);
         const accepted = (() => {
@@ -88,6 +88,40 @@ const staking = async (private_key) => {
     catch (e) {
     }
 };
+/*const refreshing = async (private_key:string)=>{
+    try{
+        const config = JSON.parse(await promisify(fs.readFile)('./config/config.json','utf-8'));
+        const validator_pub:string = config.pub_keys[config.user.use];
+        const feeprice = Number(readlineSync.question("fee price"));
+        const unit_price = Number(readlineSync.question("unit price"));
+        const log = readlineSync.question("log");
+        const chain:vr.Block[] = JSON.parse(await promisify(fs.readFile)('./json/chain.json','utf-8'));
+        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
+        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const L_Trie = data.lock_trie_ins(roots.lockroot);
+        const tx = await works.make_ref_tx([validator_pub],feeprice,unit_price,log,private_key,validator_pub,chain,S_Trie,L_Trie);
+
+        const peers:{protocol:string,ip:string,port:number}[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const header = {
+            'Content-Type':'application/json'
+        };
+        peers.forEach(peer=>{
+            const url = peer.protocol+'://'+peer.ip+':'+peer.port+'/tx';
+            const option = {
+                url: url,
+                method: 'POST',
+                headers: header,
+                json: true,
+                form:tx
+            }
+            request(option,(err,res)=>{
+            });
+        });
+    }
+    catch(e){
+        console.log(e);
+    }
+}*/
 const app = express_1.default();
 app.listen(57750);
 app.use(bodyParser.json());
@@ -104,5 +138,97 @@ replServer.defineCommand('setup', {
     async action() {
         await setup_1.default();
         console.log('finish set up');
+    }
+});
+replServer.defineCommand('request-tx', {
+    help: 'Create request tx',
+    async action(input) {
+        try {
+            const splited = input.split('--').slice(1);
+            ;
+            const config = JSON.parse(await util_1.promisify(fs.readFile)('./config/config.json', 'utf-8'));
+            const user_pub = config.pub_keys[config.user.use];
+            const type = splited[0].split('=')[1].trim();
+            const tokens = splited[1].split('=')[1].trim().split(',');
+            const bases = splited[2].split('=')[1].trim().split(',');
+            const feeprice = Number(splited[3].split('=')[1].trim());
+            const gas = Number(splited[4].split('=')[1].trim());
+            const input_raw = splited[5].split('=')[1].trim().split(',');
+            const log = splited[6].split('=')[1].trim();
+            const chain = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain.json', 'utf-8'));
+            const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
+            const S_Trie = data.state_trie_ins(roots.stateroot);
+            const L_Trie = data.lock_trie_ins(roots.lockroot);
+            const tx = await works.make_req_tx([user_pub], type, tokens, bases, feeprice, gas, input_raw, log, my_private, user_pub, chain, S_Trie, L_Trie);
+            const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+            const header = {
+                'Content-Type': 'application/json'
+            };
+            peers.forEach(peer => {
+                const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/tx';
+                const option = {
+                    url: url,
+                    method: 'POST',
+                    headers: header,
+                    json: true,
+                    form: tx
+                };
+                request_1.default(option, (err, res) => {
+                });
+            });
+        }
+        catch (e) {
+            console.log(e);
+        }
+    }
+});
+replServer.defineCommand('remit', {
+    help: 'Create request tx',
+    async action(input) {
+        try {
+            const splited = input.split('--').slice(1);
+            const config = JSON.parse(await util_1.promisify(fs.readFile)('./config/config.json', 'utf-8'));
+            const user_pub = config.pub_keys[config.user.use];
+            const type = "change";
+            const tokens = [vr.con.constant.native];
+            const remitter = vr.crypto.genereate_address(vr.con.constant.native, user_pub);
+            const receiver = splited[0].split('=')[1].trim().split(',').map(add => {
+                if (add === "remitter")
+                    return remitter;
+                else
+                    return add;
+            });
+            const bases = [remitter].concat(receiver).filter((val, i, array) => array.indexOf(val) === i);
+            const feeprice = Number(splited[1].split('=')[1].trim());
+            const gas = Number(splited[2].split('=')[1].trim());
+            const amount = splited[3].split('=')[1].trim().split(',');
+            if (receiver.length != amount.length)
+                throw new Error('invalid amount');
+            const log = splited[4].split('=')[1].trim();
+            const chain = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain.json', 'utf-8'));
+            const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
+            const S_Trie = data.state_trie_ins(roots.stateroot);
+            const L_Trie = data.lock_trie_ins(roots.lockroot);
+            const tx = await works.make_req_tx([user_pub], type, tokens, bases, feeprice, gas, amount, log, my_private, user_pub, chain, S_Trie, L_Trie);
+            const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+            const header = {
+                'Content-Type': 'application/json'
+            };
+            peers.forEach(peer => {
+                const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/tx';
+                const option = {
+                    url: url,
+                    method: 'POST',
+                    headers: header,
+                    json: true,
+                    form: tx
+                };
+                request_1.default(option, (err, res) => {
+                });
+            });
+        }
+        catch (e) {
+            console.log(e);
+        }
     }
 });

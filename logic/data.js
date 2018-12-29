@@ -112,9 +112,9 @@ exports.get_tx_lockdata = async (tx, chain, L_Trie) => {
                     address: key,
                     state: 'yet',
                     height: 0,
-                    block_hash: '',
+                    block_hash: vr.crypto.hash(''),
                     index: 0,
-                    tx_hash: ''
+                    tx_hash: vr.crypto.hash('')
                 };
                 return array.concat(new_loc);
             }

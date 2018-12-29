@@ -50,12 +50,12 @@ const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
 }
 
 
-export const make_blocks = async (chain:vr.Block[],my_pubs:string[],stateroot:string,lockroot:string,extra:string,pool:vr.Pool,private_key:string,public_key:string,S_Trie:Trie,L_Trie:Trie)=>{
+export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string,lockroot:string,extra:string,pool:vr.Pool,private_key:string,public_key:string,S_Trie:Trie,L_Trie:Trie)=>{
     try{
         const pre_key_block = vr.block.search_key_block(chain);
         const pre_micro_blocks = vr.block.search_micro_block(chain,pre_key_block);
-        if(vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub)!=vr.crypto.merge_pub_keys(my_pubs)||pre_micro_blocks.length>=vr.con.constant.max_blocks){
-            const key_block = vr.block.create_key_block(chain,my_pubs,stateroot,lockroot,extra,public_key,private_key);
+        if(vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub)!=vr.crypto.merge_pub_keys(pubs)||pre_micro_blocks.length>=vr.con.constant.max_blocks){
+            const key_block = vr.block.create_key_block(chain,pubs,stateroot,lockroot,extra,public_key,private_key);
             const StateData = await data.get_block_statedata(key_block,chain,S_Trie);
             if(!vr.block.verify_key_block(key_block,chain,stateroot,lockroot,StateData)) throw new Error('fail to create valid block');
             return key_block;
@@ -84,6 +84,62 @@ export const make_blocks = async (chain:vr.Block[],my_pubs:string[],stateroot:st
             }
             return micro_block;
         }
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
+export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],bases:string[],feeprice:number,gas:number,input_raw:string[],log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie)=>{
+    try{
+        if(tokens.some(t=>t!=vr.con.constant.native&&t!=vr.con.constant.unit)) throw new Error('unsupported token');
+        const tx = vr.tx.create_req_tx(pubs,type,tokens,bases,feeprice,gas,input_raw,log,private_key,public_key);
+        const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
+        const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
+        if(!vr.tx.verify_req_tx(tx,true,StateData,LockData)) throw new Error('fail to create valid request tx');
+        return tx;
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
+const get_nonce = (request:string,height:number,block_hash:string,refresher:string,output:string,unit_price:number)=>{
+    let nonce = 0;
+    while(!vr.tx.mining(request,height,block_hash,refresher,output,unit_price,nonce)){
+        nonce ++;
+    }
+    return nonce;
+}
+
+export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:number,height:number,index:number,log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie)=>{
+    try{
+        const target_block = chain[height]||vr.block.empty_block;
+        const req_tx_pure = target_block.txs[index] || vr.tx.empty_tx;
+        const req_tx = vr.tx.pure2tx(req_tx_pure,target_block);
+        const pre_StateData = await P.reduce(req_tx.meta.bases, async (result:vr.State[],key:string)=>{
+            const getted:vr.State = await S_Trie.get(key);
+            if(getted==null) return result;
+            else return result.concat(getted);
+        },[]);
+        const computed = req_tx.meta.tokens.reduce((result:vr.State[],token)=>{
+            const base_states = pre_StateData.filter(s=>s.kind==='state'&&s.token===token);
+            if(token===vr.con.constant.native) return result.concat(vr.tx.native_contract(base_states,req_tx));
+            else if(token===vr.con.constant.unit) return result.concat(vr.tx.unit_contract(pre_StateData,req_tx,chain));
+            else return result;
+        },[]);
+        const success = !computed.some(s=>vr.state.verify_state(s));
+        const output = (()=>{
+            if(success) return computed;
+            else return pre_StateData;
+        })();
+        const refresher = vr.crypto.genereate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys(pubs));
+        const nonce = get_nonce(req_tx.hash,height,target_block.hash,refresher,vr.crypto.object_hash(output),unit_price);
+        const tx = vr.tx.create_ref_tx(pubs,feeprice,unit_price,height,target_block.hash,index,req_tx_pure.hash,success,nonce,output.map(s=>JSON.stringify(s)),log,chain,private_key,public_key);
+        const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
+        const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
+        if(!vr.tx.verify_ref_tx(tx,chain,true,StateData,LockData)) throw new Error('fail to create valid request tx');
+        return tx;
     }
     catch(e){
         throw new Error(e);
