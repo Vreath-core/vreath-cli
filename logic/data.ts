@@ -118,7 +118,7 @@ export const get_block_statedata = async (block:vr.Block,chain:vr.Block[],S_Trie
         const validatorPub = (()=>{
             if(block.meta.kind==='key') return block.meta.validatorPub;
             else return vr.block.search_key_block(chain).meta.validatorPub;
-        })()
+        })();
         const native_validator = vr.crypto.genereate_address(native,vr.crypto.merge_pub_keys(validatorPub));
         const native_validator_state:vr.State = await S_Trie.get(native_validator) || vr.state.create_state(0,native_validator,native);
         const txs = block.txs.map(tx=>vr.tx.pure2tx(tx,block));
@@ -139,7 +139,9 @@ export const get_block_statedata = async (block:vr.Block,chain:vr.Block[],S_Trie
 export const get_block_lockdata = async (block:vr.Block,chain:vr.Block[],L_Trie:Trie)=>{
     try{
         const txs = block.txs.map(tx=>vr.tx.pure2tx(tx,block));
-        const tx_loc:vr.Lock[] = await P.reduce(txs,async (result:vr.Lock[],tx:vr.Tx)=>result.concat(await get_tx_lockdata(tx,chain,L_Trie)),[]);
+        const tx_loc:vr.Lock[] = await P.reduce(txs,async (result:vr.Lock[],tx:vr.Tx)=>{
+            return result.concat(await get_tx_lockdata(tx,chain,L_Trie))
+        },[]);
         const validatorPub = (()=>{
             if(block.meta.kind==='key') return block.meta.validatorPub;
             else return vr.block.search_key_block(chain).meta.validatorPub;

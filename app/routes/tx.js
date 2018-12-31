@@ -41,3 +41,4 @@ exports.default = router.post('/tx', async (req, res) => {
         res.status(404).send('error');
     }
 });
+//# sourceMappingURL=tx.js.map

@@ -67,7 +67,10 @@ exports.default = router.post('/block', async (req, res) => {
                 await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
                 const txs_hash = block.txs.map(pure => pure.hash);
                 const new_pool_keys = Object.keys(pool).filter(key => txs_hash.indexOf(key) === -1);
-                const new_pool = new_pool_keys.map(key => pool[key]);
+                const new_pool = new_pool_keys.reduce((obj, key) => {
+                    obj[key] = pool[key];
+                    return obj;
+                }, {});
                 await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
                 res.status(200).send('success');
             }
@@ -78,3 +81,4 @@ exports.default = router.post('/block', async (req, res) => {
         res.status(404).send('error');
     }
 });
+//# sourceMappingURL=block.js.map

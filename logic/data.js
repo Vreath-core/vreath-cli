@@ -155,7 +155,9 @@ exports.get_block_statedata = async (block, chain, S_Trie) => {
 exports.get_block_lockdata = async (block, chain, L_Trie) => {
     try {
         const txs = block.txs.map(tx => vr.tx.pure2tx(tx, block));
-        const tx_loc = await P.reduce(txs, async (result, tx) => result.concat(await exports.get_tx_lockdata(tx, chain, L_Trie)), []);
+        const tx_loc = await P.reduce(txs, async (result, tx) => {
+            return result.concat(await exports.get_tx_lockdata(tx, chain, L_Trie));
+        }, []);
         const validatorPub = (() => {
             if (block.meta.kind === 'key')
                 return block.meta.validatorPub;
@@ -173,3 +175,4 @@ exports.get_block_lockdata = async (block, chain, L_Trie) => {
         return [];
     }
 };
+//# sourceMappingURL=data.js.map

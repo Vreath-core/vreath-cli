@@ -4,6 +4,7 @@ import * as P from 'p-iteration'
 import * as math from 'mathjs'
 import * as fs from 'fs'
 import {promisify} from 'util'
+import {cloneDeep} from 'lodash'
 
 math.config({
   number: 'BigNumber'
@@ -15,6 +16,15 @@ export const sleep = (msec:number)=>{
     return new Promise(function(resolve) {
         setTimeout(function() {resolve()}, msec);
      });
+}
+
+export const copy = <T>(data:T)=>{
+  return cloneDeep(data);
+}
+
+
+export const new_obj = <T>(obj:T,fn:(obj:T)=>T)=>{
+  return fn(copy(obj));
 }
 
 const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
@@ -61,8 +71,20 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
             return key_block;
         }
         else{
-            const txs = await choose_txs(pool,L_Trie);
-            const micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra,private_key,public_key);
+            const txs = await choose_txs(pool,L_Trie)
+            const created_micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra,private_key,public_key);
+            const txs_hash = txs.map(tx=>tx.hash);
+            const micro_block = new_obj(
+                created_micro_block,
+                block=>{
+                    block.txs.forEach(tx=>{
+                        tx.additional.hash = created_micro_block.hash;
+                        tx.additional.height = created_micro_block.meta.height;
+                        tx.additional.index = txs_hash.indexOf(tx.hash);
+                    });
+                    return block;
+                }
+            );
             const StateData = await data.get_block_statedata(micro_block,chain,S_Trie);
             const LockData = await data.get_block_lockdata(micro_block,chain,L_Trie);
             if(!vr.block.verify_micro_block(micro_block,chain,stateroot,lockroot,StateData,LockData)){
@@ -90,7 +112,7 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
     }
 }
 
-export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],bases:string[],feeprice:number,gas:number,input_raw:string[],log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie)=>{
+export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],bases:string[],feeprice:number,gas:number,input_raw:string[],log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie):Promise<vr.Tx>=>{
     try{
         if(tokens.some(t=>t!=vr.con.constant.native&&t!=vr.con.constant.unit)) throw new Error('unsupported token');
         const tx = vr.tx.create_req_tx(pubs,type,tokens,bases,feeprice,gas,input_raw,log,private_key,public_key);
@@ -105,14 +127,20 @@ export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],b
 }
 
 const get_nonce = (request:string,height:number,block_hash:string,refresher:string,output:string,unit_price:number)=>{
-    let nonce = 0;
-    while(!vr.tx.mining(request,height,block_hash,refresher,output,unit_price,nonce)){
-        nonce ++;
+    try{
+        let nonce = 0;
+        setTimeout(()=>{
+            throw new Error('fail to get valid nonce');
+        },10000);
+        while(!vr.tx.mining(request,height,block_hash,refresher,output,unit_price,nonce)){
+            nonce ++;
+        }
+        return nonce;
     }
-    return nonce;
+    catch(e){return -1}
 }
 
-export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:number,height:number,index:number,log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie)=>{
+export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:number,height:number,index:number,log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie):Promise<vr.Tx>=>{
     try{
         const target_block = chain[height]||vr.block.empty_block;
         const req_tx_pure = target_block.txs[index] || vr.tx.empty_tx;
@@ -135,10 +163,11 @@ export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:numbe
         })();
         const refresher = vr.crypto.genereate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys(pubs));
         const nonce = get_nonce(req_tx.hash,height,target_block.hash,refresher,vr.crypto.object_hash(output),unit_price);
-        const tx = vr.tx.create_ref_tx(pubs,feeprice,unit_price,height,target_block.hash,index,req_tx_pure.hash,success,nonce,output.map(s=>JSON.stringify(s)),log,chain,private_key,public_key);
+        if(nonce===-1) throw new Error('fail to get valid nonce')
+        const tx = vr.tx.create_ref_tx(pubs,feeprice,unit_price,height,target_block.hash,index,req_tx_pure.hash,success,nonce,output.map(s=>JSON.stringify(s)),log,private_key,public_key);
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
-        if(!vr.tx.verify_ref_tx(tx,chain,true,StateData,LockData)) throw new Error('fail to create valid request tx');
+        if(!vr.tx.verify_ref_tx(tx,chain,true,StateData,LockData)) throw new Error('fail to create valid refresh tx');
         return tx;
     }
     catch(e){

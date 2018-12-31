@@ -54,7 +54,10 @@ export default router.post('/block',async (req,res)=>{
 
                 const txs_hash = block.txs.map(pure=>pure.hash);
                 const new_pool_keys = Object.keys(pool).filter(key=>txs_hash.indexOf(key)===-1);
-                const new_pool = new_pool_keys.map(key=>pool[key]);
+                const new_pool = new_pool_keys.reduce((obj:vr.Pool,key)=>{
+                    obj[key] = pool[key];
+                    return obj;
+                },{});
                 await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
 
                 res.status(200).send('success');
