@@ -12,6 +12,7 @@ const vr = __importStar(require("vreath"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const logic = __importStar(require("../../logic/data"));
+const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
 const router = express.Router();
 exports.default = router.post('/block', async (req, res) => {
@@ -25,7 +26,7 @@ exports.default = router.post('/block', async (req, res) => {
         if (version < vr.con.constant.compatible_version || net_id != vr.con.constant.my_net_id || chain_id != vr.con.constant.my_chain_id)
             res.send('unsupported　version');
         else {
-            const chain = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain.json', 'utf-8'));
+            const chain = await work_1.read_chain(2 * (10 ** 9));
             const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
             const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
             const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -58,8 +59,7 @@ exports.default = router.post('/block', async (req, res) => {
                 await P.forEach(accepted[1], async (lock) => {
                     await L_Trie.put(lock.address, lock);
                 });
-                const new_chain = chain.concat(block);
-                await util_1.promisify(fs.writeFile)('./json/chain.json', JSON.stringify(new_chain, null, 4), 'utf-8');
+                await work_1.write_chain(block);
                 const new_roots = {
                     stateroot: S_Trie.now_root(),
                     lockroot: L_Trie.now_root()

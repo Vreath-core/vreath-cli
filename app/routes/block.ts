@@ -3,6 +3,7 @@ import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import * as logic from '../../logic/data'
+import {read_chain, write_chain} from '../../logic/work'
 import * as P from 'p-iteration'
 
 const router = express.Router();
@@ -16,7 +17,7 @@ export default router.post('/block',async (req,res)=>{
         const chain_id = block.meta.chain_id || 0;
         if(version<vr.con.constant.compatible_version||net_id!=vr.con.constant.my_net_id||chain_id!=vr.con.constant.my_chain_id) res.send('unsupported　version');
         else{
-            const chain:vr.Block[] = JSON.parse(await promisify(fs.readFile)('./json/chain.json','utf-8'));
+            const chain:vr.Block[] = await read_chain(2*(10**9));
             const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
             const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
             const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -43,8 +44,7 @@ export default router.post('/block',async (req,res)=>{
                     await L_Trie.put(lock.address,lock);
                 });
 
-                const new_chain = chain.concat(block);
-                await promisify(fs.writeFile)('./json/chain.json',JSON.stringify(new_chain,null, 4),'utf-8');
+                await write_chain(block);
 
                 const new_roots = {
                     stateroot:S_Trie.now_root(),

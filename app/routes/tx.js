@@ -12,6 +12,7 @@ const vr = __importStar(require("vreath"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const logic = __importStar(require("../../logic/data"));
+const work_1 = require("../../logic/work");
 const router = express.Router();
 exports.default = router.post('/tx', async (req, res) => {
     try {
@@ -25,7 +26,7 @@ exports.default = router.post('/tx', async (req, res) => {
             res.send('unsupported　version');
         else {
             const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
-            const chain = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain.json', 'utf-8'));
+            const chain = await work_1.read_chain(2 * (10 ** 9));
             const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
             const S_Trie = logic.state_trie_ins(roots.stateroot);
             const StateData = await logic.get_tx_statedata(tx, chain, S_Trie);

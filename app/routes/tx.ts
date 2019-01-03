@@ -3,6 +3,7 @@ import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import * as logic from '../../logic/data'
+import {read_chain} from '../../logic/work'
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ export default router.post('/tx',async (req,res)=>{
         if(version<vr.con.constant.compatible_version||net_id!=vr.con.constant.my_net_id||chain_id!=vr.con.constant.my_chain_id) res.send('unsupported　version');
         else{
             const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
-            const chain:vr.Block[] = JSON.parse(await promisify(fs.readFile)('./json/chain.json','utf-8'));
+            const chain:vr.Block[] = await read_chain(2*(10**9));
             const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
             const S_Trie = logic.state_trie_ins(roots.stateroot);
             const StateData = await logic.get_tx_statedata(tx,chain,S_Trie);
