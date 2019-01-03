@@ -27,6 +27,56 @@ export const new_obj = <T>(obj:T,fn:(obj:T)=>T)=>{
   return fn(copy(obj));
 }
 
+type chain_info = {
+    net_id:number;
+    chain_id:number;
+    version:number;
+    compatible_version:number;
+    last_height:number;
+}
+
+export const read_chain = async (max_size:number)=>{
+    try{
+        const net_id = vr.con.constant.my_net_id;
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        let chain:vr.Block[] = [];
+        let block:vr.Block;
+        let size_sum = 0;
+        let i:number;
+        for(i=info.last_height; i>=0; i--){
+            block = JSON.parse(await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json','utf-8'));
+            size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
+            if(size_sum>max_size) break;
+            else chain.push(block);
+        }
+        return chain.slice().reverse();
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
+export const write_chain = async (block:vr.Block)=>{
+    try{
+        const net_id = vr.con.constant.my_net_id;
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        const height = block.meta.height;
+        const new_info = new_obj(
+            info,
+            i=>{
+                i.last_height = height;
+                return i;
+            }
+        )
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+height.toString()+'.json',JSON.stringify(block,null, 4),'utf-8');
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
+
 const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
     const requested_bases:string[] = (await L_Trie.filter((val:vr.Lock)=>{
@@ -65,7 +115,7 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
         const pre_key_block = vr.block.search_key_block(chain);
         const pre_micro_blocks = vr.block.search_micro_block(chain,pre_key_block);
         if(vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub)!=vr.crypto.merge_pub_keys(pubs)||pre_micro_blocks.length>=vr.con.constant.max_blocks){
-            const key_block = vr.block.create_key_block(chain,pubs,stateroot,lockroot,extra,public_key,private_key);
+            const key_block = vr.block.create_key_block(chain,pubs,stateroot,lockroot,extra,private_key,public_key);
             const StateData = await data.get_block_statedata(key_block,chain,S_Trie);
             if(!vr.block.verify_key_block(key_block,chain,stateroot,lockroot,StateData)) throw new Error('fail to create valid block');
             return key_block;
@@ -127,17 +177,16 @@ export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],b
 }
 
 const get_nonce = (request:string,height:number,block_hash:string,refresher:string,output:string,unit_price:number)=>{
-    try{
-        let nonce = 0;
-        setTimeout(()=>{
-            throw new Error('fail to get valid nonce');
-        },10000);
-        while(!vr.tx.mining(request,height,block_hash,refresher,output,unit_price,nonce)){
-            nonce ++;
-        }
-        return nonce;
+    let nonce = 0;
+    let flag = true;
+    setTimeout(()=>{
+        nonce = -1;
+        flag = false;
+    },10000);
+    while(flag&&!vr.tx.mining(request,height,block_hash,refresher,output,unit_price,nonce)){
+        nonce ++;
     }
-    catch(e){return -1}
+    return nonce;
 }
 
 export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:number,height:number,index:number,log:string,private_key:string,public_key:string,chain:vr.Block[],S_Trie:Trie,L_Trie:Trie):Promise<vr.Tx>=>{
@@ -150,12 +199,14 @@ export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:numbe
             if(getted==null) return result;
             else return result.concat(getted);
         },[]);
-        const computed = req_tx.meta.tokens.reduce((result:vr.State[],token)=>{
-            const base_states = pre_StateData.filter(s=>s.kind==='state'&&s.token===token);
-            if(token===vr.con.constant.native) return result.concat(vr.tx.native_contract(base_states,req_tx));
-            else if(token===vr.con.constant.unit) return result.concat(vr.tx.unit_contract(pre_StateData,req_tx,chain));
-            else return result;
-        },[]);
+        const computed = (()=>{
+            const main_token = req_tx.meta.tokens[0];
+            const pre_StateData_keys = pre_StateData.map(s=>s.owner);
+            const base_states = req_tx.meta.bases.map(key=>pre_StateData[pre_StateData_keys.indexOf(key)]||vr.state.create_state(0,key,key.split(':')[1],0,{}));
+            if(main_token===vr.con.constant.native) return vr.tx.native_contract(base_states,req_tx);
+            else if(main_token===vr.con.constant.unit) return vr.tx.unit_contract(base_states,req_tx,chain);
+            else return base_states;
+        })();
         const success = !computed.some(s=>vr.state.verify_state(s));
         const output = (()=>{
             if(success) return computed;

@@ -30,6 +30,44 @@ exports.copy = (data) => {
 exports.new_obj = (obj, fn) => {
     return fn(exports.copy(obj));
 };
+exports.read_chain = async (max_size) => {
+    try {
+        const net_id = vr.con.constant.my_net_id;
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
+        let chain = [];
+        let block;
+        let size_sum = 0;
+        let i;
+        for (i = info.last_height; i >= 0; i--) {
+            block = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + i.toString() + '.json', 'utf-8'));
+            size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
+            if (size_sum > max_size)
+                break;
+            else
+                chain.push(block);
+        }
+        return chain.slice().reverse();
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
+exports.write_chain = async (block) => {
+    try {
+        const net_id = vr.con.constant.my_net_id;
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
+        const height = block.meta.height;
+        const new_info = exports.new_obj(info, i => {
+            i.last_height = height;
+            return i;
+        });
+        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + height.toString() + '.json', JSON.stringify(block, null, 4), 'utf-8');
+        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', JSON.stringify(new_info, null, 4), 'utf-8');
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
 const choose_txs = async (pool, L_Trie) => {
     const pool_txs = Object.keys(pool).map(key => pool[key]);
     const requested_bases = (await L_Trie.filter((val) => {
@@ -76,7 +114,7 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
         const pre_key_block = vr.block.search_key_block(chain);
         const pre_micro_blocks = vr.block.search_micro_block(chain, pre_key_block);
         if (vr.crypto.merge_pub_keys(pre_key_block.meta.validatorPub) != vr.crypto.merge_pub_keys(pubs) || pre_micro_blocks.length >= vr.con.constant.max_blocks) {
-            const key_block = vr.block.create_key_block(chain, pubs, stateroot, lockroot, extra, public_key, private_key);
+            const key_block = vr.block.create_key_block(chain, pubs, stateroot, lockroot, extra, private_key, public_key);
             const StateData = await data.get_block_statedata(key_block, chain, S_Trie);
             if (!vr.block.verify_key_block(key_block, chain, stateroot, lockroot, StateData))
                 throw new Error('fail to create valid block');
@@ -139,19 +177,16 @@ exports.make_req_tx = async (pubs, type, tokens, bases, feeprice, gas, input_raw
     }
 };
 const get_nonce = (request, height, block_hash, refresher, output, unit_price) => {
-    try {
-        let nonce = 0;
-        setTimeout(() => {
-            throw new Error('fail to get valid nonce');
-        }, 10000);
-        while (!vr.tx.mining(request, height, block_hash, refresher, output, unit_price, nonce)) {
-            nonce++;
-        }
-        return nonce;
+    let nonce = 0;
+    let flag = true;
+    setTimeout(() => {
+        nonce = -1;
+        flag = false;
+    }, 10000);
+    while (flag && !vr.tx.mining(request, height, block_hash, refresher, output, unit_price, nonce)) {
+        nonce++;
     }
-    catch (e) {
-        return -1;
-    }
+    return nonce;
 };
 exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, private_key, public_key, chain, S_Trie, L_Trie) => {
     try {
@@ -165,15 +200,17 @@ exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, pri
             else
                 return result.concat(getted);
         }, []);
-        const computed = req_tx.meta.tokens.reduce((result, token) => {
-            const base_states = pre_StateData.filter(s => s.kind === 'state' && s.token === token);
-            if (token === vr.con.constant.native)
-                return result.concat(vr.tx.native_contract(base_states, req_tx));
-            else if (token === vr.con.constant.unit)
-                return result.concat(vr.tx.unit_contract(pre_StateData, req_tx, chain));
+        const computed = (() => {
+            const main_token = req_tx.meta.tokens[0];
+            const pre_StateData_keys = pre_StateData.map(s => s.owner);
+            const base_states = req_tx.meta.bases.map(key => pre_StateData[pre_StateData_keys.indexOf(key)] || vr.state.create_state(0, key, key.split(':')[1], 0, {}));
+            if (main_token === vr.con.constant.native)
+                return vr.tx.native_contract(base_states, req_tx);
+            else if (main_token === vr.con.constant.unit)
+                return vr.tx.unit_contract(base_states, req_tx, chain);
             else
-                return result;
-        }, []);
+                return base_states;
+        })();
         const success = !computed.some(s => vr.state.verify_state(s));
         const output = (() => {
             if (success)
