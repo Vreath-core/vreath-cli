@@ -27,7 +27,7 @@ export const new_obj = <T>(obj:T,fn:(obj:T)=>T)=>{
   return fn(copy(obj));
 }
 
-type chain_info = {
+export type chain_info = {
     net_id:number;
     chain_id:number;
     version:number;
@@ -175,8 +175,26 @@ export const make_req_tx = async (pubs:string[],type:vr.TxType,tokens:string[],b
         throw new Error(e);
     }
 }
+export const compute_output = (req_tx:vr.Tx,StateData:vr.State[],chain:vr.Block[])=>{
+    try{
+        const computed = (()=>{
+            const main_token = req_tx.meta.tokens[0];
+            const pre_StateData_keys = StateData.map(s=>s.owner);
+            const base_states = req_tx.meta.bases.map(key=>StateData[pre_StateData_keys.indexOf(key)]||vr.state.create_state(0,key,key.split(':')[1],0,{}));
+            if(main_token===vr.con.constant.native) return vr.tx.native_contract(base_states,req_tx);
+            else if(main_token===vr.con.constant.unit) return vr.tx.unit_contract(base_states,req_tx,chain);
+            else return base_states;
+        })();
+        const success = !computed.some(s=>vr.state.verify_state(s));
+        if(success) return computed;
+        else return StateData;
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
 
-const get_nonce = (request:string,height:number,block_hash:string,refresher:string,output:string,unit_price:number)=>{
+export const get_nonce = (request:string,height:number,block_hash:string,refresher:string,output:string,unit_price:number)=>{
     let nonce = 0;
     let flag = true;
     setTimeout(()=>{

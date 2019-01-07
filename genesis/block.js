@@ -27,7 +27,7 @@ const gen_meta = {
     extra: 'Vreath bring cryptocurrency to everyone.'
 };
 const gen_hash = vr.crypto.object_hash(gen_meta);
-const gen_sign = '8762f2d1162be7a24389ba1c45b46f6ca969da31e5bf4c4a6a2608e311b012d96c3fa4ca4991ac90c193e3f5ac6bc1d36547c6bf1bd15645d182b1e2d175b3b4';
+const gen_sign = '8acf304c2d3f387ce87df9f8919094c0a38b2a00aa09749511d8303929c0e6c871de9e54ad1e236957647ae0a0afd39080029a0bbd828dfbcbe86ab7a27b96d1';
 exports.genesis_block = {
     hash: gen_hash,
     validatorSign: [gen_sign],
@@ -35,3 +35,4 @@ exports.genesis_block = {
     txs: [],
     raws: []
 };
+//# sourceMappingURL=block.js.map

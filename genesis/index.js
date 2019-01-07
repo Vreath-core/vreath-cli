@@ -8,3 +8,4 @@ var block_1 = require("./block");
 exports.block = block_1.genesis_block;
 var initial_peers_1 = require("./initial_peers");
 exports.peers = initial_peers_1.peers;
+//# sourceMappingURL=index.js.map

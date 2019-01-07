@@ -4,13 +4,17 @@
         "use":0
     },
     "miner":{
-        "flag":false,
+        "flag":true,
         "use":0,
-        "interval":5
+        "interval":0.1,
+        "fee_price":0,
+        "unit_price":0
     },
     "validator":{
-        "flag":false,
+        "flag":true,
         "use":0,
-        "minimum":0
+        "minimum":0,
+        "fee_price":0,
+        "gas":0
     }
 }

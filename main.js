@@ -13,6 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const tx_1 = __importDefault(require("./app/routes/tx"));
 const block_1 = __importDefault(require("./app/routes/block"));
+const unit_1 = __importDefault(require("./app/routes/unit"));
 const works = __importStar(require("./logic/work"));
 const data = __importStar(require("./logic/data"));
 const setup_1 = __importDefault(require("./app/commands/setup"));
@@ -37,11 +38,7 @@ app.use(bodyParser.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use('/tx', tx_1.default);
 app.use('/block', block_1.default);
-/*app.get('/get_ip',(req,res)=>{
-    const remote_add = req.connection.remoteAddress || "";
-    const splited_add = remote_add.split(':');
-    res.send()
-})*/
+app.use('/tx', unit_1.default);
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -134,31 +131,21 @@ const buying_unit = async (private_key) => {
             throw new Error("You don't have enough amount");
         const validator_amount = validator_state.amount || 0;
         const minimum = config.validator.minimum || validator_amount;
-        let units = [];
-        let search_block;
-        let search_tx;
-        let search_unit;
+        const unit_store = JSON.parse(await util_1.promisify(fs.readFile)('./json/unit_store.json', 'utf-8'));
+        const unit_values = Object.values(unit_store);
+        const sorted_units = unit_values.slice().sort((a, b) => a.unit_price - b.unit_price);
         let price_sum = 0;
-        for (search_block of chain) {
-            for (search_tx of search_block.txs) {
-                if (search_tx.meta.kind === "refresh") {
-                    if (math.chain(validator_amount).subtract(price_sum).smaller(minimum).done()) {
-                        break;
-                    }
-                    search_unit = {
-                        request: search_tx.meta.req_tx_hash,
-                        height: search_tx.meta.height,
-                        block_hash: search_tx.meta.block_hash,
-                        nonce: search_tx.meta.nonce,
-                        address: vr.crypto.genereate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys(search_tx.meta.pub_key)),
-                        output: search_tx.meta.output,
-                        unit_price: search_tx.meta.unit_price
-                    };
-                    units.push(search_unit);
-                    price_sum = math.chain(price_sum).add(search_tx.meta.unit_price).done();
-                }
-            }
-        }
+        const units = await P.reduce(sorted_units, async (res, unit) => {
+            if (math.chain(validator_amount).subtract(price_sum).subtract(unit.unit_price).smaller(minimum).done())
+                return res;
+            const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0, unit.address, vr.con.constant.unit, 0, { used: "[]" });
+            const unit_used = JSON.parse(unit_state.data.used);
+            const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request) + unit.height + vr.crypto.hex2number(unit.block_hash)).toString(16));
+            if (unit_used.indexOf(iden_hash) != -1)
+                return res;
+            price_sum = math.chain(price_sum).add(unit.unit_price).done();
+            return res.concat(unit);
+        }, []);
         if (units.length === 0)
             throw new Error('no units');
         const unit_addresses = [unit_validator].concat(units.map(u => u.address)).filter((val, i, array) => array.indexOf(val) === i);
@@ -174,6 +161,14 @@ const buying_unit = async (private_key) => {
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
         if (new_pool[tx.hash] != null) {
             await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+            const new_unit_store = works.new_obj(unit_store, store => {
+                units.forEach(unit => {
+                    const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request) + unit.height + vr.crypto.hex2number(unit.block_hash)).toString(16));
+                    delete store[iden_hash];
+                });
+                return store;
+            });
+            await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');
             const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
             const header = {
                 'Content-Type': 'application/json'
@@ -198,7 +193,7 @@ const buying_unit = async (private_key) => {
 };
 const refreshing = async (private_key) => {
     try {
-        const validator_pub = config.pub_keys[config.miner.use];
+        const miner_pub = config.pub_keys[config.miner.use];
         const feeprice = Number(config.miner.fee_price);
         const unit_price = Number(config.miner.unit_price);
         const log = "";
@@ -227,7 +222,7 @@ const refreshing = async (private_key) => {
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const tx = await works.make_ref_tx([validator_pub], feeprice, unit_price, block_height, tx_index, log, private_key, validator_pub, chain, S_Trie, L_Trie);
+        const tx = await works.make_ref_tx([miner_pub], feeprice, unit_price, block_height, tx_index, log, private_key, miner_pub, chain, S_Trie, L_Trie);
         const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
         const StateData = await data.get_tx_statedata(tx, chain, S_Trie);
         const LockData = await data.get_tx_lockdata(tx, chain, L_Trie);
@@ -254,6 +249,83 @@ const refreshing = async (private_key) => {
         log.info(e);
     }
 };
+const making_unit = async (miner) => {
+    try {
+        const chain = await works.read_chain(2 * (10 ** 9));
+        const unit_price = config.miner.unit_price;
+        const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
+        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const unit_state = await S_Trie.get(miner) || vr.state.create_state(0, miner, vr.con.constant.unit, 0, { data: "[]" });
+        const used = JSON.parse(unit_state.data.used || "[]");
+        const unit_store = JSON.parse(await util_1.promisify(fs.readFile)('./json/unit_store.json', 'utf-8'));
+        let search_block;
+        let search_tx;
+        let unit_iden_hash = '';
+        let pre_unit = {
+            request: vr.crypto.hash(''),
+            height: 0,
+            block_hash: vr.crypto.hash(''),
+            nonce: 0,
+            address: miner,
+            output: vr.crypto.hash(''),
+            unit_price: 0
+        };
+        let found = false;
+        for (search_block of chain.slice().reverse()) {
+            for (search_tx of search_block.txs) {
+                if (search_tx.meta.kind === "refresh") {
+                    unit_iden_hash = vr.crypto.hash((vr.crypto.hex2number(search_tx.meta.req_tx_hash) + search_tx.meta.height + vr.crypto.hex2number(search_tx.meta.block_hash)).toString(16));
+                    if (used.indexOf(unit_iden_hash) != -1)
+                        continue;
+                    pre_unit = {
+                        request: search_tx.meta.req_tx_hash,
+                        height: search_tx.meta.height,
+                        block_hash: search_tx.meta.block_hash,
+                        nonce: 0,
+                        address: miner,
+                        output: search_tx.meta.output,
+                        unit_price: unit_price
+                    };
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found)
+            throw new Error('no new refresh-tx');
+        const nonce = works.get_nonce(pre_unit.request, pre_unit.height, pre_unit.block_hash, miner, pre_unit.output, unit_price);
+        if (nonce === -1)
+            throw new Error('fail to get valid nonce');
+        const unit = works.new_obj(pre_unit, u => {
+            u.nonce = nonce;
+            return u;
+        });
+        const new_unit_store = works.new_obj(unit_store, store => {
+            store[unit_iden_hash] = unit;
+            return store;
+        });
+        await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');
+        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+        const header = {
+            'Content-Type': 'application/json'
+        };
+        peers.forEach(peer => {
+            const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/unit';
+            const option = {
+                url: url,
+                method: 'POST',
+                headers: header,
+                json: true,
+                form: unit
+            };
+            request_1.default(option, (err, res) => {
+            });
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
+};
 if (config.validator.flag) {
     setInterval(async () => {
         await staking(my_private);
@@ -261,8 +333,11 @@ if (config.validator.flag) {
     }, 1000);
 }
 if (config.miner.flag) {
+    const my_miner_pub = config.pub_keys[config.miner.use];
+    const my_miner = vr.crypto.genereate_address(vr.con.constant.unit, my_miner_pub);
     setInterval(async () => {
         await refreshing(my_private);
+        await making_unit(my_miner);
     }, 60000 * config.miner.interval);
 }
 const replServer = repl.start({ prompt: '>', terminal: true });

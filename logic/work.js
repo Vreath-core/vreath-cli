@@ -176,7 +176,30 @@ exports.make_req_tx = async (pubs, type, tokens, bases, feeprice, gas, input_raw
         throw new Error(e);
     }
 };
-const get_nonce = (request, height, block_hash, refresher, output, unit_price) => {
+exports.compute_output = (req_tx, StateData, chain) => {
+    try {
+        const computed = (() => {
+            const main_token = req_tx.meta.tokens[0];
+            const pre_StateData_keys = StateData.map(s => s.owner);
+            const base_states = req_tx.meta.bases.map(key => StateData[pre_StateData_keys.indexOf(key)] || vr.state.create_state(0, key, key.split(':')[1], 0, {}));
+            if (main_token === vr.con.constant.native)
+                return vr.tx.native_contract(base_states, req_tx);
+            else if (main_token === vr.con.constant.unit)
+                return vr.tx.unit_contract(base_states, req_tx, chain);
+            else
+                return base_states;
+        })();
+        const success = !computed.some(s => vr.state.verify_state(s));
+        if (success)
+            return computed;
+        else
+            return StateData;
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
+exports.get_nonce = (request, height, block_hash, refresher, output, unit_price) => {
     let nonce = 0;
     let flag = true;
     setTimeout(() => {
@@ -219,7 +242,7 @@ exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, pri
                 return pre_StateData;
         })();
         const refresher = vr.crypto.genereate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys(pubs));
-        const nonce = get_nonce(req_tx.hash, height, target_block.hash, refresher, vr.crypto.object_hash(output), unit_price);
+        const nonce = exports.get_nonce(req_tx.hash, height, target_block.hash, refresher, vr.crypto.object_hash(output), unit_price);
         if (nonce === -1)
             throw new Error('fail to get valid nonce');
         const tx = vr.tx.create_ref_tx(pubs, feeprice, unit_price, height, target_block.hash, index, req_tx_pure.hash, success, nonce, output.map(s => JSON.stringify(s)), log, private_key, public_key);
