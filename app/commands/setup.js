@@ -29,7 +29,8 @@ exports.default = async () => {
         chain_id: vr.con.constant.my_chain_id,
         version: vr.con.constant.my_version,
         compatible_version: vr.con.constant.compatible_version,
-        last_height: 0
+        last_height: 0,
+        pos_diffs: [vr.con.constant.def_pos_diff]
     };
     await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', JSON.stringify(info, null, 4), 'utf-8');
     await work_1.write_chain(genesis.block);

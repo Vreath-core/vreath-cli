@@ -33,6 +33,7 @@ export type chain_info = {
     version:number;
     compatible_version:number;
     last_height:number;
+    pos_diffs:number[];
 }
 
 export const read_chain = async (max_size:number)=>{
@@ -65,6 +66,7 @@ export const write_chain = async (block:vr.Block)=>{
             info,
             i=>{
                 i.last_height = height;
+                i.pos_diffs.push(block.meta.pos_diff);
                 return i;
             }
         )

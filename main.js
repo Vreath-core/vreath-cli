@@ -11,11 +11,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
+const handshake_1 = require("./app/routes/handshake");
+const peers_1 = __importDefault(require("./app/routes/peers"));
 const tx_1 = __importDefault(require("./app/routes/tx"));
 const block_1 = __importDefault(require("./app/routes/block"));
 const unit_1 = __importDefault(require("./app/routes/unit"));
+const chain_1 = __importDefault(require("./app/routes/chain"));
 const works = __importStar(require("./logic/work"));
 const data = __importStar(require("./logic/data"));
+const generate_keys_1 = __importDefault(require("./app/commands/generate-keys"));
 const setup_1 = __importDefault(require("./app/commands/setup"));
 const request_tx_1 = __importDefault(require("./app/commands/request-tx"));
 const remit_1 = __importDefault(require("./app/commands/remit"));
@@ -24,11 +28,14 @@ const bodyParser = __importStar(require("body-parser"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const P = __importStar(require("p-iteration"));
+const crypto_js_1 = __importDefault(require("crypto-js"));
 const request_1 = __importDefault(require("request"));
+const request_promise_1 = __importDefault(require("request-promise"));
 const repl = __importStar(require("repl"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const math = __importStar(require("mathjs"));
 const bunyan_1 = __importDefault(require("bunyan"));
+const timers_1 = require("timers");
 math.config({
     number: 'BigNumber'
 });
@@ -36,9 +43,12 @@ const app = express_1.default();
 app.listen(57750);
 app.use(bodyParser.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+app.use('/handshake', handshake_1.handshake_route);
+app.use('/peer', peers_1.default);
 app.use('/tx', tx_1.default);
 app.use('/block', block_1.default);
-app.use('/tx', unit_1.default);
+app.use('/unit', unit_1.default);
+app.use('/chain', chain_1.default);
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -47,8 +57,67 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-const my_private = readline_sync_1.default.question('Your private key:', { hideEchoBack: true });
+const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
+const my_key = vr.crypto.hash(my_password).slice(0, 122);
+const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
+const my_private = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
 const config = JSON.parse(fs.readFileSync('./config/config.json', 'utf-8'));
+const shake_hands = async () => {
+    try {
+        const my_node_info = handshake_1.make_node_info();
+        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+        const header = {
+            'Content-Type': 'application/json'
+        };
+        const new_peer_list = await P.reduce(peers.slice(8), async (list, peer) => {
+            const url1 = 'http://' + peer.ip + ':57550/handshake';
+            const option1 = {
+                url: url1,
+                method: 'POST',
+                headers: header,
+                json: true,
+                form: my_node_info
+            };
+            const this_info = await request_promise_1.default(option1);
+            if (typeof this_info.version != 'number' || typeof this_info.net_id != 'number' || typeof this_info.chain_id != 'number' || typeof this_info.timestamp != 'number' || this_info.version < vr.con.constant.compatible_version || this_info.net_id != vr.con.constant.my_net_id || this_info.chain_id != vr.con.constant.my_chain_id)
+                return list;
+            const this_peer = {
+                ip: peer.ip,
+                timestamp: this_info.timestamp
+            };
+            const this_index = list.map(p => p.ip).indexOf(peer.ip);
+            const refreshed_list = list.map((p, i) => {
+                if (i === this_index)
+                    return this_peer;
+                else
+                    return p;
+            }).sort((a, b) => b.timestamp - a.timestamp);
+            const url2 = 'http://' + peer.ip + ':57550/peer';
+            const option2 = {
+                url: url2,
+                method: 'POST',
+                headers: header,
+                json: true,
+                form: peers
+            };
+            const get_list = await request_promise_1.default(option2);
+            if (!Array.isArray(get_list) || get_list.some(p => typeof p.ip != 'string' || typeof p.timestamp != 'number'))
+                return refreshed_list;
+            const get_list_ips = get_list.map(p => p.ip);
+            return refreshed_list.map(p => {
+                const i = get_list_ips.indexOf(p.ip);
+                if (i === -1)
+                    return p;
+                else
+                    return get_list[i];
+            }).sort((a, b) => b.timestamp - a.timestamp);
+        }, []);
+        await util_1.promisify(fs.writeFile)('./json/peer_list.json', JSON.stringify(new_peer_list, null, 4), 'utf-8');
+    }
+    catch (e) {
+        log.info(e);
+    }
+};
 const staking = async (private_key) => {
     try {
         const chain = await works.read_chain(2 * (10 ** 9));
@@ -99,7 +168,7 @@ const staking = async (private_key) => {
             'Content-Type': 'application/json'
         };
         peers.forEach(peer => {
-            const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/block';
+            const url = 'http://' + peer.ip + ':57550/block';
             const option = {
                 url: url,
                 method: 'POST',
@@ -174,7 +243,7 @@ const buying_unit = async (private_key) => {
                 'Content-Type': 'application/json'
             };
             peers.forEach(peer => {
-                const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/tx';
+                const url = 'http://' + peer.ip + ':57550/tx';
                 const option = {
                     url: url,
                     method: 'POST',
@@ -233,7 +302,7 @@ const refreshing = async (private_key) => {
             'Content-Type': 'application/json'
         };
         peers.forEach(peer => {
-            const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/tx';
+            const url = 'http://' + peer.ip + ':57550/tx';
             const option = {
                 url: url,
                 method: 'POST',
@@ -310,7 +379,7 @@ const making_unit = async (miner) => {
             'Content-Type': 'application/json'
         };
         peers.forEach(peer => {
-            const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/unit';
+            const url = 'http://' + peer.ip + ':57550/unit';
             const option = {
                 url: url,
                 method: 'POST',
@@ -326,8 +395,12 @@ const making_unit = async (miner) => {
         log.info(e);
     }
 };
+(async () => { await shake_hands(); })();
+timers_1.setInterval(async () => {
+    await shake_hands();
+}, 3600000);
 if (config.validator.flag) {
-    setInterval(async () => {
+    timers_1.setInterval(async () => {
         await staking(my_private);
         await buying_unit(my_private);
     }, 1000);
@@ -335,12 +408,19 @@ if (config.validator.flag) {
 if (config.miner.flag) {
     const my_miner_pub = config.pub_keys[config.miner.use];
     const my_miner = vr.crypto.genereate_address(vr.con.constant.unit, my_miner_pub);
-    setInterval(async () => {
+    timers_1.setInterval(async () => {
         await refreshing(my_private);
         await making_unit(my_miner);
     }, 60000 * config.miner.interval);
 }
 const replServer = repl.start({ prompt: '>', terminal: true });
+replServer.defineCommand('generate-keys', {
+    help: 'Generate keys',
+    async action(password) {
+        await generate_keys_1.default(password);
+        console.log("ganarated");
+    }
+});
 replServer.defineCommand('setup', {
     help: 'Setup genesis data',
     async action() {

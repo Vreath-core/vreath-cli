@@ -59,6 +59,7 @@ exports.write_chain = async (block) => {
         const height = block.meta.height;
         const new_info = exports.new_obj(info, i => {
             i.last_height = height;
+            i.pos_diffs.push(block.meta.pos_diff);
             return i;
         });
         await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + height.toString() + '.json', JSON.stringify(block, null, 4), 'utf-8');
