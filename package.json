@@ -42,5 +42,8 @@
   "license": "MIT",
   "main": "main.js",
   "repository": "Vreath-core/vreath-cli",
-  "scripts": {}
+  "scripts": {
+    "setup":"node ./run/setup.js",
+    "start":"node ./run/main.js"
+  }
 }
