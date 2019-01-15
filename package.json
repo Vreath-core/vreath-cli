@@ -44,6 +44,7 @@
   "repository": "Vreath-core/vreath-cli",
   "scripts": {
     "setup":"node ./run/setup.js",
-    "start":"node ./run/main.js"
+    "start":"node ./run/main.js",
+    "generate-keys":"node ./run/generate-keys.js"
   }
 }

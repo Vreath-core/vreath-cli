@@ -1,19 +1,18 @@
 import * as vr from 'vreath'
 import * as data from '../logic/data'
 import * as genesis from '../genesis/index'
-import readlineSync from 'readline-sync'
 import * as fs from 'fs'
 import * as fse from 'fs-extra'
+import readlineSync from 'readline-sync'
 import {promisify} from 'util'
 import * as P from 'p-iteration'
-import CryptoJS from 'crypto-js'
-import { write_chain, chain_info, new_obj} from '../logic/work';
+import { write_chain, chain_info} from '../logic/work';
 
 const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
-const my_key = vr.crypto.hash(my_password).slice(0,122);
-
 (async()=>{
     try{
+        const my_key = vr.crypto.hash(my_password).slice(0,122);
+        await promisify(fs.stat)('./keys/private/'+my_key+'.txt');
         const S_Trie = data.state_trie_ins('');
 
         await P.forEach(genesis.state, async s=>{
@@ -36,21 +35,6 @@ const my_key = vr.crypto.hash(my_password).slice(0,122);
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify({}),'utf-8');
         await promisify(fs.writeFile)('./json/peer_list.json',JSON.stringify(genesis.peers,null, 4),'utf-8');
         await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify({}),'utf-8');
-
-        const private_key = vr.crypto.genereate_key();
-        const public_key = vr.crypto.private2public(private_key);
-        const encrypted_pri = CryptoJS.AES.encrypt(private_key,my_key).toString();
-        const config = JSON.parse(await promisify(fs.readFile)('./config/config.json','utf-8'));
-        const new_config = new_obj(
-            config,
-            con=>{
-                con.pub_keys.push(public_key);
-                return con;
-            }
-        )
-        await promisify(fs.writeFile)('./keys/private/'+my_key+'.txt',encrypted_pri);
-        await promisify(fs.writeFile)('./keys/public/'+my_key+'.txt',public_key);
-        await promisify(fs.writeFile)('./config/config.json',JSON.stringify(new_config,null,4),'utf-8');
     }
     catch(e){
         console.log(e);

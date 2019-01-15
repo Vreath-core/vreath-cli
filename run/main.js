@@ -39,7 +39,7 @@ math.config({
     number: 'BigNumber'
 });
 const app = express_1.default();
-app.listen(57750);
+app.listen(57750, 'localhost');
 app.use(bodyParser.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use('/handshake', handshake_1.handshake_route);

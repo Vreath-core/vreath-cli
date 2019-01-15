@@ -29,7 +29,7 @@ math.config({
 });
 
 const app = express();
-app.listen(57750);
+app.listen(57750,'localhost');
 app.use(bodyParser.json());
 app.use(express.urlencoded({extended: true}));
 
