@@ -19,7 +19,6 @@ const unit_1 = __importDefault(require("../app/routes/unit"));
 const chain_1 = __importDefault(require("../app/routes/chain"));
 const works = __importStar(require("../logic/work"));
 const data = __importStar(require("../logic/data"));
-const generate_keys_1 = __importDefault(require("../app/commands/generate-keys"));
 const request_tx_1 = __importDefault(require("../app/commands/request-tx"));
 const remit_1 = __importDefault(require("../app/commands/remit"));
 const express_1 = __importDefault(require("express"));
@@ -39,7 +38,7 @@ math.config({
     number: 'BigNumber'
 });
 const app = express_1.default();
-app.listen(57750, 'localhost');
+app.listen(57750);
 app.use(bodyParser.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use('/handshake', handshake_1.handshake_route);
@@ -413,13 +412,6 @@ if (config.miner.flag) {
     }, 60000 * config.miner.interval);
 }
 const replServer = repl.start({ prompt: '>', terminal: true });
-replServer.defineCommand('generate-keys', {
-    help: 'Generate keys',
-    async action(password) {
-        await generate_keys_1.default(password);
-        console.log("ganarated");
-    }
-});
 replServer.defineCommand('request-tx', {
     help: 'Create request tx',
     async action(input) {

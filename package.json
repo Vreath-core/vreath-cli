@@ -45,6 +45,7 @@
   "scripts": {
     "setup":"node ./run/setup.js",
     "start":"node ./run/main.js",
-    "generate-keys":"node ./run/generate-keys.js"
+    "generate-keys":"node ./run/generate-keys.js",
+    "add-peer":"node ./run/add_peer.js"
   }
 }

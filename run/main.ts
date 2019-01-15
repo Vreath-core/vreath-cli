@@ -7,7 +7,6 @@ import unit_routes from '../app/routes/unit'
 import chain_routes from '../app/routes/chain'
 import * as works from '../logic/work'
 import * as data from '../logic/data'
-import generate_keys from '../app/commands/generate-keys'
 import req_tx_com from '../app/commands/request-tx'
 import remit from '../app/commands/remit'
 import express from 'express'
@@ -29,7 +28,7 @@ math.config({
 });
 
 const app = express();
-app.listen(57750,'localhost');
+app.listen(57750);
 app.use(bodyParser.json());
 app.use(express.urlencoded({extended: true}));
 
@@ -423,14 +422,6 @@ if(config.miner.flag){
 
 
 const replServer = repl.start({prompt:'>',terminal:true});
-
-replServer.defineCommand('generate-keys',{
-    help: 'Generate keys',
-    async action(password:string){
-        await generate_keys(password);
-        console.log("ganarated");
-    }
-});
 
 replServer.defineCommand('request-tx',{
     help: 'Create request tx',
