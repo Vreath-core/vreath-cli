@@ -15,7 +15,7 @@ const data_1 = require("../../logic/data");
 const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
 const router = express.Router();
-exports.default = router.post('/chain', async (req, res) => {
+exports.default = router.post('/', async (req, res) => {
     try {
         const new_chain = req.body;
         const my_chain = await work_1.read_chain(2 * (10 ** 9));

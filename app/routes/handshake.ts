@@ -27,7 +27,7 @@ export const make_node_info = ()=>{
     return node_info
 }
 
-export const handshake_route = router.post('/handshake',async (req,res)=>{
+export const handshake_route = router.post('/',async (req,res)=>{
     try{
         const info:node_info = req.body;
         if(typeof info.version != 'number'|| typeof info.net_id != 'number' || typeof info.chain_id != 'number' || typeof info.timestamp != 'number'){

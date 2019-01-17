@@ -11,7 +11,7 @@ const express = __importStar(require("express"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const router = express.Router();
-exports.default = router.post('/peer', async (req, res) => {
+exports.default = router.post('/', async (req, res) => {
     try {
         const list = req.body;
         if (!Array.isArray(list) || list.some(p => typeof p.ip != 'string' || typeof p.timestamp != 'number')) {

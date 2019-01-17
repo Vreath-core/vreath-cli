@@ -7,7 +7,7 @@ import {read_chain} from '../../logic/work'
 
 const router = express.Router();
 
-export default router.post('/tx',async (req,res)=>{
+export default router.post('/',async (req,res)=>{
     try{
         const tx:vr.Tx = req.body;
         if(!vr.tx.isTx(tx)){

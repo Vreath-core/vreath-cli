@@ -6,7 +6,7 @@ import {promisify} from 'util'
 
 const router = express.Router();
 
-export default router.post('/peer',async (req,res)=>{
+export default router.post('/',async (req,res)=>{
     try{
         const list:peer[] = req.body;
         if(!Array.isArray(list)||list.some(p=>typeof p.ip!='string'||typeof p.timestamp!='number')){

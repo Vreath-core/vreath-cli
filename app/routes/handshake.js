@@ -21,7 +21,7 @@ exports.make_node_info = () => {
     };
     return node_info;
 };
-exports.handshake_route = router.post('/handshake', async (req, res) => {
+exports.handshake_route = router.post('/', async (req, res) => {
     try {
         const info = req.body;
         if (typeof info.version != 'number' || typeof info.net_id != 'number' || typeof info.chain_id != 'number' || typeof info.timestamp != 'number') {

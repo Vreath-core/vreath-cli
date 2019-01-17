@@ -7,7 +7,7 @@ import {state_trie_ins} from '../../logic/data'
 
 const router = express.Router();
 
-export default router.post('/unit',async (req,res)=>{
+export default router.post('/',async (req,res)=>{
     try{
         const unit:vr.Unit = req.body;
         const unit_store:{[key:string]:vr.Unit} = JSON.parse(await promisify(fs.readFile)('./json/unit_store.json','utf-8'));

@@ -15,7 +15,7 @@ const logic = __importStar(require("../../logic/data"));
 const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
 const router = express.Router();
-exports.default = router.post('/block', async (req, res) => {
+exports.default = router.post('/', async (req, res) => {
     try {
         const block = req.body;
         if (!vr.block.isBlock(block)) {

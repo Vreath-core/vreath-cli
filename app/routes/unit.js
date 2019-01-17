@@ -14,7 +14,7 @@ const util_1 = require("util");
 const work_1 = require("../../logic/work");
 const data_1 = require("../../logic/data");
 const router = express.Router();
-exports.default = router.post('/unit', async (req, res) => {
+exports.default = router.post('/', async (req, res) => {
     try {
         const unit = req.body;
         const unit_store = JSON.parse(await util_1.promisify(fs.readFile)('./json/unit_store.json', 'utf-8'));

@@ -8,7 +8,7 @@ import * as P from 'p-iteration'
 
 const router = express.Router();
 
-export default router.post('/chain',async (req,res)=>{
+export default router.post('/',async (req,res)=>{
     try{
         const new_chain:vr.Block[] = req.body;
         const my_chain:vr.Block[] = await read_chain(2*(10**9));

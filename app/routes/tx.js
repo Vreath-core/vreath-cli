@@ -14,7 +14,7 @@ const util_1 = require("util");
 const logic = __importStar(require("../../logic/data"));
 const work_1 = require("../../logic/work");
 const router = express.Router();
-exports.default = router.post('/tx', async (req, res) => {
+exports.default = router.post('/', async (req, res) => {
     try {
         const tx = req.body;
         if (!vr.tx.isTx(tx)) {

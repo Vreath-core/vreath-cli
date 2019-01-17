@@ -8,7 +8,7 @@ import * as P from 'p-iteration'
 
 const router = express.Router();
 
-export default router.post('/block',async (req,res)=>{
+export default router.post('/',async (req,res)=>{
     try{
         const block:vr.Block = req.body;
         if(!vr.block.isBlock(block)){
