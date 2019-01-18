@@ -4,6 +4,8 @@ import * as data from '../../logic/data'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import request from 'request'
+import rp from 'request-promise-native'
+import * as P from 'p-iteration'
 
 export default async (input:string,config:{[key:string]:any},my_private:string)=>{
     try{
@@ -37,20 +39,14 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
 
         if(new_pool[tx.hash]!=null){
             const peers:{protocol:string,ip:string,port:number}[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-            const header = {
-                'Content-Type':'application/json'
-            };
-            peers.forEach(peer=>{
-                const url = peer.protocol+'://'+peer.ip+':'+peer.port+'/tx';
+            await P.forEach(peers,async peer=>{
+                const url = 'http://'+peer.ip+':57550/tx';
                 const option = {
-                    url: url,
-                    method: 'POST',
-                    headers: header,
-                    json: true,
-                    form:tx
+                    url:url,
+                    body:tx,
+                    json:true
                 }
-                request(option,(err,res)=>{
-                });
+                await rp.post(option);
             });
         }
     }

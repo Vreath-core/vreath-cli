@@ -16,7 +16,7 @@ import {promisify} from 'util'
 import * as P from 'p-iteration'
 import CryptoJS from 'crypto-js'
 import request from 'request'
-import rp from 'request-promise'
+import rp from 'request-promise-native'
 import * as repl from 'repl'
 import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
@@ -61,19 +61,14 @@ const shake_hands = async ()=>{
     try{
         const my_node_info = make_node_info();
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        const header = {
-            'Content-Type':'application/json'
-        };
-        const new_peer_list = await P.reduce(peers.slice(8), async (list:peer[],peer)=>{
-            const url1 = 'http://'+peer.ip+':57550/handshake';
+        const new_peer_list = await P.reduce(peers.slice(0,8), async (list:peer[],peer)=>{
+            const url1 = 'http://'+peer.ip+':57750/handshake';
             const option1 = {
-                url: url1,
-                method: 'POST',
-                headers: header,
-                json: true,
-                form:my_node_info
+                uri: url1,
+                body:my_node_info,
+                json: true
             }
-            const this_info:node_info = await rp(option1);
+            const this_info:node_info = await rp.post(option1);
             if(typeof this_info.version != 'number' || typeof this_info.net_id != 'number' || typeof this_info.chain_id != 'number' || typeof this_info.timestamp != 'number' || this_info.version<vr.con.constant.compatible_version || this_info.net_id!=vr.con.constant.my_net_id || this_info.chain_id!=vr.con.constant.my_chain_id) return list;
             const this_peer:peer = {
                 ip:peer.ip,
@@ -84,15 +79,13 @@ const shake_hands = async ()=>{
                 if(i===this_index) return this_peer;
                 else return p;
             }).sort((a,b)=>b.timestamp-a.timestamp);
-            const url2 = 'http://'+peer.ip+':57550/peer';
+            const url2 = 'http://'+peer.ip+':57750/peer';
             const option2 = {
                 url: url2,
-                method: 'POST',
-                headers: header,
-                json: true,
-                form:peers
+                body:peers,
+                json: true
             }
-            const get_list:peer[] = await rp(option2);
+            const get_list:peer[] = await rp.post(option2).catch(e=>console.log(e));
             if(!Array.isArray(get_list)||get_list.some(p=>typeof p.ip!='string'||typeof p.timestamp!='number')) return refreshed_list;
             const get_list_ips =  get_list.map(p=>p.ip);
             return refreshed_list.map(p=>{
@@ -100,7 +93,7 @@ const shake_hands = async ()=>{
                 if(i===-1) return p;
                 else return get_list[i];
             }).sort((a,b)=>b.timestamp-a.timestamp);
-        },[]);
+        },peers);
         await promisify(fs.writeFile)('./json/peer_list.json',JSON.stringify(new_peer_list,null,4),'utf-8');
     }
     catch(e){
@@ -153,20 +146,22 @@ const staking = async (private_key:string)=>{
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        const header = {
-            'Content-Type':'application/json'
-        };
-        peers.forEach(peer=>{
-            const url = 'http://'+peer.ip+':57550/block';
-            const option = {
-                url: url,
-                method: 'POST',
-                headers: header,
-                json: true,
-                form:block
+        await P.forEach(peers,async peer=>{
+            const url1 = 'http://'+peer.ip+':57750/block';
+            const option1 = {
+                url:url1,
+                body:block,
+                json:true
             }
-            request(option,(err,res)=>{
-            });
+            const order = await rp.post(option1);
+            if(order!='order chain') return 1;
+            const url2 = 'http://'+peer.ip+':57750/chain';
+            const option2 = {
+                url:url2,
+                body:chain,
+                json:true
+            }
+            await rp.post(option2);
         });
     }
     catch(e){
@@ -195,6 +190,7 @@ const buying_unit = async (private_key:string)=>{
         const sorted_units = unit_values.slice().sort((a,b)=>a.unit_price-b.unit_price);
         let price_sum:number = 0;
         const units = await P.reduce(sorted_units, async (res:vr.Unit[],unit)=>{
+            console.log(Buffer.from(JSON.stringify(unit)).length);
             if(math.chain(validator_amount).subtract(price_sum).subtract(unit.unit_price).smaller(minimum).done() as boolean) return res;
             const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{used:"[]"});
             const unit_used = JSON.parse(unit_state.data.used);
@@ -232,20 +228,14 @@ const buying_unit = async (private_key:string)=>{
             await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
 
             const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-            const header = {
-                'Content-Type':'application/json'
-            };
-            peers.forEach(peer=>{
+            await P.forEach(peers,async peer=>{
                 const url = 'http://'+peer.ip+':57550/tx';
                 const option = {
-                    url: url,
-                    method: 'POST',
-                    headers: header,
-                    json: true,
-                    form:tx
+                    url:url,
+                    body:tx,
+                    json:true
                 }
-                request(option,(err,res)=>{
-                });
+                await rp.post(option);
             });
         }
 
@@ -287,6 +277,7 @@ const refreshing = async (private_key:string)=>{
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_ref_tx([miner_pub],feeprice,unit_price,block_height,tx_index,log,private_key,miner_pub,chain,S_Trie,L_Trie);
+
         const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
@@ -294,20 +285,14 @@ const refreshing = async (private_key:string)=>{
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        const header = {
-            'Content-Type':'application/json'
-        };
-        peers.forEach(peer=>{
+        await P.forEach(peers,async peer=>{
             const url = 'http://'+peer.ip+':57550/tx';
             const option = {
-                url: url,
-                method: 'POST',
-                headers: header,
-                json: true,
-                form:tx
+                url:url,
+                body:tx,
+                json:true
             }
-            request(option,(err,res)=>{
-            });
+            await rp.post(option);
         });
     }
     catch(e){
@@ -377,20 +362,14 @@ const making_unit = async (miner:string)=>{
         await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        const header = {
-            'Content-Type':'application/json'
-        };
-        peers.forEach(peer=>{
+        await P.forEach(peers,async peer=>{
             const url = 'http://'+peer.ip+':57550/unit';
             const option = {
-                url: url,
-                method: 'POST',
-                headers: header,
-                json: true,
-                form:unit
+                url:url,
+                body:unit,
+                json:true
             }
-            request(option,(err,res)=>{
-            });
+            await rp.post(option);
         });
     }
     catch(e){

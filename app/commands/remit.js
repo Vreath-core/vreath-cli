@@ -15,7 +15,8 @@ const works = __importStar(require("../../logic/work"));
 const data = __importStar(require("../../logic/data"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
-const request_1 = __importDefault(require("request"));
+const request_promise_native_1 = __importDefault(require("request-promise-native"));
+const P = __importStar(require("p-iteration"));
 exports.default = async (input, config, my_private) => {
     try {
         const splited = input.split('--').slice(1);
@@ -49,20 +50,14 @@ exports.default = async (input, config, my_private) => {
         await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
         if (new_pool[tx.hash] != null) {
             const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
-            const header = {
-                'Content-Type': 'application/json'
-            };
-            peers.forEach(peer => {
-                const url = peer.protocol + '://' + peer.ip + ':' + peer.port + '/tx';
+            await P.forEach(peers, async (peer) => {
+                const url = 'http://' + peer.ip + ':57550/tx';
                 const option = {
                     url: url,
-                    method: 'POST',
-                    headers: header,
-                    json: true,
-                    form: tx
+                    body: tx,
+                    json: true
                 };
-                request_1.default(option, (err, res) => {
-                });
+                await request_promise_native_1.default.post(option);
             });
         }
     }
