@@ -6,7 +6,11 @@ import * as fse from 'fs-extra'
 import readlineSync from 'readline-sync'
 import {promisify} from 'util'
 import * as P from 'p-iteration'
-import { write_chain, chain_info} from '../logic/work';
+import { write_chain, chain_info, new_obj} from '../logic/work';
+import * as math from 'mathjs'
+math.config({
+    number: 'BigNumber'
+});
 
 const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
 (async()=>{
@@ -15,10 +19,24 @@ const my_password = readlineSync.question('Your password:',{hideEchoBack: true, 
         await promisify(fs.stat)('./keys/private/'+my_key+'.txt');
         const S_Trie = data.state_trie_ins('');
 
-        await P.forEach(genesis.state, async s=>{
+        const reduced_state = genesis.state.map(s=>{
+            if(s.kind!='state'||s.token!=vr.con.constant.unit) return s;
+            return new_obj(
+                s,
+                s=>{
+                    s.amount = math.chain(s.amount).multiply(vr.con.constant.unit_rate).done();
+                    return s;
+                }
+            )
+        })
+        await P.forEach(reduced_state, async s=>{
             if(s.kind==='state') await S_Trie.put(s.owner,s);
             else if(s.kind==='info') await S_Trie.put(s.token,s);
         },[]);
+        const new_roots = {
+            stateroot:S_Trie.now_root(),
+            lockroot:genesis.roots.lockroot
+        }
 
         await fse.emptyDir('./json/chain/net_id_'+vr.con.constant.my_net_id.toString());
         const info:chain_info = {
@@ -31,7 +49,8 @@ const my_password = readlineSync.question('Your password:',{hideEchoBack: true, 
         }
         await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json',JSON.stringify(info,null,4),'utf-8');
         await write_chain(genesis.block);
-        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(genesis.roots,null, 4),'utf-8');
+
+        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify({}),'utf-8');
         await promisify(fs.writeFile)('./json/peer_list.json',JSON.stringify(genesis.peers,null, 4),'utf-8');
         await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify({}),'utf-8');
