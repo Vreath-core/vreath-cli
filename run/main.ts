@@ -29,8 +29,8 @@ math.config({
 
 const app = express();
 app.listen(57750);
-app.use(bodyParser.json());
-app.use(express.urlencoded({extended: true}));
+app.use(bodyParser.json({limit:'2gb'}));
+app.use(express.urlencoded({limit:'2gb',extended: true}));
 
 app.use('/handshake',handshake_route);
 app.use('/peer',peer_routes);
@@ -85,7 +85,7 @@ const shake_hands = async ()=>{
                 body:peers,
                 json: true
             }
-            const get_list:peer[] = await rp.post(option2).catch(e=>console.log(e));
+            const get_list:peer[] = await rp.post(option2);
             if(!Array.isArray(get_list)||get_list.some(p=>typeof p.ip!='string'||typeof p.timestamp!='number')) return refreshed_list;
             const get_list_ips =  get_list.map(p=>p.ip);
             return refreshed_list.map(p=>{
@@ -190,7 +190,6 @@ const buying_unit = async (private_key:string)=>{
         const sorted_units = unit_values.slice().sort((a,b)=>a.unit_price-b.unit_price);
         let price_sum:number = 0;
         const units = await P.reduce(sorted_units, async (res:vr.Unit[],unit)=>{
-            console.log(Buffer.from(JSON.stringify(unit)).length);
             if(math.chain(validator_amount).subtract(price_sum).subtract(unit.unit_price).smaller(minimum).done() as boolean) return res;
             const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{used:"[]"});
             const unit_used = JSON.parse(unit_state.data.used);

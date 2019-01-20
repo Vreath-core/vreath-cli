@@ -18,7 +18,6 @@ const check_chain = async (block:vr.Block,i:number,same_chain:vr.Block[],add_cha
     const StateData = await get_block_statedata(block,chain,S_Trie);
     const LockData = await get_block_lockdata(block,chain,L_Trie);
     if(block.meta!=null&&block.meta.kind==='key'&&vr.block.verify_key_block(block,chain,stateroot,lockroot,StateData)){
-        await write_chain(block);
         const data = await vr.block.accept_key_block(block,chain,StateData,LockData);
         await P.forEach(data[0],async state=>{
             if(state.kind==='state') await S_Trie.put(state.owner,state);
@@ -29,7 +28,6 @@ const check_chain = async (block:vr.Block,i:number,same_chain:vr.Block[],add_cha
         });
     }
     else if(block.meta!=null&&block.meta.kind==='micro'&&vr.block.verify_micro_block(block,chain,stateroot,lockroot,StateData,LockData)){
-        await write_chain(block);
         const data = await vr.block.accept_micro_block(block,chain,StateData,LockData);
         await P.forEach(data[0],async state=>{
             if(state.kind==='state') await S_Trie.put(state.owner,state);
@@ -67,7 +65,7 @@ export default router.post('/',async (req,res)=>{
             pre_info,
             info=>{
                 info.last_height = same_height;
-                info.pos_diffs = info.pos_diffs.slice(0,same_height);
+                info.pos_diffs = info.pos_diffs.slice(0,same_height+1);
                 return info;
             }
         );
@@ -109,6 +107,28 @@ export default router.post('/',async (req,res)=>{
             return 0;
         }
         else{
+            const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+            await P.forEach(add_chain, async block=>{
+                await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/block_'+block.meta.height.toString()+'.json',JSON.stringify(block,null, 4),'utf-8');
+                const txs_hash = block.txs.map(pure=>pure.hash);
+                const new_pool_keys = Object.keys(pool).filter(key=>txs_hash.indexOf(key)===-1);
+                const new_pool = new_pool_keys.reduce((obj:vr.Pool,key)=>{
+                    obj[key] = pool[key];
+                    return obj;
+                },{});
+                await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+            });
+            const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+            const new_pos_diffs = same_chain.concat(add_chain).map(block=>block.meta.pos_diff);
+            const new_info = new_obj(
+                info,
+                info=>{
+                    info.last_height = add_chain[add_chain.length-1].meta.height;
+                    info.pos_diffs = new_pos_diffs;
+                    return info;
+                }
+            );
+            await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
             res.send('success');
             return 1;
         }
