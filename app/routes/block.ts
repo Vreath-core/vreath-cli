@@ -69,10 +69,9 @@ export default router.post('/',async (req,res)=>{
             const url = 'http://'+ip+':57750/chain';
             const option = {
                 url:url,
-                body:block,
                 json:true
             }
-            const new_chain:vr.Block[] = await rp.post(option);
+            const new_chain:vr.Block[] = await rp.get(option);
             const my_chain:vr.Block[] = await read_chain(2*(10**9));
             const same_height = (()=>{
                 let same_height:number = 0;

@@ -77,10 +77,9 @@ exports.default = router.post('/', async (req, res) => {
             const url = 'http://' + ip + ':57750/chain';
             const option = {
                 url: url,
-                body: block,
                 json: true
             };
-            const new_chain = await request_promise_native_1.default.post(option);
+            const new_chain = await request_promise_native_1.default.get(option);
             const my_chain = await work_1.read_chain(2 * (10 ** 9));
             const same_height = (() => {
                 let same_height = 0;

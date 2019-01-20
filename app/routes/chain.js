@@ -16,7 +16,9 @@ math.config({
 const router = express.Router();
 exports.default = router.get('/', async (req, res) => {
     try {
+        console.log('chain');
         const chain = await work_1.read_chain(2 * (10 ** 9));
+        console.log(chain);
         res.json(chain);
     }
     catch (e) {

@@ -17,7 +17,9 @@ const router = express.Router();
 
 export default router.get('/',async (req,res)=>{
     try{
+        console.log('chain');
         const chain:vr.Block[] = await read_chain(2*(10**9));
+        console.log(chain)
         res.json(chain);
     }
     catch(e){
