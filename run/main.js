@@ -59,22 +59,6 @@ const my_key = vr.crypto.hash(my_password).slice(0, 122);
 const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
 const my_private = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
 const config = JSON.parse(fs.readFileSync('./config/config.json', 'utf-8'));
-class Yets {
-    constructor() {
-        this._blocks = [];
-    }
-    get blocks() {
-        return this._blocks;
-    }
-    add_block(block) {
-        this._blocks = this._blocks.concat(block).filter(b => b.meta.height >= block.meta.height);
-        return this._blocks;
-    }
-    delete() {
-        return this._blocks.slice(1);
-    }
-}
-exports.yets = new Yets();
 const shake_hands = async () => {
     try {
         const my_node_info = handshake_1.make_node_info();
@@ -138,10 +122,7 @@ const staking = async (private_key) => {
         if (unit_validator_state == null || unit_validator_state.amount === 0)
             throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const make_block = await works.make_block(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
-        exports.yets.add_block(make_block);
-        const block = exports.yets.blocks[0];
-        console.log(block);
+        const block = await works.make_block(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
         const StateData = await data.get_block_statedata(block, chain, S_Trie);
         const LockData = await data.get_block_lockdata(block, chain, L_Trie);
         const accepted = (() => {
@@ -180,18 +161,17 @@ const staking = async (private_key) => {
                 body: block,
                 json: true
             };
-            const order = await request_promise_native_1.default.post(option1);
-            if (order != 'order chain')
-                return 1;
-            const url2 = 'http://' + peer.ip + ':57750/chain';
+            await request_promise_native_1.default.post(option1);
+            /*const order = await rp.post(option1);
+            if(order!='order chain') return 1;
+            const url2 = 'http://'+peer.ip+':57750/chain';
             const option2 = {
-                url: url2,
-                body: chain,
-                json: true
-            };
-            await request_promise_native_1.default.post(option2);
+                url:url2,
+                body:chain,
+                json:true
+            }
+            await rp.post(option2);*/
         });
-        exports.yets.delete();
     }
     catch (e) {
         log.info(e);

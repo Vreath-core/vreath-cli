@@ -3,23 +3,53 @@ import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import * as logic from '../../logic/data'
-import {read_chain, write_chain} from '../../logic/work'
+import {read_chain, write_chain, chain_info, new_obj} from '../../logic/work'
 import * as P from 'p-iteration'
-import {yets} from '../../run/main'
 import {peer} from '../../app/routes/handshake'
 import rp from 'request-promise-native'
+import * as math from 'mathjs'
+math.config({
+    number: 'BigNumber'
+});
 
 const router = express.Router();
 
+/*const check_chain = async (block:vr.Block,i:number,same_chain:vr.Block[],add_chain:vr.Block[],stateroot:string,lockroot:string,S_Trie:vr.trie,L_Trie:vr.trie):Promise<boolean>=>{
+    const chain = same_chain.concat(add_chain).slice(0,same_chain.length+i);
+    const StateData = await logic.get_block_statedata(block,chain,S_Trie);
+    const LockData = await logic.get_block_lockdata(block,chain,L_Trie);
+    if(block.meta!=null&&block.meta.kind==='key'&&vr.block.verify_key_block(block,chain,stateroot,lockroot,StateData)){
+        const data = await vr.block.accept_key_block(block,chain,StateData,LockData);
+        await P.forEach(data[0],async state=>{
+            if(state.kind==='state') await S_Trie.put(state.owner,state);
+            else if(state.kind==='info') await S_Trie.put(state.token,state);
+        });
+        await P.forEach(data[1], async lock=>{
+            await L_Trie.put(lock.address,lock);
+        });
+    }
+    else if(block.meta!=null&&block.meta.kind==='micro'&&vr.block.verify_micro_block(block,chain,stateroot,lockroot,StateData,LockData)){
+        const data = await vr.block.accept_micro_block(block,chain,StateData,LockData);
+        await P.forEach(data[0],async state=>{
+            if(state.kind==='state') await S_Trie.put(state.owner,state);
+            else if(state.kind==='info') await S_Trie.put(state.token,state);
+        });
+        await P.forEach(data[1], async lock=>{
+            await L_Trie.put(lock.address,lock);
+        });
+    }
+    else return true;
+    if(i>=add_chain.length-1) return false;
+    else return await check_chain(add_chain[i+1],i+1,same_chain,add_chain,S_Trie.now_root(),L_Trie.now_root(),S_Trie,L_Trie);
+}*/
+
 export default router.post('/',async (req,res)=>{
     try{
-        const get_block:vr.Block = req.body;
-        if(!vr.block.isBlock(get_block)){
+        const block:vr.Block = req.body;
+        if(!vr.block.isBlock(block)){
             res.status(500).send('invalid block');
             return 0;
         }
-        yets.add_block(get_block)
-        const block = yets.blocks[0];
         const version = block.meta.version || 0;
         const net_id = block.meta.network_id || 0;
         const chain_id = block.meta.chain_id || 0;
@@ -27,15 +57,54 @@ export default router.post('/',async (req,res)=>{
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const chain:vr.Block[] = await read_chain(2*(10**9));
-        if(block.meta.height<chain.length-1){
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        if(block.meta.height<info.last_height+1){
             res.status(500).send('old block');
             return 0;
         }
-        if(block.meta.height>chain.length-1){
-            res.status(200).send('order chain');
-            return 0;
+        if(block.meta.height>info.last_height+1){
+            const remote_add = req.connection.remoteAddress || '';
+            const splitted = remote_add.split(':');
+            const ip = splitted[splitted.length - 1];
+            const url = 'http://'+ip+':57750/chain';
+            const option = {
+                url:url,
+                body:block,
+                json:true
+            }
+            const new_chain:vr.Block[] = await rp.post(option);
+            const my_chain:vr.Block[] = await read_chain(2*(10**9));
+            const same_height = (()=>{
+                let same_height:number = 0;
+                let index:string;
+                let i:number;
+                for(index in new_chain.slice().reverse()){
+                    i = Number(index);
+                    if(my_chain[new_chain.length-1-i]!=null&&my_chain[new_chain.length-1-i].hash===new_chain[new_chain.length-1-i].hash){
+                        same_height = new_chain.length-1-i;
+                    }
+                }
+                return same_height;
+            })();
+            const add_chain = new_chain.slice(same_height+1);
+            const my_diff_sum = info.pos_diffs.slice(same_height+1).reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
+            const new_diff_sum:number = add_chain.reduce((sum,block)=>math.chain(sum).add(block.meta.pos_diff).done(),0);
+            if(math.largerEq(my_diff_sum,new_diff_sum)as boolean){
+                res.status(500).send('light chain');
+                return 0;
+            }
+            await P.forEach(add_chain, async block=>{
+                const new_req = new_obj(
+                    req,
+                    req=>{
+                        req.body = block;
+                        return req;
+                    }
+                );
+                await arguments.callee(new_req,res);
+            });
         }
+        const chain:vr.Block[] = await read_chain(2*(10**9));
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
         const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -100,7 +169,6 @@ export default router.post('/',async (req,res)=>{
             }
             await rp.post(option2);
         });
-        yets.delete();
         return 1;
     }
     catch(e){

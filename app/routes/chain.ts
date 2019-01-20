@@ -6,7 +6,6 @@ import {state_trie_ins,lock_trie_ins,get_block_statedata,get_block_lockdata} fro
 import {read_chain, write_chain,chain_info, new_obj} from '../../logic/work'
 import * as genesis from '../../genesis/index'
 import * as P from 'p-iteration'
-import {yets} from '../../run/main'
 import * as math from 'mathjs'
 math.config({
     number: 'BigNumber'
@@ -14,36 +13,17 @@ math.config({
 
 const router = express.Router();
 
-const check_chain = async (block:vr.Block,i:number,same_chain:vr.Block[],add_chain:vr.Block[],stateroot:string,lockroot:string,S_Trie:vr.trie,L_Trie:vr.trie):Promise<boolean>=>{
-    const chain = same_chain.concat(add_chain).slice(0,same_chain.length+i);
-    const StateData = await get_block_statedata(block,chain,S_Trie);
-    const LockData = await get_block_lockdata(block,chain,L_Trie);
-    if(block.meta!=null&&block.meta.kind==='key'&&vr.block.verify_key_block(block,chain,stateroot,lockroot,StateData)){
-        const data = await vr.block.accept_key_block(block,chain,StateData,LockData);
-        await P.forEach(data[0],async state=>{
-            if(state.kind==='state') await S_Trie.put(state.owner,state);
-            else if(state.kind==='info') await S_Trie.put(state.token,state);
-        });
-        await P.forEach(data[1], async lock=>{
-            await L_Trie.put(lock.address,lock);
-        });
-    }
-    else if(block.meta!=null&&block.meta.kind==='micro'&&vr.block.verify_micro_block(block,chain,stateroot,lockroot,StateData,LockData)){
-        const data = await vr.block.accept_micro_block(block,chain,StateData,LockData);
-        await P.forEach(data[0],async state=>{
-            if(state.kind==='state') await S_Trie.put(state.owner,state);
-            else if(state.kind==='info') await S_Trie.put(state.token,state);
-        });
-        await P.forEach(data[1], async lock=>{
-            await L_Trie.put(lock.address,lock);
-        });
-    }
-    else return true;
-    if(i>=add_chain.length-1) return false;
-    else return await check_chain(add_chain[i+1],i+1,same_chain,add_chain,S_Trie.now_root(),L_Trie.now_root(),S_Trie,L_Trie);
-}
 
-export default router.post('/',async (req,res)=>{
+
+export default router.get('/',async (req,res)=>{
+    try{
+        const chain:vr.Block[] = await read_chain(2*(10**9));
+        res.json(chain);
+    }
+    catch(e){
+        res.status(500).send('error');
+    }
+})/*.post('/',async (req,res)=>{
     try{
         const new_chain:vr.Block[] = req.body;
         const my_chain:vr.Block[] = await read_chain(2*(10**9));
@@ -69,8 +49,7 @@ export default router.post('/',async (req,res)=>{
             return 0;
         }
         add_chain.forEach(block=>yets.add_block(block));
-        return 1;
-        /*const new_info = new_obj(
+        const new_info = new_obj(
             pre_info,
             info=>{
                 info.last_height = same_height;
@@ -140,9 +119,9 @@ export default router.post('/',async (req,res)=>{
             await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
             res.send('success');
             return 1;
-        }*/
+        }
     }
     catch(e){
         res.status(500).send('error');
     }
-})
+})*/
