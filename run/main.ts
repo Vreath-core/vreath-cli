@@ -57,6 +57,21 @@ const my_private = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.en
 
 const config = JSON.parse(fs.readFileSync('./config/config.json','utf-8'));
 
+class Yets {
+    private _blocks:vr.Block[] = [];
+    get blocks(): vr.Block[]{
+        return this._blocks;
+    }
+    public add_block(block:vr.Block): vr.Block[]{
+        this._blocks = this._blocks.concat(block).filter(b=>b.meta.height>=block.meta.height);
+        return this._blocks;
+    }
+    public delete(): vr.Block[]{
+        return this._blocks.slice(1);
+    }
+}
+export const yets = new Yets();
+
 const shake_hands = async ()=>{
     try{
         const my_node_info = make_node_info();
@@ -113,7 +128,10 @@ const staking = async (private_key:string)=>{
         const unit_validator_state:vr.State = await S_Trie.get(unit_validator);
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
+        const make_block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
+        yets.add_block(make_block);
+        const block = yets.blocks[0];
+        console.log(block);
         const StateData = await data.get_block_statedata(block,chain,S_Trie);
         const LockData = await data.get_block_lockdata(block,chain,L_Trie);
         const accepted = (()=>{
@@ -163,6 +181,7 @@ const staking = async (private_key:string)=>{
             }
             await rp.post(option2);
         });
+        yets.delete();
     }
     catch(e){
         log.info(e);

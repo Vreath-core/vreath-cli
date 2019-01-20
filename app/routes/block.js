@@ -6,6 +6,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
 const vr = __importStar(require("vreath"));
@@ -14,14 +17,18 @@ const util_1 = require("util");
 const logic = __importStar(require("../../logic/data"));
 const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
+const main_1 = require("../../run/main");
+const request_promise_native_1 = __importDefault(require("request-promise-native"));
 const router = express.Router();
 exports.default = router.post('/', async (req, res) => {
     try {
-        const block = req.body;
-        if (!vr.block.isBlock(block)) {
+        const get_block = req.body;
+        if (!vr.block.isBlock(get_block)) {
             res.status(500).send('invalid block');
             return 0;
         }
+        main_1.yets.add_block(get_block);
+        const block = main_1.yets.blocks[0];
         const version = block.meta.version || 0;
         const net_id = block.meta.network_id || 0;
         const chain_id = block.meta.chain_id || 0;
@@ -85,6 +92,26 @@ exports.default = router.post('/', async (req, res) => {
         }, {});
         await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
         res.status(200).send('success');
+        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+        await P.forEach(peers, async (peer) => {
+            const url1 = 'http://' + peer.ip + ':57750/block';
+            const option1 = {
+                url: url1,
+                body: block,
+                json: true
+            };
+            const order = await request_promise_native_1.default.post(option1);
+            if (order != 'order chain')
+                return 1;
+            const url2 = 'http://' + peer.ip + ':57750/chain';
+            const option2 = {
+                url: url2,
+                body: chain.concat(block),
+                json: true
+            };
+            await request_promise_native_1.default.post(option2);
+        });
+        main_1.yets.delete();
         return 1;
     }
     catch (e) {

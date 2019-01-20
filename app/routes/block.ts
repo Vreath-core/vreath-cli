@@ -5,16 +5,21 @@ import {promisify} from 'util'
 import * as logic from '../../logic/data'
 import {read_chain, write_chain} from '../../logic/work'
 import * as P from 'p-iteration'
+import {yets} from '../../run/main'
+import {peer} from '../../app/routes/handshake'
+import rp from 'request-promise-native'
 
 const router = express.Router();
 
 export default router.post('/',async (req,res)=>{
     try{
-        const block:vr.Block = req.body;
-        if(!vr.block.isBlock(block)){
+        const get_block:vr.Block = req.body;
+        if(!vr.block.isBlock(get_block)){
             res.status(500).send('invalid block');
             return 0;
         }
+        yets.add_block(get_block)
+        const block = yets.blocks[0];
         const version = block.meta.version || 0;
         const net_id = block.meta.network_id || 0;
         const chain_id = block.meta.chain_id || 0;
@@ -76,6 +81,26 @@ export default router.post('/',async (req,res)=>{
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
 
         res.status(200).send('success');
+
+        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        await P.forEach(peers,async peer=>{
+            const url1 = 'http://'+peer.ip+':57750/block';
+            const option1 = {
+                url:url1,
+                body:block,
+                json:true
+            }
+            const order = await rp.post(option1);
+            if(order!='order chain') return 1;
+            const url2 = 'http://'+peer.ip+':57750/chain';
+            const option2 = {
+                url:url2,
+                body:chain.concat(block),
+                json:true
+            }
+            await rp.post(option2);
+        });
+        yets.delete();
         return 1;
     }
     catch(e){

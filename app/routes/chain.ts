@@ -6,6 +6,7 @@ import {state_trie_ins,lock_trie_ins,get_block_statedata,get_block_lockdata} fro
 import {read_chain, write_chain,chain_info, new_obj} from '../../logic/work'
 import * as genesis from '../../genesis/index'
 import * as P from 'p-iteration'
+import {yets} from '../../run/main'
 import * as math from 'mathjs'
 math.config({
     number: 'BigNumber'
@@ -60,8 +61,16 @@ export default router.post('/',async (req,res)=>{
         })();
         const add_chain = new_chain.slice(same_height+1);
         const same_chain = my_chain.slice(0,same_height+1);
-        const pre_info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
-        const new_info = new_obj(
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        const my_diff_sum = info.pos_diffs.slice(same_height+1).reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
+        const new_diff_sum:number = add_chain.reduce((sum,block)=>math.chain(sum).add(block.meta.pos_diff).done(),0);
+        if(math.largerEq(my_diff_sum,new_diff_sum)as boolean){
+            res.status(500).send('light chain');
+            return 0;
+        }
+        add_chain.forEach(block=>yets.add_block(block));
+        return 1;
+        /*const new_info = new_obj(
             pre_info,
             info=>{
                 info.last_height = same_height;
@@ -131,10 +140,9 @@ export default router.post('/',async (req,res)=>{
             await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
             res.send('success');
             return 1;
-        }
+        }*/
     }
     catch(e){
-        console.log(e);
         res.status(500).send('error');
     }
 })
