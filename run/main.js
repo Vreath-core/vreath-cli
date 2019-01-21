@@ -166,7 +166,7 @@ const staking = async (private_key) => {
                 body: block,
                 json: true
             };
-            await request_promise_native_1.default.post(option1);
+            //await rp.post(option1);
             const order = await request_promise_native_1.default.post(option1);
             if (order != 'order chain')
                 return 1;
@@ -376,10 +376,41 @@ const making_unit = async (miner) => {
         log.info(e);
     }
 };
-(async () => { await shake_hands(); })();
+const get_new_blocks = async () => {
+    try {
+        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+        const peer = peers[0];
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
+        const diff_sum = info.pos_diffs.reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
+        const option = {
+            url: 'http://' + peer.ip + ':57550/chain',
+            body: diff_sum,
+            json: true
+        };
+        const new_chain = await request_promise_native_1.default.get(option);
+        if (new_chain.some(block => !vr.block.isBlock(block)))
+            return 0;
+        await P.forEach(new_chain.slice().sort((a, b) => a.meta.height - b.meta.height), async (block) => {
+            await request_promise_native_1.default.post({
+                url: 'http://localhost:57750/block',
+                body: block,
+                json: true
+            });
+        });
+        return 1;
+    }
+    catch (e) {
+        log.info(e);
+    }
+};
+(async () => {
+    await shake_hands();
+    await get_new_blocks();
+})();
 timers_1.setInterval(async () => {
     await shake_hands();
-}, 3600000);
+    await get_new_blocks();
+}, 600000);
 if (config.validator.flag) {
     timers_1.setInterval(async () => {
         await staking(my_private);

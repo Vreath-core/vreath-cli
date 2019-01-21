@@ -24,10 +24,28 @@ math.config({
 const router = express.Router();
 exports.default = router.get('/', async (req, res) => {
     try {
-        console.log('chain');
+        const req_diff_sum = req.body;
+        if (typeof req_diff_sum != 'number') {
+            res.status(500).send('invalid data');
+            return 0;
+        }
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
+        const my_diffs = info.pos_diffs;
+        let height = 0;
+        let sum = 0;
+        let i;
+        let index = 0;
+        for (i in my_diffs) {
+            index = Number(i);
+            sum = math.chain(sum).add(my_diffs[index]).done();
+            if (math.larger(sum, req_diff_sum)) {
+                height = index;
+                break;
+            }
+        }
         const chain = await work_1.read_chain(2 * (10 ** 9));
-        console.log(chain);
-        res.json(chain);
+        res.json(chain.slice(height));
+        return 1;
     }
     catch (e) {
         res.status(500).send('error');

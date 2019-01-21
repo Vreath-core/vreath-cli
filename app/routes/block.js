@@ -23,7 +23,28 @@ math.config({
     number: 'BigNumber'
 });
 const router = express.Router();
-exports.default = router.post('/', async (req, res) => {
+exports.default = router.get('/', async (req, res) => {
+    try {
+        const info = req.body;
+        const height = info.height;
+        if (typeof height != 'number') {
+            res.status(500).send('invalid request data');
+            return 0;
+        }
+        const chain = await work_1.read_chain(2 * (10 ** 9));
+        const block = chain[height];
+        const hash = info.hash || block.hash;
+        if (hash != block.hash) {
+            res.status(500).send('invalid hash');
+            return 0;
+        }
+        res.json(block);
+        return 1;
+    }
+    catch (e) {
+        res.status(500).send('error');
+    }
+}).post('/', async (req, res) => {
     try {
         const block = req.body;
         if (!vr.block.isBlock(block)) {
@@ -38,12 +59,9 @@ exports.default = router.post('/', async (req, res) => {
             return 0;
         }
         const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
-        if (block.meta.height < info.last_height + 1) {
-            res.status(500).send('old block');
+        if (block.meta.height != info.last_height + 1) {
+            res.status(500).send('invalid height block');
             return 0;
-        }
-        if (block.meta.height > info.last_height + 1) {
-            res.status(200).send('order chain');
         }
         const chain = await work_1.read_chain(2 * (10 ** 9));
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
@@ -115,7 +133,7 @@ exports.default = router.post('/', async (req, res) => {
         return 1;
     }
     catch (e) {
-        console.log(e);
+        //console.log(e);
         res.status(500).send('error');
     }
 });
