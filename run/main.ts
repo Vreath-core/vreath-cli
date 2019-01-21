@@ -114,7 +114,12 @@ const staking = async (private_key:string)=>{
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
-        const StateData = await data.get_block_statedata(block,chain,S_Trie);
+        await rp.post({
+            url:'http://localhost:57750/block',
+            body:block,
+            json:true
+        });
+        /*const StateData = await data.get_block_statedata(block,chain,S_Trie);
         const LockData = await data.get_block_lockdata(block,chain,L_Trie);
         const accepted = (()=>{
             if(block.meta.kind==='key') return vr.block.accept_key_block(block,chain,StateData,LockData);
@@ -143,7 +148,7 @@ const staking = async (private_key:string)=>{
             obj[key] = pool[key];
             return obj;
         },{});
-        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');*/
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
@@ -154,7 +159,7 @@ const staking = async (private_key:string)=>{
                 json:true
             }
             await rp.post(option1);
-            /*const order = await rp.post(option1);
+            const order = await rp.post(option1);
             if(order!='order chain') return 1;
             const url2 = 'http://'+peer.ip+':57750/chain';
             const option2 = {
@@ -162,7 +167,7 @@ const staking = async (private_key:string)=>{
                 body:chain,
                 json:true
             }
-            await rp.post(option2);*/
+            await rp.post(option2);
         });
     }
     catch(e){

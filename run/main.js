@@ -123,36 +123,41 @@ const staking = async (private_key) => {
             throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
-        const StateData = await data.get_block_statedata(block, chain, S_Trie);
-        const LockData = await data.get_block_lockdata(block, chain, L_Trie);
-        const accepted = (() => {
-            if (block.meta.kind === 'key')
-                return vr.block.accept_key_block(block, chain, StateData, LockData);
-            else
-                return vr.block.accept_micro_block(block, chain, StateData, LockData);
+        await request_promise_native_1.default.post({
+            url: 'http://localhost:57750/block',
+            body: block,
+            json: true
+        });
+        /*const StateData = await data.get_block_statedata(block,chain,S_Trie);
+        const LockData = await data.get_block_lockdata(block,chain,L_Trie);
+        const accepted = (()=>{
+            if(block.meta.kind==='key') return vr.block.accept_key_block(block,chain,StateData,LockData);
+            else return vr.block.accept_micro_block(block,chain,StateData,LockData);
         })();
-        await P.forEach(accepted[0], async (state) => {
-            if (state.kind === 'state')
-                await S_Trie.put(state.owner, state);
-            else
-                await S_Trie.put(state.token, state);
+        await P.forEach(accepted[0], async (state:vr.State)=>{
+            if(state.kind==='state') await S_Trie.put(state.owner,state);
+            else await S_Trie.put(state.token,state);
         });
-        await P.forEach(accepted[1], async (lock) => {
-            await L_Trie.put(lock.address, lock);
+
+        await P.forEach(accepted[1], async (lock:vr.Lock)=>{
+            await L_Trie.put(lock.address,lock);
         });
+
         await works.write_chain(block);
+
         const new_roots = {
-            stateroot: S_Trie.now_root(),
-            lockroot: L_Trie.now_root()
-        };
-        await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
-        const txs_hash = block.txs.map(pure => pure.hash);
-        const new_pool_keys = Object.keys(pool).filter(key => txs_hash.indexOf(key) === -1);
-        const new_pool = new_pool_keys.reduce((obj, key) => {
+            stateroot:S_Trie.now_root(),
+            lockroot:L_Trie.now_root()
+        }
+        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
+
+        const txs_hash = block.txs.map(pure=>pure.hash);
+        const new_pool_keys = Object.keys(pool).filter(key=>txs_hash.indexOf(key)===-1);
+        const new_pool = new_pool_keys.reduce((obj:vr.Pool,key)=>{
             obj[key] = pool[key];
             return obj;
-        }, {});
-        await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+        },{});
+        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');*/
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         await P.forEach(peers, async (peer) => {
             const url1 = 'http://' + peer.ip + ':57750/block';
@@ -162,15 +167,16 @@ const staking = async (private_key) => {
                 json: true
             };
             await request_promise_native_1.default.post(option1);
-            /*const order = await rp.post(option1);
-            if(order!='order chain') return 1;
-            const url2 = 'http://'+peer.ip+':57750/chain';
+            const order = await request_promise_native_1.default.post(option1);
+            if (order != 'order chain')
+                return 1;
+            const url2 = 'http://' + peer.ip + ':57750/chain';
             const option2 = {
-                url:url2,
-                body:chain,
-                json:true
-            }
-            await rp.post(option2);*/
+                url: url2,
+                body: chain,
+                json: true
+            };
+            await request_promise_native_1.default.post(option2);
         });
     }
     catch (e) {

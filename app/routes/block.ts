@@ -14,35 +14,6 @@ math.config({
 
 const router = express.Router();
 
-/*const check_chain = async (block:vr.Block,i:number,same_chain:vr.Block[],add_chain:vr.Block[],stateroot:string,lockroot:string,S_Trie:vr.trie,L_Trie:vr.trie):Promise<boolean>=>{
-    const chain = same_chain.concat(add_chain).slice(0,same_chain.length+i);
-    const StateData = await logic.get_block_statedata(block,chain,S_Trie);
-    const LockData = await logic.get_block_lockdata(block,chain,L_Trie);
-    if(block.meta!=null&&block.meta.kind==='key'&&vr.block.verify_key_block(block,chain,stateroot,lockroot,StateData)){
-        const data = await vr.block.accept_key_block(block,chain,StateData,LockData);
-        await P.forEach(data[0],async state=>{
-            if(state.kind==='state') await S_Trie.put(state.owner,state);
-            else if(state.kind==='info') await S_Trie.put(state.token,state);
-        });
-        await P.forEach(data[1], async lock=>{
-            await L_Trie.put(lock.address,lock);
-        });
-    }
-    else if(block.meta!=null&&block.meta.kind==='micro'&&vr.block.verify_micro_block(block,chain,stateroot,lockroot,StateData,LockData)){
-        const data = await vr.block.accept_micro_block(block,chain,StateData,LockData);
-        await P.forEach(data[0],async state=>{
-            if(state.kind==='state') await S_Trie.put(state.owner,state);
-            else if(state.kind==='info') await S_Trie.put(state.token,state);
-        });
-        await P.forEach(data[1], async lock=>{
-            await L_Trie.put(lock.address,lock);
-        });
-    }
-    else return true;
-    if(i>=add_chain.length-1) return false;
-    else return await check_chain(add_chain[i+1],i+1,same_chain,add_chain,S_Trie.now_root(),L_Trie.now_root(),S_Trie,L_Trie);
-}*/
-
 export default router.post('/',async (req,res)=>{
     try{
         const block:vr.Block = req.body;
@@ -63,45 +34,7 @@ export default router.post('/',async (req,res)=>{
             return 0;
         }
         if(block.meta.height>info.last_height+1){
-            const remote_add = req.connection.remoteAddress || '';
-            const splitted = remote_add.split(':');
-            const ip = splitted[splitted.length - 1];
-            const url = 'http://'+ip+':57750/chain';
-            const option = {
-                url:url,
-                json:true
-            }
-            const new_chain:vr.Block[] = await rp.get(option);
-            const my_chain:vr.Block[] = await read_chain(2*(10**9));
-            const same_height = (()=>{
-                let same_height:number = 0;
-                let index:string;
-                let i:number;
-                for(index in new_chain.slice().reverse()){
-                    i = Number(index);
-                    if(my_chain[new_chain.length-1-i]!=null&&my_chain[new_chain.length-1-i].hash===new_chain[new_chain.length-1-i].hash){
-                        same_height = new_chain.length-1-i;
-                    }
-                }
-                return same_height;
-            })();
-            const add_chain = new_chain.slice(same_height+1);
-            const my_diff_sum = info.pos_diffs.slice(same_height+1).reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
-            const new_diff_sum:number = add_chain.reduce((sum,block)=>math.chain(sum).add(block.meta.pos_diff).done(),0);
-            if(math.largerEq(my_diff_sum,new_diff_sum)as boolean){
-                res.status(500).send('light chain');
-                return 0;
-            }
-            await P.forEach(add_chain, async block=>{
-                const new_req = new_obj(
-                    req,
-                    req=>{
-                        req.body = block;
-                        return req;
-                    }
-                );
-                await arguments.callee(new_req,res);
-            });
+            res.status(200).send('order chain');
         }
         const chain:vr.Block[] = await read_chain(2*(10**9));
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
