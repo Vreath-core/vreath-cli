@@ -357,7 +357,8 @@ const making_unit = async (miner) => {
             return u;
         });
         const new_unit_store = works.new_obj(unit_store, store => {
-            store[unit_iden_hash] = unit;
+            const key = vr.crypto.hash(unit_iden_hash + unit.address);
+            store[key] = unit;
             return store;
         });
         await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');

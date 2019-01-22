@@ -75,6 +75,7 @@ export default router.get('/',async (req,res)=>{
                 json:true
             });
         });
+        res.status(200).send('success');
         return 1;
     }
     catch(e){

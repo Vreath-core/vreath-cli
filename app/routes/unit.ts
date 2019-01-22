@@ -16,7 +16,10 @@ export default router.post('/',async (req,res)=>{
         const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{data:"[]"});
         const used:string[] = JSON.parse(unit_state.data.used||"[]");
         const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request)+unit.height+vr.crypto.hex2number(unit.block_hash)).toString(16));
-        if(used.indexOf(iden_hash)!=-1) res.send('already used unit');
+        if(used.indexOf(iden_hash)!=-1){
+            res.status(500).send('already used unit');
+            return 0;
+        }
         const chain:vr.Block[] = await read_chain(2*(10**9));
         const check = (()=>{
             let search_block:vr.Block;
@@ -28,15 +31,21 @@ export default router.post('/',async (req,res)=>{
             }
             return false;
         })();
-        if(!check) res.send('invalid unit');
+        if(!check){
+            res.status(500).send('invalid unit');
+            return 0;
+        }
         const new_unit_store = new_obj(
             unit_store,
             store=>{
-                store[iden_hash] = unit;
+                const key = vr.crypto.hash(iden_hash+unit.address);
+                store[key] = unit;
                 return store;
             }
         );
         await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
+        res.status(200).send('success');
+        return 1;
     }
     catch(e){
         res.status(404).send('error');

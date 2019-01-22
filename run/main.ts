@@ -360,7 +360,8 @@ const making_unit = async (miner:string)=>{
         const new_unit_store = works.new_obj(
             unit_store,
             store=>{
-                store[unit_iden_hash] = unit;
+                const key = vr.crypto.hash(unit_iden_hash+unit.address);
+                store[key] = unit;
                 return store;
             }
         );
