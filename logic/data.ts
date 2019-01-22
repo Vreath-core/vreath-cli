@@ -56,7 +56,7 @@ export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
         const base = tx.meta.bases;
         const base_states:vr.State[] = await P.reduce(base, async (result:vr.State[],key:string)=>{
             const getted:vr.State = await S_Trie.get(key);
-            if(getted==null) return result;
+            if(getted==null) return result.concat(vr.state.create_state(0,key,key.split(':')[1],0));
             else return result.concat(getted);
         },[]);
         const outputs = output_keys(tx);
@@ -77,7 +77,6 @@ export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
         return concated.filter((val,i)=>hashes.indexOf(vr.crypto.object_hash(val))===i);
     }
     catch(e){
-        console.log(e);
         return [];
     }
 }

@@ -158,16 +158,15 @@ const staking = async (private_key:string)=>{
                 body:block,
                 json:true
             }
-            //await rp.post(option1);
-            const order = await rp.post(option1);
-            if(order!='order chain') return 1;
+            await rp.post(option1);
+            /*if(order!='order chain') return 1;
             const url2 = 'http://'+peer.ip+':57750/chain';
             const option2 = {
                 url:url2,
                 body:chain,
                 json:true
             }
-            await rp.post(option2);
+            await rp.post(option2);*/
         });
     }
     catch(e){
