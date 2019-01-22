@@ -32,7 +32,7 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
         if(new_pool[tx.hash]!=null){
             const peers:{protocol:string,ip:string,port:number}[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
             await P.forEach(peers,async peer=>{
-                const url = 'http://'+peer.ip+':57550/tx';
+                const url = 'http://'+peer.ip+':57750/tx';
                 const option = {
                     url:url,
                     body:tx,

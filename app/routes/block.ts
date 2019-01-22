@@ -101,7 +101,7 @@ export default router.get('/',async (req,res)=>{
 
         res.status(200).send('success');
 
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        /*const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
             const url1 = 'http://'+peer.ip+':57750/block';
             const option1 = {
@@ -118,7 +118,7 @@ export default router.get('/',async (req,res)=>{
                 json:true
             }
             await rp.post(option2);
-        });
+        });*/
         return 1;
     }
     catch(e){

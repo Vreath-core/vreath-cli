@@ -234,7 +234,7 @@ const buying_unit = async (private_key:string)=>{
 
             const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
             await P.forEach(peers,async peer=>{
-                const url = 'http://'+peer.ip+':57550/tx';
+                const url = 'http://'+peer.ip+':57750/tx';
                 const option = {
                     url:url,
                     body:tx,
@@ -291,7 +291,7 @@ const refreshing = async (private_key:string)=>{
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
-            const url = 'http://'+peer.ip+':57550/tx';
+            const url = 'http://'+peer.ip+':57750/tx';
             const option = {
                 url:url,
                 body:tx,
@@ -368,7 +368,7 @@ const making_unit = async (miner:string)=>{
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
-            const url = 'http://'+peer.ip+':57550/unit';
+            const url = 'http://'+peer.ip+':57750/unit';
             const option = {
                 url:url,
                 body:unit,
@@ -389,19 +389,20 @@ const get_new_blocks = async ()=>{
         const info:works.chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
         const diff_sum = info.pos_diffs.reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
         const option = {
-            url:'http://'+peer.ip+':57550/chain',
-            body:diff_sum,
+            url:'http://'+peer.ip+':57750/chain',
+            body:{diff_sum:diff_sum},
             json:true
         }
-        const new_chain:vr.Block[] = await rp.get(option);
+        const new_chain:vr.Block[] = await rp.get(option).catch(e=>console.log(e));
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
-        await P.forEach(new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height), async block=>{
+        let block:vr.Block
+        for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
             await rp.post({
                 url:'http://localhost:57750/block',
                 body:block,
                 json:true
             });
-        });
+        }
         return 1;
     }
     catch(e){
@@ -416,8 +417,11 @@ const get_new_blocks = async ()=>{
 
 setInterval(async ()=>{
     await shake_hands();
-    await get_new_blocks();
 },600000);
+
+setInterval(async ()=>{
+    await get_new_blocks();
+},30000);
 
 if(config.validator.flag){
     setInterval(async ()=>{

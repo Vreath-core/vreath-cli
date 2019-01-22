@@ -239,7 +239,7 @@ const buying_unit = async (private_key) => {
             await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');
             const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
             await P.forEach(peers, async (peer) => {
-                const url = 'http://' + peer.ip + ':57550/tx';
+                const url = 'http://' + peer.ip + ':57750/tx';
                 const option = {
                     url: url,
                     body: tx,
@@ -292,7 +292,7 @@ const refreshing = async (private_key) => {
         await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         await P.forEach(peers, async (peer) => {
-            const url = 'http://' + peer.ip + ':57550/tx';
+            const url = 'http://' + peer.ip + ':57750/tx';
             const option = {
                 url: url,
                 body: tx,
@@ -363,7 +363,7 @@ const making_unit = async (miner) => {
         await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         await P.forEach(peers, async (peer) => {
-            const url = 'http://' + peer.ip + ':57550/unit';
+            const url = 'http://' + peer.ip + ':57750/unit';
             const option = {
                 url: url,
                 body: unit,
@@ -383,20 +383,21 @@ const get_new_blocks = async () => {
         const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
         const diff_sum = info.pos_diffs.reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
         const option = {
-            url: 'http://' + peer.ip + ':57550/chain',
-            body: diff_sum,
+            url: 'http://' + peer.ip + ':57750/chain',
+            body: { diff_sum: diff_sum },
             json: true
         };
-        const new_chain = await request_promise_native_1.default.get(option);
+        const new_chain = await request_promise_native_1.default.get(option).catch(e => console.log(e));
         if (new_chain.some(block => !vr.block.isBlock(block)))
             return 0;
-        await P.forEach(new_chain.slice().sort((a, b) => a.meta.height - b.meta.height), async (block) => {
+        let block;
+        for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
             await request_promise_native_1.default.post({
                 url: 'http://localhost:57750/block',
                 body: block,
                 json: true
             });
-        });
+        }
         return 1;
     }
     catch (e) {
@@ -409,8 +410,10 @@ const get_new_blocks = async () => {
 })();
 timers_1.setInterval(async () => {
     await shake_hands();
-    await get_new_blocks();
 }, 600000);
+timers_1.setInterval(async () => {
+    await get_new_blocks();
+}, 30000);
 if (config.validator.flag) {
     timers_1.setInterval(async () => {
         await staking(my_private);

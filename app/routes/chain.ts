@@ -18,7 +18,7 @@ const router = express.Router();
 
 export default router.get('/',async (req,res)=>{
     try{
-        const req_diff_sum:number = req.body;
+        const req_diff_sum:number = req.body.diff_sum || 0;
         if(typeof req_diff_sum != 'number'){
             res.status(500).send('invalid data');
             return 0;
@@ -75,6 +75,7 @@ export default router.get('/',async (req,res)=>{
                 json:true
             });
         });
+        return 1;
     }
     catch(e){
         res.status(500).send('error');
