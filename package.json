@@ -14,6 +14,7 @@
     "@types/request": "^2.48.1",
     "@types/request-promise": "^4.1.42",
     "@types/request-promise-native": "^1.0.15",
+    "@types/yargs": "^12.0.8",
     "body-parser": "^1.18.3",
     "bunyan": "^1.8.12",
     "crypto-js": "^3.1.9-1",
@@ -21,12 +22,14 @@
     "fs-extra": "^7.0.1",
     "leveldown": "^4.0.1",
     "levelup": "^3.1.1",
+    "localtunnel": "^1.9.1",
     "mathjs": "^5.4.0",
     "readline-sync": "^1.4.9",
     "request": "^2.88.0",
     "request-promise": "^4.2.2",
     "request-promise-native": "^1.0.5",
-    "vreath": "github:Vreath-core/ts-vreath-core"
+    "vreath": "github:Vreath-core/ts-vreath-core",
+    "yargs": "^12.0.5"
   },
   "devDependencies": {
     "@types/node": "^10.12.18",
@@ -42,12 +45,11 @@
     "vreath"
   ],
   "license": "MIT",
-  "main": "main.js",
+  "main": "./commands/main.js",
+  "bin": {
+    "vreath": "./commands/main.js"
+  },
   "repository": "Vreath-core/vreath-cli",
   "scripts": {
-    "setup": "node ./run/setup.js",
-    "start": "node ./run/main.js",
-    "generate-keys": "node ./run/generate-keys.js",
-    "add-peer": "node ./run/add_peer.js"
   }
 }

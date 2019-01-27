@@ -1,4 +1,9 @@
+#! /usr/bin/env node
+
 import * as vr from 'vreath'
+import setup from './setup'
+import add_peer from './add_peer'
+import generate_keys from './generate-keys'
 import {peer,handshake_route,make_node_info, node_info} from '../app/routes/handshake'
 import peer_routes from '../app/routes/peers'
 import tx_routes from '../app/routes/tx'
@@ -7,8 +12,8 @@ import unit_routes from '../app/routes/unit'
 import chain_routes from '../app/routes/chain'
 import * as works from '../logic/work'
 import * as data from '../logic/data'
-import req_tx_com from '../app/commands/request-tx'
-import remit from '../app/commands/remit'
+import req_tx_com from '../app/repl/request-tx'
+import remit from '../app/repl/remit'
 import express from 'express'
 import * as bodyParser from 'body-parser'
 import * as fs from 'fs'
@@ -20,7 +25,7 @@ import * as repl from 'repl'
 import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
-import { setInterval } from 'timers';
+import yargs from 'yargs'
 
 math.config({
     number: 'BigNumber'
@@ -47,12 +52,6 @@ const log = bunyan.createLogger({
         }
     ]
 });
-
-const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
-const my_key = vr.crypto.hash(my_password).slice(0,122);
-const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
-const my_private = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
-
 
 const config = JSON.parse(fs.readFileSync('./config/config.json','utf-8'));
 
@@ -372,49 +371,100 @@ const get_new_blocks = async ()=>{
     }
 }
 
-(async ()=>{
-    await shake_hands();
-    await get_new_blocks();
-})();
-
-setInterval(async ()=>{
-    await shake_hands();
-},600000);
-
-setInterval(async ()=>{
-    await get_new_blocks();
-},30000);
-
-if(config.validator.flag){
-    setInterval(async ()=>{
-        await staking(my_private);
-        await buying_unit(my_private);
-    },1000);
-}
-
-if(config.miner.flag){
-    const my_miner_pub = config.pub_keys[config.miner.use];
-    const my_miner = vr.crypto.genereate_address(vr.con.constant.unit,my_miner_pub);
-    setInterval(async ()=>{
-        await refreshing(my_private);
-        await making_unit(my_miner);
-    },60000*config.miner.interval);
-}
 
 
-
-const replServer = repl.start({prompt:'>',terminal:true});
-
-replServer.defineCommand('request-tx',{
-    help: 'Create request tx',
-    async action(input){
-        await req_tx_com(input,config,my_private);
+yargs.command('setup','setup data', {}, async ()=>{
+    try{
+        const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
+        await setup(my_password);
+        process.exit(1)
     }
-});
-
-replServer.defineCommand('remit',{
-    help: 'Create request tx',
-    async action(input){
-        await remit(input,config,my_private);
+    catch(e){
+        console.log(e);
+        process.exit(1)
     }
-});
+}).command('run','run server', {}, async ()=>{
+    try{
+        const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
+        const my_key = vr.crypto.hash(my_password).slice(0,122);
+        const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
+        const my_private = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
+        (async ()=>{
+            await shake_hands();
+            await get_new_blocks();
+        })();
+
+        setInterval(async ()=>{
+            await shake_hands();
+        },600000);
+
+        setInterval(async ()=>{
+            await get_new_blocks();
+        },30000);
+
+        if(config.validator.flag){
+            setInterval(async ()=>{
+                await staking(my_private);
+                await buying_unit(my_private);
+            },1000);
+        }
+
+        if(config.miner.flag){
+            const my_miner_pub = config.pub_keys[config.miner.use];
+            const my_miner = vr.crypto.genereate_address(vr.con.constant.unit,my_miner_pub);
+            setInterval(async ()=>{
+                await refreshing(my_private);
+                await making_unit(my_miner);
+            },60000*config.miner.interval);
+        }
+
+        const replServer = repl.start({prompt:'>',terminal:true});
+
+        replServer.defineCommand('request-tx',{
+            help: 'Create request tx',
+            async action(input){
+                await req_tx_com(input,config,my_private);
+            }
+        });
+
+        replServer.defineCommand('remit',{
+            help: 'Create request tx',
+            async action(input){
+                await remit(input,config,my_private);
+            }
+        });
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+}).command('add-peer <ip>','add peer ip address', {
+    'ip':{
+        describe:'new ip',
+        type:'string',
+        default:'localhost'
+    }
+}, async (argv)=>{
+    try{
+        const ip:string = argv.ip;
+        await add_peer(ip);
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+}).command('generate-keys','generate new key', {}, async ()=>{
+    try{
+        await generate_keys();
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+}).fail((msg,err)=>{
+    if(err) console.log(err);
+    else console.log(msg);
+    process.exit(1);
+}).help().argv;

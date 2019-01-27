@@ -1,3 +1,4 @@
+#! /usr/bin/env node
 "use strict";
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
@@ -11,6 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
+const setup_1 = __importDefault(require("./setup"));
+const add_peer_1 = __importDefault(require("./add_peer"));
+const generate_keys_1 = __importDefault(require("./generate-keys"));
 const handshake_1 = require("../app/routes/handshake");
 const peers_1 = __importDefault(require("../app/routes/peers"));
 const tx_1 = __importDefault(require("../app/routes/tx"));
@@ -19,8 +23,8 @@ const unit_1 = __importDefault(require("../app/routes/unit"));
 const chain_1 = __importDefault(require("../app/routes/chain"));
 const works = __importStar(require("../logic/work"));
 const data = __importStar(require("../logic/data"));
-const request_tx_1 = __importDefault(require("../app/commands/request-tx"));
-const remit_1 = __importDefault(require("../app/commands/remit"));
+const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
+const remit_1 = __importDefault(require("../app/repl/remit"));
 const express_1 = __importDefault(require("express"));
 const bodyParser = __importStar(require("body-parser"));
 const fs = __importStar(require("fs"));
@@ -32,7 +36,7 @@ const repl = __importStar(require("repl"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const math = __importStar(require("mathjs"));
 const bunyan_1 = __importDefault(require("bunyan"));
-const timers_1 = require("timers");
+const yargs_1 = __importDefault(require("yargs"));
 math.config({
     number: 'BigNumber'
 });
@@ -54,10 +58,6 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
-const my_key = vr.crypto.hash(my_password).slice(0, 122);
-const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
-const my_private = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
 const config = JSON.parse(fs.readFileSync('./config/config.json', 'utf-8'));
 const shake_hands = async () => {
     try {
@@ -365,41 +365,94 @@ const get_new_blocks = async () => {
         log.info(e);
     }
 };
-(async () => {
-    await shake_hands();
-    await get_new_blocks();
-})();
-timers_1.setInterval(async () => {
-    await shake_hands();
-}, 600000);
-timers_1.setInterval(async () => {
-    await get_new_blocks();
-}, 30000);
-if (config.validator.flag) {
-    timers_1.setInterval(async () => {
-        await staking(my_private);
-        await buying_unit(my_private);
-    }, 1000);
-}
-if (config.miner.flag) {
-    const my_miner_pub = config.pub_keys[config.miner.use];
-    const my_miner = vr.crypto.genereate_address(vr.con.constant.unit, my_miner_pub);
-    timers_1.setInterval(async () => {
-        await refreshing(my_private);
-        await making_unit(my_miner);
-    }, 60000 * config.miner.interval);
-}
-const replServer = repl.start({ prompt: '>', terminal: true });
-replServer.defineCommand('request-tx', {
-    help: 'Create request tx',
-    async action(input) {
-        await request_tx_1.default(input, config, my_private);
+yargs_1.default.command('setup', 'setup data', {}, async () => {
+    try {
+        const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
+        await setup_1.default(my_password);
+        process.exit(1);
     }
-});
-replServer.defineCommand('remit', {
-    help: 'Create request tx',
-    async action(input) {
-        await remit_1.default(input, config, my_private);
+    catch (e) {
+        console.log(e);
+        process.exit(1);
     }
-});
+}).command('run', 'run server', {}, async () => {
+    try {
+        const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
+        const my_key = vr.crypto.hash(my_password).slice(0, 122);
+        const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
+        const my_private = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
+        (async () => {
+            await shake_hands();
+            await get_new_blocks();
+        })();
+        setInterval(async () => {
+            await shake_hands();
+        }, 600000);
+        setInterval(async () => {
+            await get_new_blocks();
+        }, 30000);
+        if (config.validator.flag) {
+            setInterval(async () => {
+                await staking(my_private);
+                await buying_unit(my_private);
+            }, 1000);
+        }
+        if (config.miner.flag) {
+            const my_miner_pub = config.pub_keys[config.miner.use];
+            const my_miner = vr.crypto.genereate_address(vr.con.constant.unit, my_miner_pub);
+            setInterval(async () => {
+                await refreshing(my_private);
+                await making_unit(my_miner);
+            }, 60000 * config.miner.interval);
+        }
+        const replServer = repl.start({ prompt: '>', terminal: true });
+        replServer.defineCommand('request-tx', {
+            help: 'Create request tx',
+            async action(input) {
+                await request_tx_1.default(input, config, my_private);
+            }
+        });
+        replServer.defineCommand('remit', {
+            help: 'Create request tx',
+            async action(input) {
+                await remit_1.default(input, config, my_private);
+            }
+        });
+    }
+    catch (e) {
+        console.log(e);
+        process.exit(1);
+    }
+}).command('add-peer <ip>', 'add peer ip address', {
+    'ip': {
+        describe: 'new ip',
+        type: 'string',
+        default: 'localhost'
+    }
+}, async (argv) => {
+    try {
+        const ip = argv.ip;
+        await add_peer_1.default(ip);
+        process.exit(1);
+    }
+    catch (e) {
+        console.log(e);
+        process.exit(1);
+    }
+}).command('generate-keys', 'generate new key', {}, async () => {
+    try {
+        await generate_keys_1.default();
+        process.exit(1);
+    }
+    catch (e) {
+        console.log(e);
+        process.exit(1);
+    }
+}).fail((msg, err) => {
+    if (err)
+        console.log(err);
+    else
+        console.log(msg);
+    process.exit(1);
+}).help().argv;
 //# sourceMappingURL=main.js.map
