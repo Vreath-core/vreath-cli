@@ -157,3 +157,14 @@ export const get_block_lockdata = async (block:vr.Block,chain:vr.Block[],L_Trie:
     }
 }
 
+export const get_native_balance = async (address:string,S_Trie:Trie)=>{
+    try{
+        const state:vr.State = await S_Trie.get(address);
+        if(state==null) return 0;
+        else return state.amount;
+    }
+    catch(e){
+        console.log(e);
+        return 0;
+    }
+}

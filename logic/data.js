@@ -174,4 +174,17 @@ exports.get_block_lockdata = async (block, chain, L_Trie) => {
         return [];
     }
 };
+exports.get_native_balance = async (address, S_Trie) => {
+    try {
+        const state = await S_Trie.get(address);
+        if (state == null)
+            return 0;
+        else
+            return state.amount;
+    }
+    catch (e) {
+        console.log(e);
+        return 0;
+    }
+};
 //# sourceMappingURL=data.js.map

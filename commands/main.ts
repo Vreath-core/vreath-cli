@@ -4,6 +4,8 @@ import * as vr from 'vreath'
 import setup from './setup'
 import add_peer from './add_peer'
 import generate_keys from './generate-keys'
+import get_native_balance from './get_native_balance'
+import set_config from './config'
 import {peer,handshake_route,make_node_info, node_info} from '../app/routes/handshake'
 import peer_routes from '../app/routes/peers'
 import tx_routes from '../app/routes/tx'
@@ -26,6 +28,7 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
+import { type } from 'os';
 
 math.config({
     number: 'BigNumber'
@@ -373,7 +376,9 @@ const get_new_blocks = async ()=>{
 
 
 
-yargs.command('setup','setup data', {}, async ()=>{
+yargs
+.usage('Usage: $0 <command> [options]')
+.command('setup','setup data', {}, async ()=>{
     try{
         const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
         await setup(my_password);
@@ -463,8 +468,81 @@ yargs.command('setup','setup data', {}, async ()=>{
         console.log(e);
         process.exit(1)
     }
+}).command('get-native-balance <id>','get native balance', {
+    'id':{
+        describe:'key id to check the balance',
+        type:'number'
+    }
+}, async (argv)=>{
+    try{
+        const id:number = argv.id!=null ? argv.id : 0;
+        console.log(await get_native_balance(config,id));
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+}).command('config [new_pub] [user_id] [miner_mode] [miner_id] [miner_interval] [miner_fee] [miner_unit_price] [validator_mode] [validator_id] [validator_min] [validator_fee] [validator_gas]','set config',{
+    'new_pub':{
+        describe:'new public key',
+        type:'string'
+    },
+    'user_id':{
+        describe:'key id used for user',
+        type:'number'
+    },
+    'miner_mode':{
+        describe:'flag for mining',
+        type:'boolean'
+    },
+    'miner_id':{
+        describe:'key id used for miner',
+        type:'number'
+    },
+    'miner_interval':{
+        describe:'mining interval',
+        type:'number'
+    },
+    'miner_fee':{
+        describe:'fee of refresh-tx',
+        type:'number'
+    },
+    'miner_unit_price':{
+        describe:'unit price',
+        type:'number'
+    },
+    'validator_mode':{
+        describe:'flag for validate',
+        type:'boolean'
+    },
+    'validator_id':{
+        describe:'key id used for validator',
+        type:'number'
+    },
+    'validator_min':{
+        describe:'minimum balance to buy units',
+        type:'number'
+    },
+    'validator_fee':{
+        describe:'fee for unit-buying-tx',
+        type:'number'
+    },
+    'validator_gas':{
+        describe:'gas for unit-buying-tx',
+        type:'number'
+    }
+}, async (argv)=>{
+    try{
+        await set_config(config,argv);
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
 }).fail((msg,err)=>{
     if(err) console.log(err);
     else console.log(msg);
     process.exit(1);
-}).help().argv;
+}).help().recommendCommands().argv;
