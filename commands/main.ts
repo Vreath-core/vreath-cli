@@ -388,7 +388,7 @@ yargs
         console.log(e);
         process.exit(1)
     }
-}).command('run','run server', {}, async ()=>{
+}).command('run','run node', {}, async ()=>{
     try{
         const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
         const my_key = vr.crypto.hash(my_password).slice(0,122);
