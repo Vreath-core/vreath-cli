@@ -1,7 +1,7 @@
 # vreath-cli
----
 
 ### CLI wallet for Vreath
+---
 
 ## Attention
 This is under development.  
