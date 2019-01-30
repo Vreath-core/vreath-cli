@@ -9,7 +9,7 @@ Our main net is not launched yet.
 Our token has no value now since we could reset the blockchain.
 
 ## Installation
-`npm install vreath-cli -g`
+`npm install Vreath-core/vreath-cli -g`
 
 ## Quick Start
 Generate private key to use:  
