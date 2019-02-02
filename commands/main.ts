@@ -28,7 +28,7 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
-import { type } from 'os';
+
 
 math.config({
     number: 'BigNumber'
@@ -227,10 +227,13 @@ const refreshing = async (private_key:string)=>{
         let search_tx:vr.TxPure;
         let block_height = -1;
         let tx_index = -1;
+        let checker = false;
         for(search_block of chain.slice().reverse()){
             for(tx_i in search_block.txs){
+                if(checker) break;
                 search_tx = search_block.txs[Number(tx_i)];
                 if(search_tx.meta.kind==='request'&&refreshed.indexOf(search_tx.hash)===-1){
+                    checker = true;
                     block_height = search_block.meta.height;
                     tx_index = Number(tx_i);
                     break;

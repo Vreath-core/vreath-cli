@@ -228,10 +228,14 @@ const refreshing = async (private_key) => {
         let search_tx;
         let block_height = -1;
         let tx_index = -1;
+        let checker = false;
         for (search_block of chain.slice().reverse()) {
             for (tx_i in search_block.txs) {
+                if (checker)
+                    break;
                 search_tx = search_block.txs[Number(tx_i)];
                 if (search_tx.meta.kind === 'request' && refreshed.indexOf(search_tx.hash) === -1) {
+                    checker = true;
                     block_height = search_block.meta.height;
                     tx_index = Number(tx_i);
                     break;
@@ -379,7 +383,7 @@ yargs_1.default
         console.log(e);
         process.exit(1);
     }
-}).command('run', 'run server', {}, async () => {
+}).command('run', 'run node', {}, async () => {
     try {
         const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
         const my_key = vr.crypto.hash(my_password).slice(0, 122);
