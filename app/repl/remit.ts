@@ -13,7 +13,7 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
         const user_pub:string = config.pub_keys[config.user.use];
         const type:vr.TxType = "change"
         const tokens = [vr.con.constant.native];
-        const remitter = vr.crypto.genereate_address(vr.con.constant.native,user_pub);
+        const remitter = vr.crypto.generate_address(vr.con.constant.native,user_pub);
         const receiver = splited[0].split('=')[1].trim().split(',').map(add=>{
             if(add==="remitter") return remitter;
             else return add;

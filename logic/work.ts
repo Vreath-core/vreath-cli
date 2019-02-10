@@ -227,12 +227,12 @@ export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:numbe
             else if(main_token===vr.con.constant.unit) return vr.tx.unit_contract(base_states,req_tx,chain);
             else return base_states;
         })();
-        const success = !computed.some(s=>vr.state.verify_state(s));
+        const success = !computed.some(s=>!vr.state.verify_state(s));
         const output = (()=>{
             if(success) return computed;
             else return pre_StateData;
         })();
-        const refresher = vr.crypto.genereate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys(pubs));
+        const refresher = vr.crypto.generate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys(pubs));
         const nonce = get_nonce(req_tx.hash,height,target_block.hash,refresher,vr.crypto.object_hash(output),unit_price);
         if(nonce===-1) throw new Error('fail to get valid nonce')
         const tx = vr.tx.create_ref_tx(pubs,feeprice,unit_price,height,target_block.hash,index,req_tx_pure.hash,success,nonce,output.map(s=>JSON.stringify(s)),log,private_key,public_key);

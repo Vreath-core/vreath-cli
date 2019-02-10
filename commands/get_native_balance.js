@@ -16,7 +16,7 @@ exports.default = async (config, id) => {
     const my_pub = pub_keys[id];
     if (my_pub == null)
         return 0;
-    const address = vr.crypto.genereate_address(vr.con.constant.native, my_pub);
+    const address = vr.crypto.generate_address(vr.con.constant.native, my_pub);
     const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
     const stateroot = roots.stateroot;
     const S_Trie = data_1.state_trie_ins(stateroot);

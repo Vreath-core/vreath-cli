@@ -15,7 +15,6 @@ export default async (my_password:string)=>{
     const my_key = vr.crypto.hash(my_password).slice(0,122);
     await promisify(fs.stat)('./keys/private/'+my_key+'.txt');
     const S_Trie = data.state_trie_ins('');
-
     const reduced_state = genesis.state.map(s=>{
         if(s.kind!='state'||s.token!=vr.con.constant.unit) return s;
         return new_obj(

@@ -235,14 +235,14 @@ exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, pri
             else
                 return base_states;
         })();
-        const success = !computed.some(s => vr.state.verify_state(s));
+        const success = !computed.some(s => !vr.state.verify_state(s));
         const output = (() => {
             if (success)
                 return computed;
             else
                 return pre_StateData;
         })();
-        const refresher = vr.crypto.genereate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys(pubs));
+        const refresher = vr.crypto.generate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys(pubs));
         const nonce = exports.get_nonce(req_tx.hash, height, target_block.hash, refresher, vr.crypto.object_hash(output), unit_price);
         if (nonce === -1)
             throw new Error('fail to get valid nonce');

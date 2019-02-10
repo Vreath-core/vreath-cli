@@ -119,7 +119,7 @@ const staking = async (private_key) => {
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
         const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
         const S_Trie = data.state_trie_ins(roots.stateroot);
-        const unit_validator = vr.crypto.genereate_address(vr.con.constant.unit, validator_pub);
+        const unit_validator = vr.crypto.generate_address(vr.con.constant.unit, validator_pub);
         const unit_validator_state = await S_Trie.get(unit_validator);
         if (unit_validator_state == null || unit_validator_state.amount === 0)
             throw new Error('the validator has no units');
@@ -154,8 +154,8 @@ const buying_unit = async (private_key) => {
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const native_validator = vr.crypto.genereate_address(vr.con.constant.native, vr.crypto.merge_pub_keys([pub_key]));
-        const unit_validator = vr.crypto.genereate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys([pub_key]));
+        const native_validator = vr.crypto.generate_address(vr.con.constant.native, vr.crypto.merge_pub_keys([pub_key]));
+        const unit_validator = vr.crypto.generate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys([pub_key]));
         const validator_state = await S_Trie.get(native_validator);
         if (validator_state == null)
             throw new Error("You don't have enough amount");
@@ -359,6 +359,7 @@ const get_new_blocks = async () => {
             return 0;
         let block;
         for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
+            console.log(block);
             await request_promise_native_1.default.post({
                 url: 'http://localhost:57750/block',
                 body: block,
@@ -368,6 +369,7 @@ const get_new_blocks = async () => {
         return 1;
     }
     catch (e) {
+        console.log(e);
         log.info(e);
     }
 };
@@ -407,7 +409,7 @@ yargs_1.default
         }
         if (config.miner.flag) {
             const my_miner_pub = config.pub_keys[config.miner.use];
-            const my_miner = vr.crypto.genereate_address(vr.con.constant.unit, my_miner_pub);
+            const my_miner = vr.crypto.generate_address(vr.con.constant.unit, my_miner_pub);
             setInterval(async () => {
                 await refreshing(my_private);
                 await making_unit(my_miner);

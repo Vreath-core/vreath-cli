@@ -23,7 +23,7 @@ exports.default = async (input, config, my_private) => {
         const user_pub = config.pub_keys[config.user.use];
         const type = "change";
         const tokens = [vr.con.constant.native];
-        const remitter = vr.crypto.genereate_address(vr.con.constant.native, user_pub);
+        const remitter = vr.crypto.generate_address(vr.con.constant.native, user_pub);
         const receiver = splited[0].split('=')[1].trim().split(',').map(add => {
             if (add === "remitter")
                 return remitter;

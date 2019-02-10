@@ -46,7 +46,6 @@ app.use('/block',block_routes);
 app.use('/unit',unit_routes);
 app.use('/chain',chain_routes);
 
-
 const log = bunyan.createLogger({
     name:'vreath-cli',
     streams:[
@@ -111,7 +110,7 @@ const staking = async (private_key:string)=>{
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
         const S_Trie = data.state_trie_ins(roots.stateroot);
-        const unit_validator = vr.crypto.genereate_address(vr.con.constant.unit,validator_pub);
+        const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,validator_pub);
         const unit_validator_state:vr.State = await S_Trie.get(unit_validator);
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
@@ -147,8 +146,8 @@ const buying_unit = async (private_key:string)=>{
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
-        const native_validator = vr.crypto.genereate_address(vr.con.constant.native,vr.crypto.merge_pub_keys([pub_key]))
-        const unit_validator = vr.crypto.genereate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys([pub_key]))
+        const native_validator = vr.crypto.generate_address(vr.con.constant.native,vr.crypto.merge_pub_keys([pub_key]))
+        const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys([pub_key]))
         const validator_state:vr.State = await S_Trie.get(native_validator);
         if(validator_state==null) throw new Error("You don't have enough amount");
         const validator_amount = validator_state.amount || 0;
@@ -364,6 +363,7 @@ const get_new_blocks = async ()=>{
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
         let block:vr.Block
         for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
+            console.log(block)
             await rp.post({
                 url:'http://localhost:57750/block',
                 body:block,
@@ -373,10 +373,10 @@ const get_new_blocks = async ()=>{
         return 1;
     }
     catch(e){
+        console.log(e)
         log.info(e);
     }
 }
-
 
 
 yargs
@@ -419,7 +419,7 @@ yargs
 
         if(config.miner.flag){
             const my_miner_pub = config.pub_keys[config.miner.use];
-            const my_miner = vr.crypto.genereate_address(vr.con.constant.unit,my_miner_pub);
+            const my_miner = vr.crypto.generate_address(vr.con.constant.unit,my_miner_pub);
             setInterval(async ()=>{
                 await refreshing(my_private);
                 await making_unit(my_miner);

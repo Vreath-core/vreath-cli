@@ -26,7 +26,7 @@ export default router.post('/',async (req,res)=>{
             let search_tx:vr.TxPure;
             for(search_block of chain.slice().reverse()){
                 for(search_tx of search_block.txs){
-                    if(search_tx.meta.kind==="refresh"&&search_tx.meta.req_tx_hash===unit.request&&search_tx.meta.height===unit.height&&search_tx.meta.block_hash===unit.block_hash&&search_tx.meta.output===unit.output&&!vr.crypto.verify_address(unit.address)&&unit.unit_price>=0&&vr.tx.mining(unit.request,unit.height,unit.block_hash,unit.address,unit.output,unit.unit_price,unit.nonce)) return true;
+                    if(search_tx.meta.kind==="refresh"&&search_tx.meta.req_tx_hash===unit.request&&search_tx.meta.height===unit.height&&search_tx.meta.block_hash===unit.block_hash&&search_tx.meta.output===unit.output&&vr.crypto.verify_address(unit.address)&&unit.unit_price>=0&&vr.tx.mining(unit.request,unit.height,unit.block_hash,unit.address,unit.output,unit.unit_price,unit.nonce)) return true;
                 }
             }
             return false;
