@@ -28,7 +28,6 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
-import chain from '../app/routes/chain';
 
 
 math.config({
@@ -109,7 +108,7 @@ const staking = async (private_key:string,config:any)=>{
         const validator_pub:string = config.pub_keys[config.validator.use];
         if(validator_pub==null) throw new Error('invalid validator public key');
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
-        const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+        const pool:vr.Pool = await works.read_pool(10**9);
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,validator_pub);
         const unit_validator_state:vr.State = await S_Trie.get(unit_validator);
@@ -176,13 +175,13 @@ const buying_unit = async (private_key:string,config:any)=>{
         const input_raw = ["buy",JSON.stringify(units)];
         const tx = await works.make_req_tx([pub_key],type,tokens,bases,feeprice,gas,input_raw,"",private_key,pub_key,chain,S_Trie,L_Trie);
 
-        const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+        const pool:vr.Pool = await works.read_pool(10**9)
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
 
         if(new_pool[tx.hash]!=null){
-            await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+            await works.write_pool(new_pool);
             const new_unit_store = works.new_obj(
                 unit_store,
                 store=>{
@@ -249,11 +248,11 @@ const refreshing = async (private_key:string,config:any)=>{
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_ref_tx([miner_pub],feeprice,unit_price,block_height,tx_index,log,private_key,miner_pub,chain,S_Trie,L_Trie);
 
-        const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+        const pool:vr.Pool = await works.read_pool(10**9)
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
-        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+        await works.write_pool(new_pool);
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
@@ -365,7 +364,6 @@ const get_new_blocks = async ()=>{
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
         let block:vr.Block
         for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
-            console.log(block)
             await rp.post({
                 url:'http://localhost:57750/block',
                 body:block,

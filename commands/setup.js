@@ -52,9 +52,10 @@ exports.default = async (my_password) => {
     };
     await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', JSON.stringify(info, null, 4), 'utf-8');
     await work_1.write_chain(genesis.block);
+    await fse.emptyDir('./json/pool');
     await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
-    await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify({}), 'utf-8');
     await util_1.promisify(fs.writeFile)('./json/peer_list.json', JSON.stringify(genesis.peers, null, 4), 'utf-8');
     await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify({}), 'utf-8');
+    await util_1.promisify(fs.writeFile)('./log/log.log', '', 'utf-8');
 };
 //# sourceMappingURL=setup.js.map

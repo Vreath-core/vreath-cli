@@ -29,7 +29,7 @@ exports.default = router.post('/', async (req, res) => {
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+        const pool = await work_1.read_pool(10 ** 9);
         const chain = await work_1.read_chain(2 * (10 ** 9));
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
         const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -62,7 +62,7 @@ exports.default = router.post('/', async (req, res) => {
             }
         }
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
-        await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+        await work_1.write_pool(new_pool);
         res.status(200).send('success');
         return 1;
     }

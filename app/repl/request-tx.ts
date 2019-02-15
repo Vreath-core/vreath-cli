@@ -23,11 +23,11 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_req_tx([user_pub],type,tokens,bases,feeprice,gas,input_raw,log,my_private,user_pub,chain,S_Trie,L_Trie);
-        const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+        const pool:vr.Pool = await works.read_pool(10**9)
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
-        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+        await works.write_pool(new_pool);
 
         if(new_pool[tx.hash]!=null){
             const peers:{protocol:string,ip:string,port:number}[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");

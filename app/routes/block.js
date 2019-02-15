@@ -61,7 +61,7 @@ exports.default = router.get('/', async (req, res) => {
         }
         const chain = await work_1.read_chain(2 * (10 ** 9));
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
-        const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+        const pool = await work_1.read_pool(10 ** 9);
         const S_Trie = logic.state_trie_ins(roots.stateroot);
         const StateData = await logic.get_block_statedata(block, chain, S_Trie);
         const L_Trie = logic.lock_trie_ins(roots.lockroot);
@@ -105,7 +105,7 @@ exports.default = router.get('/', async (req, res) => {
             obj[key] = pool[key];
             return obj;
         }, {});
-        await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+        await work_1.write_pool(new_pool);
         res.status(200).send('success');
         /*const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{

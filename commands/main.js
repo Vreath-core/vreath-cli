@@ -117,7 +117,7 @@ const staking = async (private_key, config) => {
         if (validator_pub == null)
             throw new Error('invalid validator public key');
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
-        const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+        const pool = await works.read_pool(10 ** 9);
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit, validator_pub);
         const unit_validator_state = await S_Trie.get(unit_validator);
@@ -185,12 +185,12 @@ const buying_unit = async (private_key, config) => {
         const gas = config.validator.gas;
         const input_raw = ["buy", JSON.stringify(units)];
         const tx = await works.make_req_tx([pub_key], type, tokens, bases, feeprice, gas, input_raw, "", private_key, pub_key, chain, S_Trie, L_Trie);
-        const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+        const pool = await works.read_pool(10 ** 9);
         const StateData = await data.get_tx_statedata(tx, chain, S_Trie);
         const LockData = await data.get_tx_lockdata(tx, chain, L_Trie);
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
         if (new_pool[tx.hash] != null) {
-            await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+            await works.write_pool(new_pool);
             const new_unit_store = works.new_obj(unit_store, store => {
                 units.forEach(unit => {
                     const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request) + unit.height + vr.crypto.hex2number(unit.block_hash)).toString(16));
@@ -251,11 +251,11 @@ const refreshing = async (private_key, config) => {
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_ref_tx([miner_pub], feeprice, unit_price, block_height, tx_index, log, private_key, miner_pub, chain, S_Trie, L_Trie);
-        const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+        const pool = await works.read_pool(10 ** 9);
         const StateData = await data.get_tx_statedata(tx, chain, S_Trie);
         const LockData = await data.get_tx_lockdata(tx, chain, L_Trie);
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
-        await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+        await works.write_pool(new_pool);
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         await P.forEach(peers, async (peer) => {
             const url = 'http://' + peer.ip + ':57750/tx';
@@ -361,7 +361,6 @@ const get_new_blocks = async () => {
             return 0;
         let block;
         for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
-            console.log(block);
             await request_promise_native_1.default.post({
                 url: 'http://localhost:57750/block',
                 body: block,

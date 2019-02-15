@@ -78,6 +78,50 @@ export const write_chain = async (block:vr.Block)=>{
     }
 }
 
+export const read_pool = async (max_size:number)=>{
+    try{
+        const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];
+        let size = 0;
+        let name:string;
+        let tx:vr.Tx;
+        let pool:vr.Pool = {};
+        for(name of filenames){
+            tx = JSON.parse(await promisify(fs.readFile)('./json/pool/'+name,'utf-8'));
+            if(size+Buffer.from(JSON.stringify(tx)).length>max_size) break;
+            pool[tx.hash] = tx;
+        }
+        return pool;
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
+export const write_pool = async (pool:vr.Pool)=>{
+    try{
+        const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];
+        const tx_names = Object.keys(pool);
+        const for_save = tx_names.filter(name=>filenames.indexOf(name+'.json')===-1);
+        const for_del = filenames.filter(name=>tx_names.indexOf(name+'.json')===-1);
+        let name:string;
+        let file_name:string;
+        let tx:vr.Tx;
+        for(name of filenames){
+            if(for_del.indexOf(name)!=-1) await promisify(fs.unlink)('./json/pool/'+name);
+        }
+        for(name of tx_names){
+            file_name = name+'.json';
+            if(for_save.indexOf(name)!=-1){
+                tx = pool[name];
+                await promisify(fs.writeFile)('./json/pool/'+file_name,JSON.stringify(tx,null,4),'utf-8');
+            }
+        }
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
 
 const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
@@ -148,12 +192,12 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
                     else if(tx.meta.kind==='refresh'&&!vr.tx.verify_ref_tx(tx,chain,true,s_data,l_data))return result.concat(tx.hash);
                     else return result;
                 },[]);
-                const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+                const pool:vr.Pool = await read_pool(10**9);
                 const new_pool:vr.Pool = Object.keys(pool).filter(key=>invalid_tx_hashes.indexOf(key)===-1).reduce((res:vr.Pool,key)=>{
                     res[key] = pool[key];
                     return res;
                 },{});
-                await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+                await write_pool(new_pool);
                 throw new Error('remove invalid txs');
             }
             return micro_block;

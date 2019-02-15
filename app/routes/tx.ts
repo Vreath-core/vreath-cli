@@ -3,7 +3,7 @@ import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import * as logic from '../../logic/data'
-import {read_chain, compute_output} from '../../logic/work'
+import {read_chain, compute_output, read_pool, write_pool} from '../../logic/work'
 import * as P from 'p-iteration'
 
 const router = express.Router();
@@ -22,7 +22,7 @@ export default router.post('/',async (req,res)=>{
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));
+        const pool:vr.Pool = await read_pool(10**9)
         const chain:vr.Block[] = await read_chain(2*(10**9));
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -51,7 +51,7 @@ export default router.post('/',async (req,res)=>{
             }
         }
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
-        await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
+        await write_pool(new_pool);
         res.status(200).send('success');
         return 1;
     }

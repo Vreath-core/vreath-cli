@@ -69,6 +69,50 @@ exports.write_chain = async (block) => {
         throw new Error(e);
     }
 };
+exports.read_pool = async (max_size) => {
+    try {
+        const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];
+        let size = 0;
+        let name;
+        let tx;
+        let pool = {};
+        for (name of filenames) {
+            tx = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool/' + name, 'utf-8'));
+            if (size + Buffer.from(JSON.stringify(tx)).length > max_size)
+                break;
+            pool[tx.hash] = tx;
+        }
+        return pool;
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
+exports.write_pool = async (pool) => {
+    try {
+        const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];
+        const tx_names = Object.keys(pool);
+        const for_save = tx_names.filter(name => filenames.indexOf(name + '.json') === -1);
+        const for_del = filenames.filter(name => tx_names.indexOf(name + '.json') === -1);
+        let name;
+        let file_name;
+        let tx;
+        for (name of filenames) {
+            if (for_del.indexOf(name) != -1)
+                await util_1.promisify(fs.unlink)('./json/pool/' + name);
+        }
+        for (name of tx_names) {
+            file_name = name + '.json';
+            if (for_save.indexOf(name) != -1) {
+                tx = pool[name];
+                await util_1.promisify(fs.writeFile)('./json/pool/' + file_name, JSON.stringify(tx, null, 4), 'utf-8');
+            }
+        }
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
 const choose_txs = async (pool, L_Trie) => {
     const pool_txs = Object.keys(pool).map(key => pool[key]);
     const requested_bases = (await L_Trie.filter((val) => {
@@ -147,12 +191,12 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
                     else
                         return result;
                 }, []);
-                const pool = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool.json', 'utf-8'));
+                const pool = await exports.read_pool(10 ** 9);
                 const new_pool = Object.keys(pool).filter(key => invalid_tx_hashes.indexOf(key) === -1).reduce((res, key) => {
                     res[key] = pool[key];
                     return res;
                 }, {});
-                await util_1.promisify(fs.writeFile)('./json/pool.json', JSON.stringify(new_pool, null, 4), 'utf-8');
+                await exports.write_pool(new_pool);
                 throw new Error('remove invalid txs');
             }
             return micro_block;
