@@ -110,7 +110,7 @@ const shake_hands = async () => {
         log.info(e);
     }
 };
-const staking = async (private_key) => {
+const staking = async (private_key, config) => {
     try {
         const chain = await works.read_chain(2 * (10 ** 9));
         const validator_pub = config.pub_keys[config.validator.use];
@@ -145,7 +145,7 @@ const staking = async (private_key) => {
         log.info(e);
     }
 };
-const buying_unit = async (private_key) => {
+const buying_unit = async (private_key, config) => {
     try {
         const pub_key = config.pub_keys[config.validator.use];
         const type = "change";
@@ -215,7 +215,7 @@ const buying_unit = async (private_key) => {
         log.info(e);
     }
 };
-const refreshing = async (private_key) => {
+const refreshing = async (private_key, config) => {
     try {
         const miner_pub = config.pub_keys[config.miner.use];
         const feeprice = Number(config.miner.fee_price);
@@ -271,7 +271,7 @@ const refreshing = async (private_key) => {
         log.info(e);
     }
 };
-const making_unit = async (miner) => {
+const making_unit = async (miner, config) => {
     try {
         const chain = await works.read_chain(2 * (10 ** 9));
         const unit_price = config.miner.unit_price;
@@ -347,6 +347,8 @@ const get_new_blocks = async () => {
     try {
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         const peer = peers[0];
+        if (peer == null)
+            throw new Error('no peer');
         const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
         const diff_sum = info.pos_diffs.reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
         const option = {
@@ -369,7 +371,6 @@ const get_new_blocks = async () => {
         return 1;
     }
     catch (e) {
-        console.log(e);
         log.info(e);
     }
 };
@@ -403,16 +404,16 @@ yargs_1.default
         }, 30000);
         if (config.validator.flag) {
             setInterval(async () => {
-                await staking(my_private);
-                await buying_unit(my_private);
+                await staking(my_private, config);
+                await buying_unit(my_private, config);
             }, 1000);
         }
         if (config.miner.flag) {
             const my_miner_pub = config.pub_keys[config.miner.use];
             const my_miner = vr.crypto.generate_address(vr.con.constant.unit, my_miner_pub);
             setInterval(async () => {
-                await refreshing(my_private);
-                await making_unit(my_miner);
+                await refreshing(my_private, config);
+                await making_unit(my_miner, config);
             }, 60000 * config.miner.interval);
         }
         const replServer = repl.start({ prompt: '>', terminal: true });

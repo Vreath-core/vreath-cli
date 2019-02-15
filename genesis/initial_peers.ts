@@ -1,1 +1,2 @@
-export const peers = [];
+export const peers = [
+];

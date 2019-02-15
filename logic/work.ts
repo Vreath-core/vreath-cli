@@ -145,7 +145,7 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
                     const s_data = await data.get_tx_statedata(tx,chain,S_Trie);
                     const l_data = await data.get_tx_lockdata(tx,chain,L_Trie);
                     if(tx.meta.kind==='request'&&!vr.tx.verify_req_tx(tx,false,s_data,l_data)) return result.concat(tx.hash)
-                    else if(tx.meta.kind==='refresh'&&!vr.tx.verify_ref_tx(tx,chain,true,s_data,l_data)) return result.concat(tx.hash);
+                    else if(tx.meta.kind==='refresh'&&!vr.tx.verify_ref_tx(tx,chain,true,s_data,l_data))return result.concat(tx.hash);
                     else return result;
                 },[]);
                 const pool:vr.Pool = JSON.parse(await promisify(fs.readFile)('./json/pool.json','utf-8'));

@@ -14,7 +14,7 @@ const gen_meta = {
     version: vr.con.constant.my_version,
     network_id: vr.con.constant.my_net_id,
     chain_id: vr.con.constant.my_chain_id,
-    validator: vr.crypto.genereate_address(vr.con.constant.native, state_1.genesis_pub),
+    validator: vr.crypto.generate_address(vr.con.constant.native, state_1.genesis_pub),
     height: 0,
     previoushash: vr.crypto.hash(''),
     timestamp: 1545629491,
@@ -27,7 +27,7 @@ const gen_meta = {
     extra: 'Vreath bring cryptocurrency to everyone.'
 };
 const gen_hash = vr.crypto.object_hash(gen_meta);
-const gen_sign = '8acf304c2d3f387ce87df9f8919094c0a38b2a00aa09749511d8303929c0e6c871de9e54ad1e236957647ae0a0afd39080029a0bbd828dfbcbe86ab7a27b96d1';
+const gen_sign = 'c9e7c3ba9635d5a3a7550440053d0017c63cae89172777019a1797ee3d463bc834878ab06c5acd44195b1dd853f3a9e4eb888f98e6f83a4b79da135343c9df62';
 exports.genesis_block = {
     hash: gen_hash,
     validatorSign: [gen_sign],

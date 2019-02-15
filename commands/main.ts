@@ -28,6 +28,7 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
+import chain from '../app/routes/chain';
 
 
 math.config({
@@ -102,7 +103,7 @@ const shake_hands = async ()=>{
     }
 }
 
-const staking = async (private_key:string)=>{
+const staking = async (private_key:string,config:any)=>{
     try{
         const chain:vr.Block[] = await works.read_chain(2*(10**9));
         const validator_pub:string = config.pub_keys[config.validator.use];
@@ -137,7 +138,7 @@ const staking = async (private_key:string)=>{
     }
 }
 
-const buying_unit = async (private_key:string)=>{
+const buying_unit = async (private_key:string,config:any)=>{
     try{
         const pub_key:string = config.pub_keys[config.validator.use];
         const type:vr.TxType = "change";
@@ -213,7 +214,7 @@ const buying_unit = async (private_key:string)=>{
 }
 
 
-const refreshing = async (private_key:string)=>{
+const refreshing = async (private_key:string,config:any)=>{
     try{
         const miner_pub:string = config.pub_keys[config.miner.use];
         const feeprice = Number(config.miner.fee_price);
@@ -270,7 +271,7 @@ const refreshing = async (private_key:string)=>{
     }
 }
 
-const making_unit = async (miner:string)=>{
+const making_unit = async (miner:string,config:any)=>{
     try{
         const chain:vr.Block[] = await works.read_chain(2*(10**9));
         const unit_price:number = config.miner.unit_price;
@@ -352,6 +353,7 @@ const get_new_blocks = async ()=>{
     try{
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         const peer = peers[0];
+        if(peer==null) throw new Error('no peer');
         const info:works.chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
         const diff_sum = info.pos_diffs.reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
         const option = {
@@ -373,7 +375,6 @@ const get_new_blocks = async ()=>{
         return 1;
     }
     catch(e){
-        console.log(e)
         log.info(e);
     }
 }
@@ -412,8 +413,8 @@ yargs
 
         if(config.validator.flag){
             setInterval(async ()=>{
-                await staking(my_private);
-                await buying_unit(my_private);
+                await staking(my_private,config);
+                await buying_unit(my_private,config);
             },1000);
         }
 
@@ -421,8 +422,8 @@ yargs
             const my_miner_pub = config.pub_keys[config.miner.use];
             const my_miner = vr.crypto.generate_address(vr.con.constant.unit,my_miner_pub);
             setInterval(async ()=>{
-                await refreshing(my_private);
-                await making_unit(my_miner);
+                await refreshing(my_private,config);
+                await making_unit(my_miner,config);
             },60000*config.miner.interval);
         }
 

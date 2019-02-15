@@ -3,7 +3,8 @@ import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import * as logic from '../../logic/data'
-import {read_chain} from '../../logic/work'
+import {read_chain, compute_output} from '../../logic/work'
+import * as P from 'p-iteration'
 
 const router = express.Router();
 
@@ -28,6 +29,27 @@ export default router.post('/',async (req,res)=>{
         const StateData = await logic.get_tx_statedata(tx,chain,S_Trie);
         const L_Trie = logic.lock_trie_ins(roots.lockroot);
         const LockData = await logic.get_tx_lockdata(tx,chain,L_Trie);
+        if(tx.meta.kind==='refresh'){
+            const req_tx = vr.tx.find_req_tx(tx,chain);
+            const checked = await (async ()=>{
+                const not_refed = await P.some(req_tx.meta.bases, async (key:string)=>{
+                    const lock:vr.Lock = await L_Trie.get(key);
+                    return lock==null||!(lock.state==="already"&&lock.height===tx.meta.height&&lock.block_hash===tx.meta.block_hash&&lock.index===tx.meta.index&&lock.tx_hash===tx.meta.req_tx_hash)
+                });
+                if(!not_refed) return true;
+                const in_pool = Object.values(pool).some(t=>{
+                    return t.meta.kind==='refresh'&&t.meta.req_tx_hash===tx.meta.req_tx_hash&&t.meta.height===tx.meta.height&&t.meta.index===tx.meta.index&&t.meta.block_hash===tx.meta.block_hash
+                });
+                if(in_pool) return true;
+                else return false;
+            })();
+            if(!checked){
+                const valid_output = compute_output(req_tx,StateData,chain);
+                const suc = !valid_output.some(s=>!vr.state.verify_state(s));
+                const valid_out_hash = vr.crypto.object_hash(valid_output);
+                if(suc!=tx.meta.success||valid_out_hash!=tx.meta.output) throw new Error('invalid output');
+            }
+        }
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
         await promisify(fs.writeFile)('./json/pool.json',JSON.stringify(new_pool,null, 4),'utf-8');
         res.status(200).send('success');

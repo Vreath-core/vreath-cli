@@ -3,7 +3,7 @@ import * as vr from 'vreath'
 import * as data from '../logic/data'*/
 
 export const genesis_pub = '0234d5f4af3126a2183b633b0f9869512bcc01e4650251695ba33a7448c6091212';
-const genesis_unit_address = vr.crypto.genereate_address(vr.con.constant.unit,genesis_pub);
+const genesis_unit_address = vr.crypto.generate_address(vr.con.constant.unit,genesis_pub);
 
 export const genesis_state:vr.State[] = [vr.state.create_state(0,genesis_unit_address,vr.con.constant.unit,1,{used:"[]"}),vr.state.create_info(0,vr.con.constant.native),vr.state.create_info(0,vr.con.constant.unit,1)];
 
