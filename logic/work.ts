@@ -5,6 +5,7 @@ import * as math from 'mathjs'
 import * as fs from 'fs'
 import {promisify} from 'util'
 import {cloneDeep} from 'lodash'
+import share_data from '../json/share_data';
 
 math.config({
   number: 'BigNumber'
@@ -33,13 +34,18 @@ export type chain_info = {
     version:number;
     compatible_version:number;
     last_height:number;
+    last_hash:string;
     pos_diffs:number[];
 }
 
 export const read_chain = async (max_size:number)=>{
     try{
         const net_id = vr.con.constant.my_net_id;
+        const pre_chain = share_data.chain;
         const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        if(pre_chain.length-1>=info.last_height&&pre_chain[pre_chain.length-1]!=null&&pre_chain[pre_chain.length-1].hash===info.last_hash){
+            return pre_chain;
+        }
         let chain:vr.Block[] = [];
         let block:vr.Block;
         let size_sum = 0;
@@ -47,10 +53,17 @@ export const read_chain = async (max_size:number)=>{
         for(i=info.last_height; i>=0; i--){
             block = JSON.parse(await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json','utf-8'));
             size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
-            if(size_sum>max_size) break;
+            if(pre_chain[info.last_height-i]!=null&&pre_chain[info.last_height-i].hash===block.hash){
+                chain = pre_chain.concat(chain.reverse());
+                break;
+            }
+            if(size_sum>max_size){
+                chain.reverse();
+                break;
+            }
             else chain.push(block);
         }
-        return chain.slice().reverse();
+        return chain;
     }
     catch(e){
         throw new Error(e);
@@ -66,12 +79,14 @@ export const write_chain = async (block:vr.Block)=>{
             info,
             i=>{
                 i.last_height = height;
+                i.last_hash = block.hash;
                 i.pos_diffs.push(block.meta.pos_diff);
                 return i;
             }
         )
         await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+height.toString()+'.json',JSON.stringify(block,null, 4),'utf-8');
         await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
+        share_data.chain.push(block);
     }
     catch(e){
         throw new Error(e);

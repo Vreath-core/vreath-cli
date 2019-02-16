@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import * as fse from 'fs-extra'
 import {promisify} from 'util'
 import * as P from 'p-iteration'
-import { write_chain, chain_info, new_obj, write_pool} from '../logic/work';
+import { write_chain, chain_info, new_obj} from '../logic/work';
 import * as math from 'mathjs'
 math.config({
     number: 'BigNumber'
@@ -41,6 +41,7 @@ export default async (my_password:string)=>{
         version:vr.con.constant.my_version,
         compatible_version:vr.con.constant.compatible_version,
         last_height:0,
+        last_hash:genesis.block.hash,
         pos_diffs:[]
     }
     await promisify(fs.writeFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json',JSON.stringify(info,null,4),'utf-8');

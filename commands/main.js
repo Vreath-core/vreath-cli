@@ -27,6 +27,8 @@ const works = __importStar(require("../logic/work"));
 const data = __importStar(require("../logic/data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
 const remit_1 = __importDefault(require("../app/repl/remit"));
+const balance_1 = __importDefault(require("../app/repl/balance"));
+const share_data_1 = __importDefault(require("../json/share_data"));
 const express_1 = __importDefault(require("express"));
 const bodyParser = __importStar(require("body-parser"));
 const fs = __importStar(require("fs"));
@@ -39,6 +41,10 @@ const readline_sync_1 = __importDefault(require("readline-sync"));
 const math = __importStar(require("mathjs"));
 const bunyan_1 = __importDefault(require("bunyan"));
 const yargs_1 = __importDefault(require("yargs"));
+/*import pidusage from 'pidusage'
+import heapdump from 'heapdump'
+
+heapdump.writeSnapshot('./' + Date.now() + '.heapsnapshot');*/
 math.config({
     number: 'BigNumber'
 });
@@ -109,8 +115,10 @@ const shake_hands = async () => {
     catch (e) {
         log.info(e);
     }
+    setImmediate(shake_hands);
+    return 0;
 };
-const staking = async (private_key, config) => {
+const staking = async (private_key) => {
     try {
         const chain = await works.read_chain(2 * (10 ** 9));
         const validator_pub = config.pub_keys[config.validator.use];
@@ -125,11 +133,36 @@ const staking = async (private_key, config) => {
             throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain, [validator_pub], roots.stateroot, roots.lockroot, '', pool, private_key, validator_pub, S_Trie, L_Trie);
-        await request_promise_native_1.default.post({
-            url: 'http://localhost:57750/block',
-            body: block,
-            json: true
+        const StateData = await data.get_block_statedata(block, chain, S_Trie);
+        const LockData = await data.get_block_lockdata(block, chain, L_Trie);
+        const accepted = (() => {
+            if (block.meta.kind === 'key')
+                return vr.block.accept_key_block(block, chain, StateData, LockData);
+            else
+                return vr.block.accept_micro_block(block, chain, StateData, LockData);
+        })();
+        await P.forEach(accepted[0], async (state) => {
+            if (state.kind === 'state')
+                await S_Trie.put(state.owner, state);
+            else
+                await S_Trie.put(state.token, state);
         });
+        await P.forEach(accepted[1], async (lock) => {
+            await L_Trie.put(lock.address, lock);
+        });
+        await works.write_chain(block);
+        const new_roots = {
+            stateroot: S_Trie.now_root(),
+            lockroot: L_Trie.now_root()
+        };
+        await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
+        const txs_hash = block.txs.map(pure => pure.hash);
+        const new_pool_keys = Object.keys(pool).filter(key => txs_hash.indexOf(key) === -1);
+        const new_pool = new_pool_keys.reduce((obj, key) => {
+            obj[key] = pool[key];
+            return obj;
+        }, {});
+        await works.write_pool(new_pool);
         const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
         await P.forEach(peers, async (peer) => {
             const url1 = 'http://' + peer.ip + ':57750/block';
@@ -144,8 +177,11 @@ const staking = async (private_key, config) => {
     catch (e) {
         log.info(e);
     }
+    await works.sleep(1000);
+    setImmediate(() => staking.apply(null, [private_key]));
+    return 0;
 };
-const buying_unit = async (private_key, config) => {
+const buying_unit = async (private_key) => {
     try {
         const pub_key = config.pub_keys[config.validator.use];
         const type = "change";
@@ -214,8 +250,10 @@ const buying_unit = async (private_key, config) => {
     catch (e) {
         log.info(e);
     }
+    setImmediate(() => buying_unit.apply(null, [private_key]));
+    return 0;
 };
-const refreshing = async (private_key, config) => {
+const refreshing = async (private_key) => {
     try {
         const miner_pub = config.pub_keys[config.miner.use];
         const feeprice = Number(config.miner.fee_price);
@@ -270,8 +308,10 @@ const refreshing = async (private_key, config) => {
     catch (e) {
         log.info(e);
     }
+    setImmediate(() => refreshing.apply(null, [private_key]));
+    return 0;
 };
-const making_unit = async (miner, config) => {
+const making_unit = async (miner) => {
     try {
         const chain = await works.read_chain(2 * (10 ** 9));
         const unit_price = config.miner.unit_price;
@@ -342,6 +382,8 @@ const making_unit = async (miner, config) => {
     catch (e) {
         log.info(e);
     }
+    setImmediate(() => making_unit.apply(null, [miner]));
+    return 0;
 };
 const get_new_blocks = async () => {
     try {
@@ -367,11 +409,12 @@ const get_new_blocks = async () => {
                 json: true
             });
         }
-        return 1;
     }
     catch (e) {
         log.info(e);
     }
+    setImmediate(get_new_blocks);
+    return 0;
 };
 yargs_1.default
     .usage('Usage: $0 <command> [options]')
@@ -391,29 +434,49 @@ yargs_1.default
         const my_key = vr.crypto.hash(my_password).slice(0, 122);
         const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
         const my_private = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
-        (async () => {
+        share_data_1.default.chain = await works.read_chain(2 * (10 ** 9));
+        /*(async ()=>{
             await shake_hands();
             await get_new_blocks();
-        })();
-        setInterval(async () => {
-            await shake_hands();
-        }, 600000);
-        setInterval(async () => {
-            await get_new_blocks();
-        }, 30000);
+            return 0;
+        })();*/
+        /*setInterval(async ()=>{
+            await shake_hands(log);
+            return 0;
+        },600000);*/
+        /*setInterval(async ()=>{
+            await get_new_blocks(log);
+            return 0;
+        },30000);
+
+        if(config.validator.flag){
+            await staking(my_private,config,log);
+            setInterval(async ()=>{
+                await buying_unit(my_private,config,log);
+                return 0;
+            },1000);
+        }
+
+        if(config.miner.flag){
+            const my_miner_pub = config.pub_keys[config.miner.use];
+            const my_miner = vr.crypto.generate_address(vr.con.constant.unit,my_miner_pub);
+            setInterval(async ()=>{
+                await refreshing(my_private,config,log);
+                await making_unit(my_miner,config,log);
+                return 0;
+            },60000*config.miner.interval);
+        }*/
+        await shake_hands();
+        await get_new_blocks();
         if (config.validator.flag) {
-            setInterval(async () => {
-                await staking(my_private, config);
-                await buying_unit(my_private, config);
-            }, 1000);
+            await staking(my_private);
+            await buying_unit(my_private);
         }
         if (config.miner.flag) {
             const my_miner_pub = config.pub_keys[config.miner.use];
             const my_miner = vr.crypto.generate_address(vr.con.constant.unit, my_miner_pub);
-            setInterval(async () => {
-                await refreshing(my_private, config);
-                await making_unit(my_miner, config);
-            }, 60000 * config.miner.interval);
+            await refreshing(my_private);
+            await making_unit(my_miner);
         }
         const replServer = repl.start({ prompt: '>', terminal: true });
         replServer.defineCommand('request-tx', {
@@ -426,6 +489,13 @@ yargs_1.default
             help: 'Create request tx',
             async action(input) {
                 await remit_1.default(input, config, my_private);
+            }
+        });
+        replServer.defineCommand('balance', {
+            help: 'Check the balance of VRT',
+            async action() {
+                const balance = await balance_1.default(my_private);
+                console.log(balance);
             }
         });
     }

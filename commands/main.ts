@@ -16,6 +16,8 @@ import * as works from '../logic/work'
 import * as data from '../logic/data'
 import req_tx_com from '../app/repl/request-tx'
 import remit from '../app/repl/remit'
+import repl_balance from '../app/repl/balance'
+import share_data from '../json/share_data'
 import express from 'express'
 import * as bodyParser from 'body-parser'
 import * as fs from 'fs'
@@ -28,7 +30,10 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
+/*import pidusage from 'pidusage'
+import heapdump from 'heapdump'
 
+heapdump.writeSnapshot('./' + Date.now() + '.heapsnapshot');*/
 
 math.config({
     number: 'BigNumber'
@@ -56,7 +61,6 @@ const log = bunyan.createLogger({
 });
 
 const config = JSON.parse(fs.readFileSync('./config/config.json','utf-8'));
-
 
 const shake_hands = async ()=>{
     try{
@@ -100,9 +104,11 @@ const shake_hands = async ()=>{
     catch(e){
         log.info(e);
     }
+    setImmediate(shake_hands);
+    return 0;
 }
 
-const staking = async (private_key:string,config:any)=>{
+const staking = async (private_key:string)=>{
     try{
         const chain:vr.Block[] = await works.read_chain(2*(10**9));
         const validator_pub:string = config.pub_keys[config.validator.use];
@@ -115,11 +121,36 @@ const staking = async (private_key:string,config:any)=>{
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
-        await rp.post({
-            url:'http://localhost:57750/block',
-            body:block,
-            json:true
+
+        const StateData = await data.get_block_statedata(block,chain,S_Trie);
+        const LockData = await data.get_block_lockdata(block,chain,L_Trie);
+        const accepted = (()=>{
+            if(block.meta.kind==='key') return vr.block.accept_key_block(block,chain,StateData,LockData);
+            else return vr.block.accept_micro_block(block,chain,StateData,LockData);
+        })();
+        await P.forEach(accepted[0], async (state:vr.State)=>{
+            if(state.kind==='state') await S_Trie.put(state.owner,state);
+            else await S_Trie.put(state.token,state);
         });
+
+        await P.forEach(accepted[1], async (lock:vr.Lock)=>{
+            await L_Trie.put(lock.address,lock);
+        });
+
+        await works.write_chain(block);
+        const new_roots = {
+            stateroot:S_Trie.now_root(),
+            lockroot:L_Trie.now_root()
+        }
+        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
+
+        const txs_hash = block.txs.map(pure=>pure.hash);
+        const new_pool_keys = Object.keys(pool).filter(key=>txs_hash.indexOf(key)===-1);
+        const new_pool = new_pool_keys.reduce((obj:vr.Pool,key)=>{
+            obj[key] = pool[key];
+            return obj;
+        },{});
+        await works.write_pool(new_pool);
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
@@ -135,9 +166,12 @@ const staking = async (private_key:string,config:any)=>{
     catch(e){
         log.info(e);
     }
+    await works.sleep(1000);
+    setImmediate(()=>staking.apply(null,[private_key]));
+    return 0;
 }
 
-const buying_unit = async (private_key:string,config:any)=>{
+const buying_unit = async (private_key:string)=>{
     try{
         const pub_key:string = config.pub_keys[config.validator.use];
         const type:vr.TxType = "change";
@@ -210,10 +244,12 @@ const buying_unit = async (private_key:string,config:any)=>{
     catch(e){
         log.info(e);
     }
+    setImmediate(()=>buying_unit.apply(null,[private_key]));
+    return 0;
 }
 
 
-const refreshing = async (private_key:string,config:any)=>{
+const refreshing = async (private_key:string)=>{
     try{
         const miner_pub:string = config.pub_keys[config.miner.use];
         const feeprice = Number(config.miner.fee_price);
@@ -268,9 +304,11 @@ const refreshing = async (private_key:string,config:any)=>{
     catch(e){
         log.info(e);
     }
+    setImmediate(()=>refreshing.apply(null,[private_key]));
+    return 0;
 }
 
-const making_unit = async (miner:string,config:any)=>{
+const making_unit = async (miner:string)=>{
     try{
         const chain:vr.Block[] = await works.read_chain(2*(10**9));
         const unit_price:number = config.miner.unit_price;
@@ -346,6 +384,8 @@ const making_unit = async (miner:string,config:any)=>{
     catch(e){
         log.info(e);
     }
+    setImmediate(()=>making_unit.apply(null,[miner]));
+    return 0;
 }
 
 const get_new_blocks = async ()=>{
@@ -370,11 +410,12 @@ const get_new_blocks = async ()=>{
                 json:true
             });
         }
-        return 1;
     }
     catch(e){
         log.info(e);
     }
+    setImmediate(get_new_blocks);
+    return 0;
 }
 
 
@@ -396,23 +437,28 @@ yargs
         const my_key = vr.crypto.hash(my_password).slice(0,122);
         const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
         const my_private = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
-        (async ()=>{
+        share_data.chain = await works.read_chain(2*(10**9));
+        /*(async ()=>{
             await shake_hands();
             await get_new_blocks();
-        })();
+            return 0;
+        })();*/
 
-        setInterval(async ()=>{
-            await shake_hands();
-        },600000);
+        /*setInterval(async ()=>{
+            await shake_hands(log);
+            return 0;
+        },600000);*/
 
-        setInterval(async ()=>{
-            await get_new_blocks();
+        /*setInterval(async ()=>{
+            await get_new_blocks(log);
+            return 0;
         },30000);
 
         if(config.validator.flag){
+            await staking(my_private,config,log);
             setInterval(async ()=>{
-                await staking(my_private,config);
-                await buying_unit(my_private,config);
+                await buying_unit(my_private,config,log);
+                return 0;
             },1000);
         }
 
@@ -420,9 +466,22 @@ yargs
             const my_miner_pub = config.pub_keys[config.miner.use];
             const my_miner = vr.crypto.generate_address(vr.con.constant.unit,my_miner_pub);
             setInterval(async ()=>{
-                await refreshing(my_private,config);
-                await making_unit(my_miner,config);
+                await refreshing(my_private,config,log);
+                await making_unit(my_miner,config,log);
+                return 0;
             },60000*config.miner.interval);
+        }*/
+        await shake_hands();
+        await get_new_blocks();
+        if(config.validator.flag){
+            await staking(my_private);
+            await buying_unit(my_private);
+        }
+        if(config.miner.flag){
+            const my_miner_pub = config.pub_keys[config.miner.use];
+            const my_miner = vr.crypto.generate_address(vr.con.constant.unit,my_miner_pub);
+            await refreshing(my_private);
+            await making_unit(my_miner);
         }
 
         const replServer = repl.start({prompt:'>',terminal:true});
@@ -440,6 +499,14 @@ yargs
                 await remit(input,config,my_private);
             }
         });
+
+        replServer.defineCommand('balance',{
+            help: 'Check the balance of VRT',
+            async action(){
+                const balance = await repl_balance(my_private);
+                console.log(balance);
+            }
+        })
     }
     catch(e){
         console.log(e);

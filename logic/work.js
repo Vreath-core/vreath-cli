@@ -6,6 +6,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const data = __importStar(require("./data"));
@@ -14,6 +17,7 @@ const math = __importStar(require("mathjs"));
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const lodash_1 = require("lodash");
+const share_data_1 = __importDefault(require("../json/share_data"));
 math.config({
     number: 'BigNumber'
 });
@@ -33,7 +37,11 @@ exports.new_obj = (obj, fn) => {
 exports.read_chain = async (max_size) => {
     try {
         const net_id = vr.con.constant.my_net_id;
+        const pre_chain = share_data_1.default.chain;
         const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
+        if (pre_chain.length - 1 >= info.last_height && pre_chain[pre_chain.length - 1] != null && pre_chain[pre_chain.length - 1].hash === info.last_hash) {
+            return pre_chain;
+        }
         let chain = [];
         let block;
         let size_sum = 0;
@@ -41,12 +49,18 @@ exports.read_chain = async (max_size) => {
         for (i = info.last_height; i >= 0; i--) {
             block = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + i.toString() + '.json', 'utf-8'));
             size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
-            if (size_sum > max_size)
+            if (pre_chain[info.last_height - i] != null && pre_chain[info.last_height - i].hash === block.hash) {
+                chain = pre_chain.concat(chain.reverse());
                 break;
+            }
+            if (size_sum > max_size) {
+                chain.reverse();
+                break;
+            }
             else
                 chain.push(block);
         }
-        return chain.slice().reverse();
+        return chain;
     }
     catch (e) {
         throw new Error(e);
@@ -59,11 +73,13 @@ exports.write_chain = async (block) => {
         const height = block.meta.height;
         const new_info = exports.new_obj(info, i => {
             i.last_height = height;
+            i.last_hash = block.hash;
             i.pos_diffs.push(block.meta.pos_diff);
             return i;
         });
         await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + height.toString() + '.json', JSON.stringify(block, null, 4), 'utf-8');
         await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', JSON.stringify(new_info, null, 4), 'utf-8');
+        share_data_1.default.chain.push(block);
     }
     catch (e) {
         throw new Error(e);
