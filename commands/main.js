@@ -115,7 +115,40 @@ const shake_hands = async () => {
     catch (e) {
         log.info(e);
     }
+    await works.sleep(600000);
     setImmediate(shake_hands);
+    return 0;
+};
+const get_new_blocks = async () => {
+    try {
+        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
+        const peer = peers[0];
+        if (peer == null)
+            throw new Error('no peer');
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
+        const diff_sum = info.pos_diffs.reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
+        const option = {
+            url: 'http://' + peer.ip + ':57750/chain',
+            body: { diff_sum: diff_sum },
+            json: true
+        };
+        const new_chain = await request_promise_native_1.default.get(option).catch(e => console.log(e));
+        if (new_chain.some(block => !vr.block.isBlock(block)))
+            return 0;
+        let block;
+        for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
+            await request_promise_native_1.default.post({
+                url: 'http://localhost:57750/block',
+                body: block,
+                json: true
+            });
+        }
+    }
+    catch (e) {
+        log.info(e);
+    }
+    await works.sleep(30000);
+    setImmediate(get_new_blocks);
     return 0;
 };
 const staking = async (private_key) => {
@@ -250,6 +283,7 @@ const buying_unit = async (private_key) => {
     catch (e) {
         log.info(e);
     }
+    await works.sleep(1000);
     setImmediate(() => buying_unit.apply(null, [private_key]));
     return 0;
 };
@@ -308,11 +342,14 @@ const refreshing = async (private_key) => {
     catch (e) {
         log.info(e);
     }
+    await works.sleep(60000 * config.miner.interval);
     setImmediate(() => refreshing.apply(null, [private_key]));
     return 0;
 };
-const making_unit = async (miner) => {
+const making_unit = async () => {
     try {
+        const pub = config.pub_keys[config.miner.use];
+        const miner = vr.crypto.generate_address(vr.con.constant.unit, pub);
         const chain = await works.read_chain(2 * (10 ** 9));
         const unit_price = config.miner.unit_price;
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
@@ -382,38 +419,8 @@ const making_unit = async (miner) => {
     catch (e) {
         log.info(e);
     }
-    setImmediate(() => making_unit.apply(null, [miner]));
-    return 0;
-};
-const get_new_blocks = async () => {
-    try {
-        const peers = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8') || "[]");
-        const peer = peers[0];
-        if (peer == null)
-            throw new Error('no peer');
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
-        const diff_sum = info.pos_diffs.reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
-        const option = {
-            url: 'http://' + peer.ip + ':57750/chain',
-            body: { diff_sum: diff_sum },
-            json: true
-        };
-        const new_chain = await request_promise_native_1.default.get(option).catch(e => console.log(e));
-        if (new_chain.some(block => !vr.block.isBlock(block)))
-            return 0;
-        let block;
-        for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
-            await request_promise_native_1.default.post({
-                url: 'http://localhost:57750/block',
-                body: block,
-                json: true
-            });
-        }
-    }
-    catch (e) {
-        log.info(e);
-    }
-    setImmediate(get_new_blocks);
+    await works.sleep(60000 * config.miner.interval);
+    setImmediate(making_unit);
     return 0;
 };
 yargs_1.default
@@ -466,17 +473,15 @@ yargs_1.default
                 return 0;
             },60000*config.miner.interval);
         }*/
-        await shake_hands();
-        await get_new_blocks();
+        shake_hands();
+        get_new_blocks();
         if (config.validator.flag) {
-            await staking(my_private);
-            await buying_unit(my_private);
+            staking(my_private);
+            buying_unit(my_private);
         }
         if (config.miner.flag) {
-            const my_miner_pub = config.pub_keys[config.miner.use];
-            const my_miner = vr.crypto.generate_address(vr.con.constant.unit, my_miner_pub);
-            await refreshing(my_private);
-            await making_unit(my_miner);
+            refreshing(my_private);
+            making_unit();
         }
         const replServer = repl.start({ prompt: '>', terminal: true });
         replServer.defineCommand('request-tx', {
