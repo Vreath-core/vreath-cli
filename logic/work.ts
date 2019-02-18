@@ -54,7 +54,8 @@ export const read_chain = async (max_size:number)=>{
             block = JSON.parse(await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json','utf-8'));
             size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
             if(pre_chain[info.last_height-i]!=null&&pre_chain[info.last_height-i].hash===block.hash){
-                chain = pre_chain.concat(chain.reverse());
+                const reversed = chain.reverse()
+                chain = pre_chain.concat(reversed);
                 break;
             }
             if(size_sum>max_size){
@@ -62,6 +63,10 @@ export const read_chain = async (max_size:number)=>{
                 break;
             }
             else chain.push(block);
+            if(i===0){
+                chain.reverse();
+                break;
+            }
         }
         return chain;
     }

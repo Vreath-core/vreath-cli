@@ -46,7 +46,6 @@ exports.default = router.get('/', async (req, res) => {
         let index = 0;
         for (i in my_diffs) {
             index = Number(i);
-            sum = math.chain(sum).add(my_diffs[index]).done();
             if (math.larger(sum, req_diff_sum)) {
                 height = index;
                 break;

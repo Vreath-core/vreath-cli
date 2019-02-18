@@ -123,8 +123,8 @@ const get_new_blocks = async ()=>{
         }
         const new_chain:vr.Block[] = await rp.get(option);
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
-        const pre_blocks = share_data.chain.slice(new_chain[0].meta.height);
-        await works.back_chain(new_chain[0].meta.height-1);
+        /*const pre_blocks = share_data.chain.slice(new_chain[0].meta.height);
+        await works.back_chain(new_chain[0].meta.height-1);*/
         let block:vr.Block
         for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
             await rp.post({
@@ -133,7 +133,8 @@ const get_new_blocks = async ()=>{
                 json:true
             });
         }
-        if(share_data.chain.length===new_chain[0].meta.height){
+        /*if(share_data.chain.length===new_chain[0].meta.height){
+            console.log(share_data.chain.length)
             for(block of pre_blocks.slice().sort((a,b)=>a.meta.height-b.meta.height)){
                 await rp.post({
                     url:'http://localhost:57750/block',
@@ -141,9 +142,10 @@ const get_new_blocks = async ()=>{
                     json:true
                 });
             }
-        }
+        }*/
     }
     catch(e){
+        console.log(e)
         log.info(e);
     }
     await works.sleep(30000);
@@ -169,8 +171,12 @@ const staking = async (private_key:string)=>{
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
-
-        const StateData = await data.get_block_statedata(block,chain,S_Trie);
+        await rp.post({
+            url:'http://localhost:57750/block',
+            body:block,
+            json:true
+        });
+        /*const StateData = await data.get_block_statedata(block,chain,S_Trie);
         const LockData = await data.get_block_lockdata(block,chain,L_Trie);
         const accepted = (()=>{
             if(block.meta.kind==='key') return vr.block.accept_key_block(block,chain,StateData,LockData);
@@ -198,7 +204,7 @@ const staking = async (private_key:string)=>{
             obj[key] = pool[key];
             return obj;
         },{});
-        await works.write_pool(new_pool);
+        await works.write_pool(new_pool);*/
 
         const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
         await P.forEach(peers,async peer=>{
