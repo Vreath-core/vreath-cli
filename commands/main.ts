@@ -123,6 +123,7 @@ const get_new_blocks = async ()=>{
         }
         const new_chain:vr.Block[] = await rp.get(option);
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
+        console.log(new_chain[0].meta.height)
         /*const pre_blocks = share_data.chain.slice(new_chain[0].meta.height);
         await works.back_chain(new_chain[0].meta.height-1);*/
         let block:vr.Block
