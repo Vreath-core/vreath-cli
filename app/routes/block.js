@@ -6,6 +6,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
 const vr = __importStar(require("vreath"));
@@ -14,9 +17,18 @@ const util_1 = require("util");
 const logic = __importStar(require("../../logic/data"));
 const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
+const bunyan_1 = __importDefault(require("bunyan"));
 const math = __importStar(require("mathjs"));
 math.config({
     number: 'BigNumber'
+});
+const log = bunyan_1.default.createLogger({
+    name: 'vreath-cli',
+    streams: [
+        {
+            path: './log/log.log'
+        }
+    ]
 });
 const router = express.Router();
 exports.default = router.get('/', async (req, res) => {
@@ -60,6 +72,10 @@ exports.default = router.get('/', async (req, res) => {
             return 0;
         }
         const chain = await work_1.read_chain(2 * (10 ** 9));
+        if (block.meta.kind === 'micro' && vr.block.search_key_block(chain).meta.validator != block.meta.validator) {
+            res.status(500).send('invalid validator');
+            return 0;
+        }
         const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
         const pool = await work_1.read_pool(10 ** 9);
         const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -107,28 +123,10 @@ exports.default = router.get('/', async (req, res) => {
         }, {});
         await work_1.write_pool(new_pool);
         res.status(200).send('success');
-        /*const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        await P.forEach(peers,async peer=>{
-            const url1 = 'http://'+peer.ip+':57750/block';
-            const option1 = {
-                url:url1,
-                body:block,
-                json:true
-            }
-            const order = await rp.post(option1);
-            if(order!='order chain') return 1;
-            const url2 = 'http://'+peer.ip+':57750/chain';
-            const option2 = {
-                url:url2,
-                body:chain.concat(block),
-                json:true
-            }
-            await rp.post(option2);
-        });*/
         return 1;
     }
     catch (e) {
-        //console.log(e);
+        log.info(e);
         res.status(500).send('error');
     }
 });

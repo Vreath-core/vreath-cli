@@ -85,6 +85,25 @@ exports.write_chain = async (block) => {
         throw new Error(e);
     }
 };
+exports.back_chain = async (height) => {
+    try {
+        const net_id = vr.con.constant.my_net_id;
+        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
+        let i;
+        for (i = height + 1; i <= info.last_height; i++) {
+            try {
+                await util_1.promisify(fs.unlink)('./json/chain/net_id_' + net_id.toString() + '/block_' + i.toString() + '.json');
+            }
+            catch (e) {
+                continue;
+            }
+        }
+        share_data_1.default.chain = share_data_1.default.chain.slice(0, height + 1);
+    }
+    catch (e) {
+        throw new Error(e);
+    }
+};
 exports.read_pool = async (max_size) => {
     try {
         const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];

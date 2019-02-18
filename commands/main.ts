@@ -30,7 +30,6 @@ import readlineSync from 'readline-sync'
 import * as math from 'mathjs'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
-import cluster from 'cluster'
 /*import pidusage from 'pidusage'
 import heapdump from 'heapdump'
 
@@ -122,8 +121,10 @@ const get_new_blocks = async ()=>{
             body:{diff_sum:diff_sum},
             json:true
         }
-        const new_chain:vr.Block[] = await rp.get(option).catch(e=>console.log(e));
+        const new_chain:vr.Block[] = await rp.get(option);
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
+        const pre_blocks = share_data.chain.slice(new_chain[0].meta.height);
+        await works.back_chain(new_chain[0].meta.height-1);
         let block:vr.Block
         for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
             await rp.post({
@@ -131,6 +132,15 @@ const get_new_blocks = async ()=>{
                 body:block,
                 json:true
             });
+        }
+        if(share_data.chain.length===new_chain[0].meta.height){
+            for(block of pre_blocks.slice().sort((a,b)=>a.meta.height-b.meta.height)){
+                await rp.post({
+                    url:'http://localhost:57750/block',
+                    body:block,
+                    json:true
+                });
+            }
         }
     }
     catch(e){
@@ -143,7 +153,12 @@ const get_new_blocks = async ()=>{
 
 const staking = async (private_key:string)=>{
     try{
-        const chain:vr.Block[] = await works.read_chain(2*(10**9));
+        const read:vr.Block[] = await works.read_chain(2*(10**9));
+        const key = vr.block.search_key_block(read);
+        const micros = vr.block.search_micro_block(read,key);
+        const pre_validator = key.meta.validator;
+        const slice_height = key.meta.height + 1 + micros.length + (micros.findIndex(block=>pre_validator!=block.meta.validator)+1||0)
+        const chain:vr.Block[] = read.slice(0,slice_height);
         const validator_pub:string = config.pub_keys[config.validator.use];
         if(validator_pub==null) throw new Error('invalid validator public key');
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));

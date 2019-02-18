@@ -4,6 +4,16 @@ import * as fs from 'fs'
 import {promisify} from 'util'
 import {read_chain, new_obj} from '../../logic/work'
 import {state_trie_ins} from '../../logic/data'
+import bunyan from 'bunyan'
+
+const log = bunyan.createLogger({
+    name:'vreath-cli',
+    streams:[
+        {
+            path:'./log/log.log'
+        }
+    ]
+});
 
 const router = express.Router();
 
@@ -48,6 +58,7 @@ export default router.post('/',async (req,res)=>{
         return 1;
     }
     catch(e){
+        log.info(e);
         res.status(404).send('error');
     }
 });

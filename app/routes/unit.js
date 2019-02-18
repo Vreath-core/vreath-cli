@@ -6,6 +6,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const express = __importStar(require("express"));
@@ -13,6 +16,15 @@ const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const work_1 = require("../../logic/work");
 const data_1 = require("../../logic/data");
+const bunyan_1 = __importDefault(require("bunyan"));
+const log = bunyan_1.default.createLogger({
+    name: 'vreath-cli',
+    streams: [
+        {
+            path: './log/log.log'
+        }
+    ]
+});
 const router = express.Router();
 exports.default = router.post('/', async (req, res) => {
     try {
@@ -53,6 +65,7 @@ exports.default = router.post('/', async (req, res) => {
         return 1;
     }
     catch (e) {
+        log.info(e);
         res.status(404).send('error');
     }
 });

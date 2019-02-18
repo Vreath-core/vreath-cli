@@ -17,9 +17,18 @@ const util_1 = require("util");
 const work_1 = require("../../logic/work");
 const P = __importStar(require("p-iteration"));
 const request_promise_native_1 = __importDefault(require("request-promise-native"));
+const bunyan_1 = __importDefault(require("bunyan"));
 const math = __importStar(require("mathjs"));
 math.config({
     number: 'BigNumber'
+});
+const log = bunyan_1.default.createLogger({
+    name: 'vreath-cli',
+    streams: [
+        {
+            path: './log/log.log'
+        }
+    ]
 });
 const router = express.Router();
 exports.default = router.get('/', async (req, res) => {
@@ -85,6 +94,7 @@ exports.default = router.get('/', async (req, res) => {
         return 1;
     }
     catch (e) {
+        log.info(e);
         res.status(500).send('error');
     }
 });

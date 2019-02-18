@@ -2,14 +2,22 @@ import * as express from 'express'
 import * as vr from 'vreath'
 import * as fs from 'fs'
 import {promisify} from 'util'
-import {state_trie_ins,lock_trie_ins,get_block_statedata,get_block_lockdata} from '../../logic/data'
-import {read_chain, write_chain,chain_info, new_obj} from '../../logic/work'
-import * as genesis from '../../genesis/index'
+import {read_chain, chain_info} from '../../logic/work'
 import * as P from 'p-iteration'
 import rp from 'request-promise-native'
+import bunyan from 'bunyan'
 import * as math from 'mathjs'
 math.config({
     number: 'BigNumber'
+});
+
+const log = bunyan.createLogger({
+    name:'vreath-cli',
+    streams:[
+        {
+            path:'./log/log.log'
+        }
+    ]
 });
 
 const router = express.Router();
@@ -79,6 +87,7 @@ export default router.get('/',async (req,res)=>{
         return 1;
     }
     catch(e){
+        log.info(e);
         res.status(500).send('error');
     }
 });

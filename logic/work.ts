@@ -93,6 +93,26 @@ export const write_chain = async (block:vr.Block)=>{
     }
 }
 
+export const back_chain = async (height:number)=>{
+    try{
+        const net_id = vr.con.constant.my_net_id;
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        let i:number;
+        for(i=height+1; i<=info.last_height; i++){
+            try{
+                await promisify(fs.unlink)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json');
+            }
+            catch(e){
+                continue;
+            }
+        }
+        share_data.chain = share_data.chain.slice(0,height+1);
+    }
+    catch(e){
+        throw new Error(e);
+    }
+}
+
 export const read_pool = async (max_size:number)=>{
     try{
         const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];

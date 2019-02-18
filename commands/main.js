@@ -132,9 +132,11 @@ const get_new_blocks = async () => {
             body: { diff_sum: diff_sum },
             json: true
         };
-        const new_chain = await request_promise_native_1.default.get(option).catch(e => console.log(e));
+        const new_chain = await request_promise_native_1.default.get(option);
         if (new_chain.some(block => !vr.block.isBlock(block)))
             return 0;
+        const pre_blocks = share_data_1.default.chain.slice(new_chain[0].meta.height);
+        await works.back_chain(new_chain[0].meta.height - 1);
         let block;
         for (block of new_chain.slice().sort((a, b) => a.meta.height - b.meta.height)) {
             await request_promise_native_1.default.post({
@@ -142,6 +144,15 @@ const get_new_blocks = async () => {
                 body: block,
                 json: true
             });
+        }
+        if (share_data_1.default.chain.length === new_chain[0].meta.height) {
+            for (block of pre_blocks.slice().sort((a, b) => a.meta.height - b.meta.height)) {
+                await request_promise_native_1.default.post({
+                    url: 'http://localhost:57750/block',
+                    body: block,
+                    json: true
+                });
+            }
         }
     }
     catch (e) {
@@ -153,7 +164,12 @@ const get_new_blocks = async () => {
 };
 const staking = async (private_key) => {
     try {
-        const chain = await works.read_chain(2 * (10 ** 9));
+        const read = await works.read_chain(2 * (10 ** 9));
+        const key = vr.block.search_key_block(read);
+        const micros = vr.block.search_micro_block(read, key);
+        const pre_validator = key.meta.validator;
+        const slice_height = key.meta.height + 1 + micros.length + (micros.findIndex(block => pre_validator != block.meta.validator) + 1 || 0);
+        const chain = read.slice(0, slice_height);
         const validator_pub = config.pub_keys[config.validator.use];
         if (validator_pub == null)
             throw new Error('invalid validator public key');

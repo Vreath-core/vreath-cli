@@ -5,11 +5,19 @@ import {promisify} from 'util'
 import * as logic from '../../logic/data'
 import {read_chain, write_chain, chain_info, read_pool, write_pool} from '../../logic/work'
 import * as P from 'p-iteration'
-import {peer} from '../../app/routes/handshake'
-import rp from 'request-promise-native'
+import bunyan from 'bunyan'
 import * as math from 'mathjs'
 math.config({
     number: 'BigNumber'
+});
+
+const log = bunyan.createLogger({
+    name:'vreath-cli',
+    streams:[
+        {
+            path:'./log/log.log'
+        }
+    ]
 });
 
 const router = express.Router();
@@ -55,6 +63,10 @@ export default router.get('/',async (req,res)=>{
             return 0;
         }
         const chain:vr.Block[] = await read_chain(2*(10**9));
+        if(block.meta.kind==='micro'&&vr.block.search_key_block(chain).meta.validator!=block.meta.validator){
+            res.status(500).send('invalid validator');
+            return 0;
+        }
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const pool:vr.Pool = await read_pool(10**9)
         const S_Trie = logic.state_trie_ins(roots.stateroot);
@@ -100,29 +112,10 @@ export default router.get('/',async (req,res)=>{
         await write_pool(new_pool);
 
         res.status(200).send('success');
-
-        /*const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
-        await P.forEach(peers,async peer=>{
-            const url1 = 'http://'+peer.ip+':57750/block';
-            const option1 = {
-                url:url1,
-                body:block,
-                json:true
-            }
-            const order = await rp.post(option1);
-            if(order!='order chain') return 1;
-            const url2 = 'http://'+peer.ip+':57750/chain';
-            const option2 = {
-                url:url2,
-                body:chain.concat(block),
-                json:true
-            }
-            await rp.post(option2);
-        });*/
         return 1;
     }
     catch(e){
-        //console.log(e);
+        log.info(e);
         res.status(500).send('error');
     }
 });
