@@ -46,7 +46,16 @@ export default router.get('/',async (req,res)=>{
             }
         }
         const chain:vr.Block[] = await read_chain(2*(10**9));
-        res.json(chain.slice(height));
+        let block:vr.Block;
+        let key_height:number = 0;
+        for(block of chain.slice(0,height+1).reverse()){
+            if(block.meta.kind==='key'){
+                key_height = block.meta.height;
+                break;
+            }
+        }
+        const sliced = chain.slice(key_height);
+        res.json(sliced);
         return 1;
     }
     catch(e){

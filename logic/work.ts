@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import {promisify} from 'util'
 import {cloneDeep} from 'lodash'
 import share_data from '../json/share_data';
+import { genesis_block } from '../genesis/block';
 
 math.config({
   number: 'BigNumber'
@@ -100,6 +101,7 @@ export const write_chain = async (block:vr.Block)=>{
 
 export const back_chain = async (height:number)=>{
     try{
+        if(share_data.chain.length-1===height) return 0;
         const net_id = vr.con.constant.my_net_id;
         const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
         let i:number;
@@ -111,7 +113,23 @@ export const back_chain = async (height:number)=>{
                 continue;
             }
         }
-        share_data.chain = share_data.chain.slice(0,height+1);
+        const backed_chain = share_data.chain.slice(0,height+1);
+        const new_info = new_obj(info,info=>{
+            const last_block = backed_chain[backed_chain.length-1] || genesis_block
+            info.last_height = height;
+            info.last_hash = last_block.hash;
+            info.pos_diffs = info.pos_diffs.slice(0,height+1);
+            return info;
+        });
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
+        const post_block = share_data.chain[height+1];
+        const new_roots = {
+            stateroot:post_block.meta.stateroot,
+            lockroot:post_block.meta.lockroot
+        }
+        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
+        share_data.chain = backed_chain;
+        return 1;
     }
     catch(e){
         throw new Error(e);
@@ -163,7 +181,7 @@ export const write_pool = async (pool:vr.Pool)=>{
 }
 
 
-const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
+const choose_txs = async (unit_mode:boolean,pool:vr.Pool,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
     const requested_bases:string[] = (await L_Trie.filter((val:vr.Lock)=>{
         const getted:vr.Lock = val;
@@ -184,7 +202,8 @@ const choose_txs = async (pool:vr.Pool,L_Trie:Trie)=>{
         else return result;
     },[]);
     let size_sum = 0;
-    const sorted = not_same.slice().sort((a,b)=>{
+    const unit_prioritized = not_same.filter(tx=>(unit_mode&&tx.meta.kind==='request'&&vr.crypto.object_hash(tx.meta.bases)===vr.crypto.object_hash([vr.con.constant.unit,vr.con.constant.native]))||(!unit_mode&&tx.meta.kind==='request'&&vr.crypto.object_hash(tx.meta.bases)!=vr.crypto.object_hash([vr.con.constant.unit,vr.con.constant.native])))
+    const sorted = unit_prioritized.slice().sort((a,b)=>{
         return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
     });
     const choosed = sorted.reduce((txs:vr.Tx[],tx)=>{
@@ -207,7 +226,8 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
             return key_block;
         }
         else{
-            const txs = await choose_txs(pool,L_Trie)
+            const unit_mode = (chain.length-1)%10 === 0;
+            const txs = await choose_txs(unit_mode,pool,L_Trie)
             const created_micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra,private_key,public_key);
             const txs_hash = txs.map(tx=>tx.hash);
             const micro_block = new_obj(

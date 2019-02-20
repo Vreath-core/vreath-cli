@@ -18,6 +18,7 @@ const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const lodash_1 = require("lodash");
 const share_data_1 = __importDefault(require("../json/share_data"));
+const block_1 = require("../genesis/block");
 math.config({
     number: 'BigNumber'
 });
@@ -92,6 +93,8 @@ exports.write_chain = async (block) => {
 };
 exports.back_chain = async (height) => {
     try {
+        if (share_data_1.default.chain.length - 1 === height)
+            return 0;
         const net_id = vr.con.constant.my_net_id;
         const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
         let i;
@@ -103,7 +106,23 @@ exports.back_chain = async (height) => {
                 continue;
             }
         }
-        share_data_1.default.chain = share_data_1.default.chain.slice(0, height + 1);
+        const backed_chain = share_data_1.default.chain.slice(0, height + 1);
+        const new_info = exports.new_obj(info, info => {
+            const last_block = backed_chain[backed_chain.length - 1] || block_1.genesis_block;
+            info.last_height = height;
+            info.last_hash = last_block.hash;
+            info.pos_diffs = info.pos_diffs.slice(0, height + 1);
+            return info;
+        });
+        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', JSON.stringify(new_info, null, 4), 'utf-8');
+        const post_block = share_data_1.default.chain[height + 1];
+        const new_roots = {
+            stateroot: post_block.meta.stateroot,
+            lockroot: post_block.meta.lockroot
+        };
+        await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
+        share_data_1.default.chain = backed_chain;
+        return 1;
     }
     catch (e) {
         throw new Error(e);
@@ -153,7 +172,7 @@ exports.write_pool = async (pool) => {
         throw new Error(e);
     }
 };
-const choose_txs = async (pool, L_Trie) => {
+const choose_txs = async (unit_mode, pool, L_Trie) => {
     const pool_txs = Object.keys(pool).map(key => pool[key]);
     const requested_bases = (await L_Trie.filter((val) => {
         const getted = val;
@@ -183,7 +202,8 @@ const choose_txs = async (pool, L_Trie) => {
             return result;
     }, []);
     let size_sum = 0;
-    const sorted = not_same.slice().sort((a, b) => {
+    const unit_prioritized = not_same.filter(tx => (unit_mode && tx.meta.kind === 'request' && vr.crypto.object_hash(tx.meta.bases) === vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native])) || (!unit_mode && tx.meta.kind === 'request' && vr.crypto.object_hash(tx.meta.bases) != vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native])));
+    const sorted = unit_prioritized.slice().sort((a, b) => {
         return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
     });
     const choosed = sorted.reduce((txs, tx) => {
@@ -206,7 +226,8 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
             return key_block;
         }
         else {
-            const txs = await choose_txs(pool, L_Trie);
+            const unit_mode = (chain.length - 1) % 10 === 0;
+            const txs = await choose_txs(unit_mode, pool, L_Trie);
             const created_micro_block = vr.block.create_micro_block(chain, stateroot, lockroot, txs, extra, private_key, public_key);
             const txs_hash = txs.map(tx => tx.hash);
             const micro_block = exports.new_obj(created_micro_block, block => {

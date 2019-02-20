@@ -63,10 +63,6 @@ export default router.get('/',async (req,res)=>{
             return 0;
         }
         const chain:vr.Block[] = await read_chain(2*(10**9));
-        if(block.meta.kind==='micro'&&vr.block.search_key_block(chain).meta.validator!=block.meta.validator){
-            res.status(500).send('invalid validator');
-            return 0;
-        }
         const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
         const pool:vr.Pool = await read_pool(10**9)
         const S_Trie = logic.state_trie_ins(roots.stateroot);

@@ -123,19 +123,23 @@ const get_new_blocks = async ()=>{
         }
         const new_chain:vr.Block[] = await rp.get(option);
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
-        console.log(new_chain[0].meta.height)
-        /*const pre_blocks = share_data.chain.slice(new_chain[0].meta.height);
-        await works.back_chain(new_chain[0].meta.height-1);*/
+        const back_height = Math.max(1,new_chain[0].meta.height);
+        const pre_blocks = share_data.chain.slice(back_height);
+        await works.back_chain(back_height-1);
         let block:vr.Block
-        for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height)){
-            await rp.post({
-                url:'http://localhost:57750/block',
-                body:block,
-                json:true
-            });
+        for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height).filter(b=>b.meta.height>=1)){
+            try{
+                await rp.post({
+                    url:'http://localhost:57750/block',
+                    body:block,
+                    json:true
+                });
+            }
+            catch(e){
+                continue;
+            }
         }
-        /*if(share_data.chain.length===new_chain[0].meta.height){
-            console.log(share_data.chain.length)
+        if(share_data.chain.length===back_height){
             for(block of pre_blocks.slice().sort((a,b)=>a.meta.height-b.meta.height)){
                 await rp.post({
                     url:'http://localhost:57750/block',
@@ -143,7 +147,7 @@ const get_new_blocks = async ()=>{
                     json:true
                 });
             }
-        }*/
+        }
     }
     catch(e){
         console.log(e)
