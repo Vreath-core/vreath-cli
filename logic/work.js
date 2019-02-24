@@ -202,7 +202,14 @@ const choose_txs = async (unit_mode, pool, L_Trie) => {
             return result;
     }, []);
     let size_sum = 0;
-    const unit_prioritized = not_same.filter(tx => (unit_mode && tx.meta.kind === 'request' && vr.crypto.object_hash(tx.meta.bases) === vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native])) || (!unit_mode && tx.meta.kind === 'request' && vr.crypto.object_hash(tx.meta.bases) != vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native])));
+    const unit_prioritized = not_same.filter(tx => {
+        if (unit_mode) {
+            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.bases) === vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
+        }
+        else {
+            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.bases) != vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
+        }
+    });
     const sorted = unit_prioritized.slice().sort((a, b) => {
         return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
     });
@@ -245,8 +252,10 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
                     const tx = vr.tx.pure2tx(pure, micro_block);
                     const s_data = await data.get_tx_statedata(tx, chain, S_Trie);
                     const l_data = await data.get_tx_lockdata(tx, chain, L_Trie);
-                    if (tx.meta.kind === 'request' && !vr.tx.verify_req_tx(tx, false, s_data, l_data))
+                    if (tx.meta.kind === 'request' && !vr.tx.verify_req_tx(tx, false, s_data, l_data)) {
+                        console.log(tx);
                         return result.concat(tx.hash);
+                    }
                     else if (tx.meta.kind === 'refresh' && !vr.tx.verify_ref_tx(tx, chain, true, s_data, l_data))
                         return result.concat(tx.hash);
                     else
