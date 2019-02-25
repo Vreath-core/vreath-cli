@@ -138,12 +138,14 @@ export const back_chain = async (height:number)=>{
 
 export const read_pool = async (max_size:number)=>{
     try{
+        const mem_pool = share_data.pool;
         const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];
         let size = 0;
         let name:string;
         let tx:vr.Tx;
         let pool:vr.Pool = {};
         for(name of filenames){
+            if(mem_pool[name.split('.json')[0]]!=null) continue;
             tx = JSON.parse(await promisify(fs.readFile)('./json/pool/'+name,'utf-8'));
             if(size+Buffer.from(JSON.stringify(tx)).length>max_size) break;
             pool[tx.hash] = tx;
@@ -165,12 +167,16 @@ export const write_pool = async (pool:vr.Pool)=>{
         let file_name:string;
         let tx:vr.Tx;
         for(name of filenames){
-            if(for_del.indexOf(name)!=-1) await promisify(fs.unlink)('./json/pool/'+name);
+            if(for_del.indexOf(name)!=-1){
+                delete share_data.pool[name.split('.json')[0]];
+                await promisify(fs.unlink)('./json/pool/'+name);
+            }
         }
         for(name of tx_names){
             file_name = name+'.json';
             if(for_save.indexOf(name)!=-1){
                 tx = pool[name];
+                share_data.pool[name] = tx;
                 await promisify(fs.writeFile)('./json/pool/'+file_name,JSON.stringify(tx,null,4),'utf-8');
             }
         }
@@ -256,11 +262,9 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
                     const s_data = await data.get_tx_statedata(tx,chain,S_Trie);
                     const l_data = await data.get_tx_lockdata(tx,chain,L_Trie);
                     if(tx.meta.kind==='request'&&!vr.tx.verify_req_tx(tx,false,s_data,l_data)){
-                        console.log(tx);
                         return result.concat(tx.hash)
                     }
                     else if(tx.meta.kind==='refresh'&&!vr.tx.verify_ref_tx(tx,chain,true,s_data,l_data)){
-                        console.log(tx);
                         return result.concat(tx.hash);
                     }
                     else return result;
