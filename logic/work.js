@@ -137,8 +137,10 @@ exports.read_pool = async (max_size) => {
         let tx;
         let pool = {};
         for (name of filenames) {
-            if (mem_pool[name.split('.json')[0]] != null)
+            if (mem_pool[name.split('.json')[0]] != null) {
+                pool[name.split('.json')[0]] = mem_pool[name.split('.json')[0]];
                 continue;
+            }
             tx = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool/' + name, 'utf-8'));
             if (size + Buffer.from(JSON.stringify(tx)).length > max_size)
                 break;
