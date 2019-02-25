@@ -222,6 +222,9 @@ const buying_unit = async (private_key) => {
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native, vr.crypto.merge_pub_keys([pub_key]));
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit, vr.crypto.merge_pub_keys([pub_key]));
+        const pool = await works.read_pool(10 ** 9);
+        if (Object.values(pool).some(tx => tx.meta.kind === 'request' && tx.meta.bases.indexOf(unit_validator) != -1 && tx.meta.tokens[0] === vr.con.constant.unit && tx.raw.raw[0] === 'buy'))
+            throw new Error('already bought units');
         const validator_state = await S_Trie.get(native_validator);
         if (validator_state == null)
             throw new Error("You don't have enough amount");
@@ -236,7 +239,7 @@ const buying_unit = async (private_key) => {
                 return res;
             const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0, unit.address, vr.con.constant.unit, 0, { used: "[]" });
             const unit_used = JSON.parse(unit_state.data.used || '[]');
-            const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request) + unit.height + vr.crypto.hex2number(unit.block_hash)).toString(16));
+            const iden_hash = vr.crypto.hash(unit.request + unit.height.toString(16) + unit.block_hash);
             if (unit_used.indexOf(iden_hash) != -1)
                 return res;
             price_sum = math.chain(price_sum).add(unit.unit_price).done();
@@ -251,7 +254,6 @@ const buying_unit = async (private_key) => {
         const gas = config.validator.gas;
         const input_raw = ["buy", JSON.stringify(units)];
         const tx = await works.make_req_tx([pub_key], type, tokens, bases, feeprice, gas, input_raw, "", private_key, pub_key, chain, S_Trie, L_Trie);
-        const pool = await works.read_pool(10 ** 9);
         const StateData = await data.get_tx_statedata(tx, chain, S_Trie);
         const LockData = await data.get_tx_lockdata(tx, chain, L_Trie);
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
@@ -259,7 +261,7 @@ const buying_unit = async (private_key) => {
             await works.write_pool(new_pool);
             const new_unit_store = works.new_obj(unit_store, store => {
                 units.forEach(unit => {
-                    const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request) + unit.height + vr.crypto.hex2number(unit.block_hash)).toString(16));
+                    const iden_hash = vr.crypto.hash(unit.request + unit.height.toString(16) + unit.block_hash + unit.address);
                     delete store[iden_hash];
                 });
                 return store;
@@ -339,7 +341,7 @@ const refreshing = async (private_key) => {
     catch (e) {
         log.info(e);
     }
-    await works.sleep(60000 * config.miner.interval);
+    await works.sleep(2000);
     setImmediate(() => refreshing.apply(null, [private_key]));
     return 0;
 };
@@ -357,6 +359,7 @@ const making_unit = async () => {
         let search_block;
         let search_tx;
         let unit_iden_hash = '';
+        let unit_store_key = '';
         let pre_unit = {
             request: vr.crypto.hash(''),
             height: 0,
@@ -370,8 +373,9 @@ const making_unit = async () => {
         for (search_block of chain.slice().reverse()) {
             for (search_tx of search_block.txs) {
                 if (search_tx.meta.kind === "refresh") {
-                    unit_iden_hash = vr.crypto.hash((vr.crypto.hex2number(search_tx.meta.req_tx_hash) + search_tx.meta.height + vr.crypto.hex2number(search_tx.meta.block_hash)).toString(16));
-                    if (used.indexOf(unit_iden_hash) != -1)
+                    unit_iden_hash = vr.crypto.hash(search_tx.meta.req_tx_hash + search_tx.meta.height.toString(16) + search_tx.meta.block_hash);
+                    unit_store_key = vr.crypto.hash(search_tx.meta.req_tx_hash + search_tx.meta.height.toString(16) + search_tx.meta.block_hash + miner);
+                    if (used.indexOf(unit_iden_hash) != -1 || unit_store[unit_store_key] != null)
                         continue;
                     pre_unit = {
                         request: search_tx.meta.req_tx_hash,
@@ -397,7 +401,7 @@ const making_unit = async () => {
             return u;
         });
         const new_unit_store = works.new_obj(unit_store, store => {
-            const key = vr.crypto.hash(unit_iden_hash + unit.address);
+            const key = vr.crypto.hash(unit.request + unit.height.toString(16) + unit.block_hash + unit.address);
             store[key] = unit;
             return store;
         });
@@ -416,7 +420,7 @@ const making_unit = async () => {
     catch (e) {
         log.info(e);
     }
-    await works.sleep(60000 * config.miner.interval);
+    await works.sleep(2000);
     setImmediate(making_unit);
     return 0;
 };

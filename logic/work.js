@@ -152,7 +152,7 @@ exports.write_pool = async (pool) => {
         const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];
         const tx_names = Object.keys(pool);
         const for_save = tx_names.filter(name => filenames.indexOf(name + '.json') === -1);
-        const for_del = filenames.filter(name => tx_names.indexOf(name + '.json') === -1);
+        const for_del = filenames.filter(name => tx_names.indexOf(name.split('.json')[0]) === -1);
         let name;
         let file_name;
         let tx;
@@ -204,10 +204,10 @@ const choose_txs = async (unit_mode, pool, L_Trie) => {
     let size_sum = 0;
     const unit_prioritized = not_same.filter(tx => {
         if (unit_mode) {
-            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.bases) === vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
+            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.tokens) === vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
         }
         else {
-            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.bases) != vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
+            return tx.meta.kind === 'refresh' || vr.crypto.object_hash(tx.meta.tokens) != vr.crypto.object_hash([vr.con.constant.unit, vr.con.constant.native]);
         }
     });
     const sorted = unit_prioritized.slice().sort((a, b) => {
@@ -233,7 +233,7 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
             return key_block;
         }
         else {
-            const unit_mode = (chain.length - 1) % 10 === 0;
+            const unit_mode = chain.length % 10 === 0;
             const txs = await choose_txs(unit_mode, pool, L_Trie);
             const created_micro_block = vr.block.create_micro_block(chain, stateroot, lockroot, txs, extra, private_key, public_key);
             const txs_hash = txs.map(tx => tx.hash);
@@ -256,8 +256,10 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
                         console.log(tx);
                         return result.concat(tx.hash);
                     }
-                    else if (tx.meta.kind === 'refresh' && !vr.tx.verify_ref_tx(tx, chain, true, s_data, l_data))
+                    else if (tx.meta.kind === 'refresh' && !vr.tx.verify_ref_tx(tx, chain, true, s_data, l_data)) {
+                        console.log(tx);
                         return result.concat(tx.hash);
+                    }
                     else
                         return result;
                 }, []);
@@ -267,7 +269,8 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
                     return res;
                 }, {});
                 await exports.write_pool(new_pool);
-                throw new Error('remove invalid txs');
+                if (invalid_tx_hashes.length > 0)
+                    throw new Error('remove invalid txs');
             }
             return micro_block;
         }

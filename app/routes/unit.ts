@@ -25,7 +25,7 @@ export default router.post('/',async (req,res)=>{
         const S_Trie = state_trie_ins(roots.stateroot);
         const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{data:"[]"});
         const used:string[] = JSON.parse(unit_state.data.used||"[]");
-        const iden_hash = vr.crypto.hash((vr.crypto.hex2number(unit.request)+unit.height+vr.crypto.hex2number(unit.block_hash)).toString(16));
+        const iden_hash = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash);
         if(used.indexOf(iden_hash)!=-1){
             res.status(500).send('already used unit');
             return 0;
@@ -48,7 +48,7 @@ export default router.post('/',async (req,res)=>{
         const new_unit_store = new_obj(
             unit_store,
             store=>{
-                const key = vr.crypto.hash(iden_hash+unit.address);
+                const key = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash+unit.address);
                 store[key] = unit;
                 return store;
             }
