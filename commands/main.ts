@@ -287,6 +287,8 @@ const refreshing = async (private_key:string)=>{
         const unit_price = Number(config.miner.unit_price);
         const log = "";
         const chain:vr.Block[] = await works.read_chain(2*(10**9));
+        const pool:vr.Pool = await works.read_pool(10**9)
+        const pool_txs = Object.values(pool);
         let refreshed:string[] = [];
         let search_block:vr.Block;
         let tx_i:string;
@@ -298,7 +300,7 @@ const refreshing = async (private_key:string)=>{
             for(tx_i in search_block.txs){
                 if(checker) break;
                 search_tx = search_block.txs[Number(tx_i)];
-                if(search_tx.meta.kind==='request'&&refreshed.indexOf(search_tx.hash)===-1){
+                if(search_tx.meta.kind==='request'&&refreshed.indexOf(search_tx.hash)===-1&&!pool_txs.some(tx=>tx.meta.kind==='refresh'&&tx.meta.req_tx_hash===search_tx.hash&&tx.meta.block_hash===search_block.hash&&tx.meta.height===search_block.meta.height&&tx.meta.index===Number(tx_i))){
                     checker = true;
                     block_height = search_block.meta.height;
                     tx_index = Number(tx_i);
@@ -315,7 +317,6 @@ const refreshing = async (private_key:string)=>{
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_ref_tx([miner_pub],feeprice,unit_price,block_height,tx_index,log,private_key,miner_pub,chain,S_Trie,L_Trie);
 
-        const pool:vr.Pool = await works.read_pool(10**9)
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
