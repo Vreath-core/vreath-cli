@@ -1,9 +1,7 @@
 import * as express from 'express'
 import * as vr from 'vreath'
-import * as fs from 'fs'
-import {promisify} from 'util'
-import * as logic from '../../logic/data'
-import {read_chain, compute_output, read_pool, write_pool} from '../../logic/work'
+import * as data from '../../logic/data'
+import * as work from '../../logic/work'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
 
@@ -32,13 +30,13 @@ export default router.post('/',async (req,res)=>{
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const pool:vr.Pool = await read_pool(10**9)
-        const chain:vr.Block[] = await read_chain(2*(10**9));
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
-        const S_Trie = logic.state_trie_ins(roots.stateroot);
-        const StateData = await logic.get_tx_statedata(tx,chain,S_Trie);
-        const L_Trie = logic.lock_trie_ins(roots.lockroot);
-        const LockData = await logic.get_tx_lockdata(tx,chain,L_Trie);
+        const pool:vr.Pool = await data.read_pool(10**9)
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
+        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
+        const L_Trie = data.lock_trie_ins(roots.lockroot);
+        const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         if(tx.meta.kind==='refresh'){
             const req_tx = vr.tx.find_req_tx(tx,chain);
             const checked = await (async ()=>{
@@ -54,14 +52,14 @@ export default router.post('/',async (req,res)=>{
                 else return false;
             })();
             if(!checked){
-                const valid_output = compute_output(req_tx,StateData,chain);
+                const valid_output = work.compute_output(req_tx,StateData,chain);
                 const suc = !valid_output.some(s=>!vr.state.verify_state(s));
                 const valid_out_hash = vr.crypto.object_hash(valid_output);
                 if(suc!=tx.meta.success||valid_out_hash!=tx.meta.output) throw new Error('invalid output');
             }
         }
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
-        await write_pool(new_pool);
+        await data.write_pool(new_pool);
         res.status(200).send('success');
         return 1;
     }

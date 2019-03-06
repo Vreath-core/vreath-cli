@@ -11,10 +11,10 @@ const vr = __importStar(require("vreath"));
 const data = __importStar(require("../logic/data"));
 const genesis = __importStar(require("../genesis/index"));
 const fs = __importStar(require("fs"));
-const fse = __importStar(require("fs-extra"));
 const util_1 = require("util");
 const P = __importStar(require("p-iteration"));
 const work_1 = require("../logic/work");
+const data_1 = require("../logic/data");
 const math = __importStar(require("mathjs"));
 math.config({
     number: 'BigNumber'
@@ -32,16 +32,18 @@ exports.default = async (my_password) => {
         });
     });
     await P.forEach(reduced_state, async (s) => {
+        await data.write_state(s);
+        const hash = vr.crypto.object_hash(s);
         if (s.kind === 'state')
-            await S_Trie.put(s.owner, s);
+            await data.put_state_to_trie(S_Trie, hash, s.kind, s.owner);
         else if (s.kind === 'info')
-            await S_Trie.put(s.token, s);
+            await data.put_state_to_trie(S_Trie, hash, s.kind, s.token);
     }, []);
     const new_roots = {
         stateroot: S_Trie.now_root(),
         lockroot: genesis.roots.lockroot
     };
-    await fse.emptyDir('./json/chain/net_id_' + vr.con.constant.my_net_id.toString());
+    await data.reset_chain();
     const info = {
         net_id: vr.con.constant.my_net_id,
         chain_id: vr.con.constant.my_chain_id,
@@ -51,12 +53,11 @@ exports.default = async (my_password) => {
         last_hash: genesis.block.hash,
         pos_diffs: []
     };
-    await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', JSON.stringify(info, null, 4), 'utf-8');
-    await work_1.write_chain(genesis.block);
-    await fse.emptyDir('./json/pool');
-    await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
-    await util_1.promisify(fs.writeFile)('./json/peer_list.json', JSON.stringify(genesis.peers, null, 4), 'utf-8');
-    await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify({}), 'utf-8');
+    await data.write_chain_info(info);
+    await data_1.write_chain(genesis.block);
+    await data.empty_pool();
+    await data.write_root(new_roots);
+    await P.forEach(genesis.peers, async (peer) => await data.write_peer(peer));
     await util_1.promisify(fs.writeFile)('./log/log.log', '', 'utf-8');
 };
 //# sourceMappingURL=setup.js.map

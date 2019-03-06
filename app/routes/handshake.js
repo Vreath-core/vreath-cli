@@ -12,9 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
 const vr = __importStar(require("vreath"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
 const bunyan_1 = __importDefault(require("bunyan"));
+const data_1 = require("../../logic/data");
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -52,7 +51,7 @@ exports.handshake_route = router.post('/', async (req, res) => {
             ip: ip,
             timestamp: info.timestamp
         };
-        const peer_list = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8'));
+        const peer_list = await data_1.get_peer_list();
         const this_peer_index = peer_list.map(peer => peer.ip).indexOf(this_peer.ip);
         const new_peer_list = peer_list.map((p, i) => {
             if (i === this_peer_index)
@@ -60,7 +59,10 @@ exports.handshake_route = router.post('/', async (req, res) => {
             else
                 return p;
         }).sort((a, b) => b.timestamp - a.timestamp);
-        await util_1.promisify(fs.writeFile)('./json/peer_list.json', JSON.stringify(new_peer_list, null, 4), 'utf-8');
+        let peer;
+        for (peer of new_peer_list) {
+            await data_1.write_peer(peer);
+        }
         const my_node_info = exports.make_node_info();
         res.send(my_node_info);
         return 1;

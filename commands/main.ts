@@ -17,11 +17,10 @@ import * as data from '../logic/data'
 import req_tx_com from '../app/repl/request-tx'
 import remit from '../app/repl/remit'
 import repl_balance from '../app/repl/balance'
-import share_data from '../json/share_data'
+import share_data from '../share/share_data'
 import express from 'express'
 import * as bodyParser from 'body-parser'
 import * as fs from 'fs'
-import {promisify} from 'util'
 import * as P from 'p-iteration'
 import CryptoJS from 'crypto-js'
 import rp from 'request-promise-native'
@@ -65,7 +64,7 @@ const config = JSON.parse(fs.readFileSync('./config/config.json','utf-8'));
 const shake_hands = async ()=>{
     try{
         const my_node_info = make_node_info();
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const peers:peer[] = await data.get_peer_list();
         const new_peer_list = await P.reduce(peers.slice(0,8), async (list:peer[],peer)=>{
             const url1 = 'http://'+peer.ip+':57750/handshake';
             const option1 = {
@@ -99,7 +98,10 @@ const shake_hands = async ()=>{
                 else return get_list[i];
             }).sort((a,b)=>b.timestamp-a.timestamp);
         },peers);
-        await promisify(fs.writeFile)('./json/peer_list.json',JSON.stringify(new_peer_list,null,4),'utf-8');
+        let w_peer:peer;
+        for(w_peer of new_peer_list){
+            await data.write_peer(w_peer);
+        }
     }
     catch(e){
         log.info(e);
@@ -111,21 +113,22 @@ const shake_hands = async ()=>{
 
 const get_new_blocks = async ()=>{
     try{
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const peers:peer[] = await data.get_peer_list();
         const peer = peers[0];
         if(peer==null) throw new Error('no peer');
-        const info:works.chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        const info:data.chain_info = await data.read_chain_info();
         const diff_sum = info.pos_diffs.reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
         const option = {
             url:'http://'+peer.ip+':57750/chain',
             body:{diff_sum:diff_sum},
-            json:true
+            json:true,
+            timeout: 8000
         }
         const new_chain:vr.Block[] = await rp.get(option);
         if(new_chain.some(block=>!vr.block.isBlock(block))) return 0;
         const back_height = Math.max(1,new_chain[0].meta.height);
         const pre_blocks = share_data.chain.slice(back_height);
-        await works.back_chain(back_height-1);
+        await data.back_chain(back_height-1);
         let block:vr.Block
         for(block of new_chain.slice().sort((a,b)=>a.meta.height-b.meta.height).filter(b=>b.meta.height>=1)){
             try{
@@ -159,7 +162,7 @@ const get_new_blocks = async ()=>{
 
 const staking = async (private_key:string)=>{
     try{
-        const read:vr.Block[] = await works.read_chain(2*(10**9));
+        const read:vr.Block[] = await data.read_chain(2*(10**9));
         const key = vr.block.search_key_block(read);
         const micros = vr.block.search_micro_block(read,key);
         const pre_validator = key.meta.validator;
@@ -167,11 +170,11 @@ const staking = async (private_key:string)=>{
         const chain:vr.Block[] = read.slice(0,slice_height);
         const validator_pub:string = config.pub_keys[config.validator.use];
         if(validator_pub==null) throw new Error('invalid validator public key');
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
-        const pool:vr.Pool = await works.read_pool(10**9);
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
+        const pool:vr.Pool = await data.read_pool(10**9);
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,validator_pub);
-        const unit_validator_state:vr.State = await S_Trie.get(unit_validator);
+        const unit_validator_state:vr.State = await data.read_state(S_Trie,unit_validator,vr.state.create_state());
         if(unit_validator_state==null||unit_validator_state.amount===0) throw new Error('the validator has no units');
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const block = await works.make_block(chain,[validator_pub],roots.stateroot,roots.lockroot,'',pool,private_key,validator_pub,S_Trie,L_Trie);
@@ -181,7 +184,7 @@ const staking = async (private_key:string)=>{
             json:true
         });
 
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const peers:peer[] = await data.get_peer_list();
         await P.forEach(peers,async peer=>{
             const url1 = 'http://'+peer.ip+':57750/block';
             const option1 = {
@@ -205,26 +208,26 @@ const buying_unit = async (private_key:string)=>{
         const pub_key:string = config.pub_keys[config.validator.use];
         const type:vr.TxType = "change";
         const tokens = [vr.con.constant.unit,vr.con.constant.native];
-        const chain:vr.Block[] = await works.read_chain(2*(10**9));
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native,vr.crypto.merge_pub_keys([pub_key]))
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,vr.crypto.merge_pub_keys([pub_key]))
-        const pool:vr.Pool = await works.read_pool(10**9)
+        const pool:vr.Pool = await data.read_pool(10**9)
         if(Object.values(pool).some(tx=>tx.meta.kind==='request'&&tx.meta.bases.indexOf(unit_validator)!=-1&&tx.meta.tokens[0]===vr.con.constant.unit&&tx.raw.raw[0]==='buy')) throw new Error('already bought units');
-        const validator_state:vr.State = await S_Trie.get(native_validator);
-        if(validator_state==null) throw new Error("You don't have enough amount");
+        const validator_state:vr.State = await data.read_state(S_Trie,native_validator,vr.state.create_state());
         const validator_amount = validator_state.amount || 0;
-        const minimum:number = config.validator.minimum || validator_amount;
+        const minimum:number = config.validator.minimum;
+        if(validator_state==null||math.smaller(validator_amount,minimum)) throw new Error("You don't have enough amount");
 
-        const unit_store:{[key:string]:vr.Unit} = JSON.parse(await promisify(fs.readFile)('./json/unit_store.json','utf-8'));
+        const unit_store = await data.get_unit_store();
         const unit_values = Object.values(unit_store);
         const sorted_units = unit_values.slice().sort((a,b)=>a.unit_price-b.unit_price);
         let price_sum:number = 0;
         const units = await P.reduce(sorted_units, async (res:vr.Unit[],unit)=>{
             if(math.chain(validator_amount).subtract(price_sum).subtract(unit.unit_price).smaller(minimum).done() as boolean) return res;
-            const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{used:"[]"});
+            const unit_state = await data.read_state(S_Trie,unit.address,vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{used:"[]"}));
             const unit_used = JSON.parse(unit_state.data.used||'[]');
             const iden_hash = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash);
             if(unit_used.indexOf(iden_hash)!=-1) return res;
@@ -245,20 +248,12 @@ const buying_unit = async (private_key:string)=>{
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
 
         if(new_pool[tx.hash]!=null){
-            await works.write_pool(new_pool);
-            const new_unit_store = works.new_obj(
-                unit_store,
-                store=>{
-                    units.forEach(unit=>{
-                        const iden_hash = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash+unit.address);
-                        delete store[iden_hash];
-                    });
-                    return store;
-                }
-            );
-            await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
+            await data.write_pool(new_pool);
+            await P.forEach(units, async (unit)=>{
+                await data.del_unit(unit);
+            });
 
-            const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+            const peers:peer[] = await data.get_peer_list();
             await P.forEach(peers,async peer=>{
                 const url = 'http://'+peer.ip+':57750/tx';
                 const option = {
@@ -286,8 +281,8 @@ const refreshing = async (private_key:string)=>{
         const feeprice = Number(config.miner.fee_price);
         const unit_price = Number(config.miner.unit_price);
         const log = "";
-        const chain:vr.Block[] = await works.read_chain(2*(10**9));
-        const pool:vr.Pool = await works.read_pool(10**9)
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
+        const pool:vr.Pool = await data.read_pool(10**9)
         const pool_txs = Object.values(pool);
         let refreshed:string[] = [];
         let search_block:vr.Block;
@@ -312,7 +307,7 @@ const refreshing = async (private_key:string)=>{
             }
         }
         if(block_height===-1||tx_index===-1) throw new Error('any request tx is already refreshed.');
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
         const S_Trie = data.state_trie_ins(roots.stateroot);
         const L_Trie = data.lock_trie_ins(roots.lockroot);
         const tx = await works.make_ref_tx([miner_pub],feeprice,unit_price,block_height,tx_index,log,private_key,miner_pub,chain,S_Trie,L_Trie);
@@ -320,9 +315,9 @@ const refreshing = async (private_key:string)=>{
         const StateData = await data.get_tx_statedata(tx,chain,S_Trie);
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
-        await works.write_pool(new_pool);
+        await data.write_pool(new_pool);
 
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const peers:peer[] = await data.get_peer_list();
         await P.forEach(peers,async peer=>{
             const url = 'http://'+peer.ip+':57750/tx';
             const option = {
@@ -345,13 +340,13 @@ const making_unit = async ()=>{
     try{
         const pub = config.pub_keys[config.miner.use];
         const miner = vr.crypto.generate_address(vr.con.constant.unit,pub);
-        const chain:vr.Block[] = await works.read_chain(2*(10**9));
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
         const unit_price:number = config.miner.unit_price;
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
         const S_Trie = data.state_trie_ins(roots.stateroot);
-        const unit_state = await S_Trie.get(miner) || vr.state.create_state(0,miner,vr.con.constant.unit,0,{data:"[]"});
+        const unit_state = await data.read_state(S_Trie,miner,vr.state.create_state(0,miner,vr.con.constant.unit,0,{data:"[]"}));
         const used:string[] = JSON.parse(unit_state.data.used||"[]");
-        const unit_store:{[key:string]:vr.Unit} = JSON.parse(await promisify(fs.readFile)('./json/unit_store.json','utf-8'));
+        const unit_store = await data.get_unit_store();
         let search_block:vr.Block;
         let search_tx:vr.TxPure;
         let unit_iden_hash:string = '';
@@ -397,17 +392,9 @@ const making_unit = async ()=>{
                 return u;
             }
         );
-        const new_unit_store = works.new_obj(
-            unit_store,
-            store=>{
-                const key = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash+unit.address);
-                store[key] = unit;
-                return store;
-            }
-        );
-        await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
+        await data.write_unit(unit);
 
-        const peers:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8')||"[]");
+        const peers:peer[] = await data.get_peer_list();
         await P.forEach(peers,async peer=>{
             const url = 'http://'+peer.ip+':57750/unit';
             const option = {
@@ -446,7 +433,7 @@ yargs
         const my_key = vr.crypto.hash(my_password).slice(0,122);
         const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
         const my_private = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
-        share_data.chain = await works.read_chain(2*(10**9));
+        share_data.chain = await data.read_chain(2*(10**9));
         /*(async ()=>{
             await shake_hands();
             await get_new_blocks();

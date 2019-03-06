@@ -12,8 +12,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const express = __importStar(require("express"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
 const work_1 = require("../../logic/work");
 const data_1 = require("../../logic/data");
 const bunyan_1 = __importDefault(require("bunyan"));
@@ -29,17 +27,17 @@ const router = express.Router();
 exports.default = router.post('/', async (req, res) => {
     try {
         const unit = req.body;
-        const unit_store = JSON.parse(await util_1.promisify(fs.readFile)('./json/unit_store.json', 'utf-8'));
-        const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
+        const unit_store = await data_1.get_unit_store();
+        const roots = await data_1.read_root();
         const S_Trie = data_1.state_trie_ins(roots.stateroot);
-        const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0, unit.address, vr.con.constant.unit, 0, { data: "[]" });
+        const unit_state = await data_1.read_state(S_Trie, unit.address, vr.state.create_state(0, unit.address, vr.con.constant.unit, 0, { data: "[]" }));
         const used = JSON.parse(unit_state.data.used || "[]");
         const iden_hash = vr.crypto.hash(unit.request + unit.height.toString(16) + unit.block_hash);
         if (used.indexOf(iden_hash) != -1) {
             res.status(500).send('already used unit');
             return 0;
         }
-        const chain = await work_1.read_chain(2 * (10 ** 9));
+        const chain = await data_1.read_chain(2 * (10 ** 9));
         const check = (() => {
             let search_block;
             let search_tx;
@@ -60,7 +58,10 @@ exports.default = router.post('/', async (req, res) => {
             store[key] = unit;
             return store;
         });
-        await util_1.promisify(fs.writeFile)('./json/unit_store.json', JSON.stringify(new_unit_store, null, 4), 'utf-8');
+        let w_unit;
+        for (w_unit of Object.values(new_unit_store)) {
+            await data_1.write_unit(w_unit);
+        }
         res.status(200).send('success');
         return 1;
     }

@@ -1,8 +1,7 @@
 import * as express from 'express'
 import * as vr from 'vreath'
-import * as fs from 'fs'
-import {promisify} from 'util'
 import bunyan from 'bunyan'
+import { get_peer_list, write_peer } from '../../logic/data';
 
 const log = bunyan.createLogger({
     name:'vreath-cli',
@@ -56,13 +55,16 @@ export const handshake_route = router.post('/',async (req,res)=>{
             ip:ip,
             timestamp:info.timestamp
         }
-        const peer_list:peer[] = JSON.parse(await promisify(fs.readFile)('./json/peer_list.json','utf-8'));
+        const peer_list:peer[] = await get_peer_list();
         const this_peer_index = peer_list.map(peer=>peer.ip).indexOf(this_peer.ip);
         const new_peer_list = peer_list.map((p,i)=>{
             if(i===this_peer_index) return this_peer;
             else return p;
         }).sort((a,b)=>b.timestamp - a.timestamp);
-        await promisify(fs.writeFile)('./json/peer_list.json',JSON.stringify(new_peer_list,null,4),'utf-8');
+        let peer:peer;
+        for(peer of new_peer_list){
+            await write_peer(peer);
+        }
         const my_node_info = make_node_info();
         res.send(my_node_info);
         return 1;

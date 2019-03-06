@@ -1,12 +1,11 @@
 import * as express from 'express'
 import * as vr from 'vreath'
-import * as fs from 'fs'
-import {promisify} from 'util'
-import {read_chain, chain_info} from '../../logic/work'
+import {read_chain, chain_info, read_chain_info} from '../../logic/data'
 import * as P from 'p-iteration'
 import rp from 'request-promise-native'
 import bunyan from 'bunyan'
 import * as math from 'mathjs'
+
 math.config({
     number: 'BigNumber'
 });
@@ -31,7 +30,7 @@ export default router.get('/',async (req,res)=>{
             res.status(500).send('invalid data');
             return 0;
         }
-        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        const info:chain_info = await read_chain_info();
         const my_diffs = info.pos_diffs;
         let height:number = 0;
         let sum:number = 0;
@@ -78,7 +77,7 @@ export default router.get('/',async (req,res)=>{
             return same_height;
         })();
         const add_chain = new_chain.slice(same_height+1);
-        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        const info:chain_info = await read_chain_info();
         const my_diff_sum = info.pos_diffs.slice(same_height+1).reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
         const new_diff_sum:number = add_chain.reduce((sum,block)=>math.chain(sum).add(block.meta.pos_diff).done(),0);
         if(math.largerEq(my_diff_sum,new_diff_sum)as boolean){

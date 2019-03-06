@@ -8,8 +8,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
 const data_1 = require("../logic/data");
 exports.default = async (config, id) => {
     const pub_keys = config.pub_keys || [];
@@ -17,7 +15,7 @@ exports.default = async (config, id) => {
     if (my_pub == null)
         return 0;
     const address = vr.crypto.generate_address(vr.con.constant.native, my_pub);
-    const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
+    const roots = await data_1.read_root();
     const stateroot = roots.stateroot;
     const S_Trie = data_1.state_trie_ins(stateroot);
     const balance = await data_1.get_native_balance(address, S_Trie);

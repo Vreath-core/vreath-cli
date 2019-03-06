@@ -2,11 +2,8 @@ import * as vr from 'vreath'
 import * as data from './data'
 import * as P from 'p-iteration'
 import * as math from 'mathjs'
-import * as fs from 'fs'
-import {promisify} from 'util'
 import {cloneDeep} from 'lodash'
-import share_data from '../json/share_data';
-import { genesis_block } from '../genesis/block';
+import {read_pool,write_pool} from './data'
 
 math.config({
   number: 'BigNumber'
@@ -28,7 +25,7 @@ export const copy = <T>(data:T)=>{
 export const new_obj = <T>(obj:T,fn:(obj:T)=>T)=>{
   return fn(copy(obj));
 }
-
+/*
 export type chain_info = {
     net_id:number;
     chain_id:number;
@@ -188,7 +185,7 @@ export const write_pool = async (pool:vr.Pool)=>{
         throw new Error(e);
     }
 }
-
+*/
 
 const choose_txs = async (unit_mode:boolean,pool:vr.Pool,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
@@ -338,9 +335,10 @@ export const make_ref_tx = async (pubs:string[],feeprice:number,unit_price:numbe
         const target_block = chain[height]||vr.block.empty_block;
         const req_tx_pure = target_block.txs[index] || vr.tx.empty_tx;
         const req_tx = vr.tx.pure2tx(req_tx_pure,target_block);
+        const empty_state = vr.state.create_state();
         const pre_StateData = await P.reduce(req_tx.meta.bases, async (result:vr.State[],key:string)=>{
-            const getted:vr.State = await S_Trie.get(key);
-            if(getted==null) return result;
+            const getted:vr.State = await data.read_state(S_Trie,key,empty_state);
+            if(vr.crypto.object_hash(getted)===vr.crypto.object_hash(empty_state)) return result;
             else return result.concat(getted);
         },[]);
         const computed = (()=>{

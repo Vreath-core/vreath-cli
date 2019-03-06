@@ -1,9 +1,7 @@
 import * as vr from 'vreath'
 import * as express from 'express'
-import * as fs from 'fs'
-import {promisify} from 'util'
-import {read_chain, new_obj} from '../../logic/work'
-import {state_trie_ins} from '../../logic/data'
+import {new_obj} from '../../logic/work'
+import {state_trie_ins,read_chain,read_root,get_unit_store,write_unit, read_state} from '../../logic/data'
 import bunyan from 'bunyan'
 
 const log = bunyan.createLogger({
@@ -20,10 +18,10 @@ const router = express.Router();
 export default router.post('/',async (req,res)=>{
     try{
         const unit:vr.Unit = req.body;
-        const unit_store:{[key:string]:vr.Unit} = JSON.parse(await promisify(fs.readFile)('./json/unit_store.json','utf-8'));
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
+        const unit_store = await get_unit_store();
+        const roots:{stateroot:string,lockroot:string} = await read_root();
         const S_Trie = state_trie_ins(roots.stateroot);
-        const unit_state = await S_Trie.get(unit.address) || vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{data:"[]"});
+        const unit_state = await read_state(S_Trie,unit.address,vr.state.create_state(0,unit.address,vr.con.constant.unit,0,{data:"[]"}));
         const used:string[] = JSON.parse(unit_state.data.used||"[]");
         const iden_hash = vr.crypto.hash(unit.request+unit.height.toString(16)+unit.block_hash);
         if(used.indexOf(iden_hash)!=-1){
@@ -53,7 +51,10 @@ export default router.post('/',async (req,res)=>{
                 return store;
             }
         );
-        await promisify(fs.writeFile)('./json/unit_store.json',JSON.stringify(new_unit_store,null, 4),'utf-8');
+        let w_unit:vr.Unit;
+        for(w_unit of Object.values(new_unit_store)){
+            await write_unit(w_unit);
+        }
         res.status(200).send('success');
         return 1;
     }

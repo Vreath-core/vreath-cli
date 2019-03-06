@@ -6,19 +6,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const data = __importStar(require("./data"));
 const P = __importStar(require("p-iteration"));
 const math = __importStar(require("mathjs"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
 const lodash_1 = require("lodash");
-const share_data_1 = __importDefault(require("../json/share_data"));
-const block_1 = require("../genesis/block");
+const data_1 = require("./data");
 math.config({
     number: 'BigNumber'
 });
@@ -35,151 +29,167 @@ exports.copy = (data) => {
 exports.new_obj = (obj, fn) => {
     return fn(exports.copy(obj));
 };
-exports.read_chain = async (max_size) => {
-    try {
+/*
+export type chain_info = {
+    net_id:number;
+    chain_id:number;
+    version:number;
+    compatible_version:number;
+    last_height:number;
+    last_hash:string;
+    pos_diffs:number[];
+}
+
+export const read_chain = async (max_size:number)=>{
+    try{
         const net_id = vr.con.constant.my_net_id;
-        const pre_chain = share_data_1.default.chain;
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
-        if (pre_chain.length - 1 >= info.last_height && pre_chain[pre_chain.length - 1] != null && pre_chain[pre_chain.length - 1].hash === info.last_hash) {
+        const pre_chain = share_data.chain;
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        if(pre_chain.length-1>=info.last_height&&pre_chain[pre_chain.length-1]!=null&&pre_chain[pre_chain.length-1].hash===info.last_hash){
             return pre_chain;
         }
-        let chain = [];
-        let block;
+        let chain:vr.Block[] = [];
+        let block:vr.Block;
         let size_sum = 0;
-        let i;
-        for (i = info.last_height; i >= 0; i--) {
-            block = JSON.parse(await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + i.toString() + '.json', 'utf-8'));
+        let i:number;
+        for(i=info.last_height; i>=0; i--){
+            block = JSON.parse(await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json','utf-8'));
             size_sum = math.chain(size_sum).add(Buffer.from(JSON.stringify(block)).length).done();
-            if (pre_chain[info.last_height - i] != null && pre_chain[info.last_height - i].hash === block.hash) {
-                const reversed = chain.reverse();
+            if(pre_chain[info.last_height-i]!=null&&pre_chain[info.last_height-i].hash===block.hash){
+                const reversed = chain.reverse()
                 chain = pre_chain.concat(reversed);
                 break;
             }
-            if (size_sum > max_size) {
+            if(size_sum>max_size){
                 chain.reverse();
                 break;
             }
-            else
-                chain.push(block);
-            if (i === 0) {
+            else chain.push(block);
+            if(i===0){
                 chain.reverse();
                 break;
             }
         }
         return chain;
     }
-    catch (e) {
+    catch(e){
         throw new Error(e);
     }
-};
-exports.write_chain = async (block) => {
-    try {
+}
+
+export const write_chain = async (block:vr.Block)=>{
+    try{
         const net_id = vr.con.constant.my_net_id;
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
         const height = block.meta.height;
-        const new_info = exports.new_obj(info, i => {
-            i.last_height = height;
-            i.last_hash = block.hash;
-            i.pos_diffs.push(block.meta.pos_diff);
-            return i;
-        });
-        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/block_' + height.toString() + '.json', JSON.stringify(block, null, 4), 'utf-8');
-        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', JSON.stringify(new_info, null, 4), 'utf-8');
-        share_data_1.default.chain.push(block);
+        const new_info = new_obj(
+            info,
+            i=>{
+                i.last_height = height;
+                i.last_hash = block.hash;
+                i.pos_diffs.push(block.meta.pos_diff);
+                return i;
+            }
+        )
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/block_'+height.toString()+'.json',JSON.stringify(block,null, 4),'utf-8');
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
+        share_data.chain.push(block);
     }
-    catch (e) {
+    catch(e){
         throw new Error(e);
     }
-};
-exports.back_chain = async (height) => {
-    try {
-        if (share_data_1.default.chain.length - 1 === height)
-            return 0;
+}
+
+export const back_chain = async (height:number)=>{
+    try{
+        if(share_data.chain.length-1===height) return 0;
         const net_id = vr.con.constant.my_net_id;
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', 'utf-8')));
-        let i;
-        for (i = height + 1; i <= info.last_height; i++) {
-            try {
-                await util_1.promisify(fs.unlink)('./json/chain/net_id_' + net_id.toString() + '/block_' + i.toString() + '.json');
+        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+net_id.toString()+'/info.json','utf-8')));
+        let i:number;
+        for(i=height+1; i<=info.last_height; i++){
+            try{
+                await promisify(fs.unlink)('./json/chain/net_id_'+net_id.toString()+'/block_'+i.toString()+'.json');
             }
-            catch (e) {
+            catch(e){
                 continue;
             }
         }
-        const backed_chain = share_data_1.default.chain.slice(0, height + 1);
-        const new_info = exports.new_obj(info, info => {
-            const last_block = backed_chain[backed_chain.length - 1] || block_1.genesis_block;
+        const backed_chain = share_data.chain.slice(0,height+1);
+        const new_info = new_obj(info,info=>{
+            const last_block = backed_chain[backed_chain.length-1] || genesis_block
             info.last_height = height;
             info.last_hash = last_block.hash;
-            info.pos_diffs = info.pos_diffs.slice(0, height + 1);
+            info.pos_diffs = info.pos_diffs.slice(0,height+1);
             return info;
         });
-        await util_1.promisify(fs.writeFile)('./json/chain/net_id_' + net_id.toString() + '/info.json', JSON.stringify(new_info, null, 4), 'utf-8');
-        const post_block = share_data_1.default.chain[height + 1];
+        await promisify(fs.writeFile)('./json/chain/net_id_'+net_id.toString()+'/info.json',JSON.stringify(new_info,null, 4),'utf-8');
+        const post_block = share_data.chain[height+1];
         const new_roots = {
-            stateroot: post_block.meta.stateroot,
-            lockroot: post_block.meta.lockroot
-        };
-        await util_1.promisify(fs.writeFile)('./json/root.json', JSON.stringify(new_roots, null, 4), 'utf-8');
-        share_data_1.default.chain = backed_chain;
+            stateroot:post_block.meta.stateroot,
+            lockroot:post_block.meta.lockroot
+        }
+        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
+        share_data.chain = backed_chain;
         return 1;
     }
-    catch (e) {
+    catch(e){
         throw new Error(e);
     }
-};
-exports.read_pool = async (max_size) => {
-    try {
-        const mem_pool = share_data_1.default.pool;
-        const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];
+}
+
+export const read_pool = async (max_size:number)=>{
+    try{
+        const mem_pool = share_data.pool;
+        const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];
         let size = 0;
-        let name;
-        let tx;
-        let pool = {};
-        for (name of filenames) {
-            if (mem_pool[name.split('.json')[0]] != null) {
+        let name:string;
+        let tx:vr.Tx;
+        let pool:vr.Pool = {};
+        for(name of filenames){
+            if(mem_pool[name.split('.json')[0]]!=null){
                 pool[name.split('.json')[0]] = mem_pool[name.split('.json')[0]];
                 continue;
             }
-            tx = JSON.parse(await util_1.promisify(fs.readFile)('./json/pool/' + name, 'utf-8'));
-            if (size + Buffer.from(JSON.stringify(tx)).length > max_size)
-                break;
+            tx = JSON.parse(await promisify(fs.readFile)('./json/pool/'+name,'utf-8'));
+            if(size+Buffer.from(JSON.stringify(tx)).length>max_size) break;
             pool[tx.hash] = tx;
         }
         return pool;
     }
-    catch (e) {
+    catch(e){
         throw new Error(e);
     }
-};
-exports.write_pool = async (pool) => {
-    try {
-        const filenames = await util_1.promisify(fs.readdir)('./json/pool', 'utf8') || [];
+}
+
+export const write_pool = async (pool:vr.Pool)=>{
+    try{
+        const filenames = await promisify(fs.readdir)('./json/pool','utf8') || [];
         const tx_names = Object.keys(pool);
-        const for_save = tx_names.filter(name => filenames.indexOf(name + '.json') === -1);
-        const for_del = filenames.filter(name => tx_names.indexOf(name.split('.json')[0]) === -1);
-        let name;
-        let file_name;
-        let tx;
-        for (name of filenames) {
-            if (for_del.indexOf(name) != -1) {
-                delete share_data_1.default.pool[name.split('.json')[0]];
-                await util_1.promisify(fs.unlink)('./json/pool/' + name);
+        const for_save = tx_names.filter(name=>filenames.indexOf(name+'.json')===-1);
+        const for_del = filenames.filter(name=>tx_names.indexOf(name.split('.json')[0])===-1);
+        let name:string;
+        let file_name:string;
+        let tx:vr.Tx;
+        for(name of filenames){
+            if(for_del.indexOf(name)!=-1){
+                delete share_data.pool[name.split('.json')[0]];
+                await promisify(fs.unlink)('./json/pool/'+name);
             }
         }
-        for (name of tx_names) {
-            file_name = name + '.json';
-            if (for_save.indexOf(name) != -1) {
+        for(name of tx_names){
+            file_name = name+'.json';
+            if(for_save.indexOf(name)!=-1){
                 tx = pool[name];
-                share_data_1.default.pool[name] = tx;
-                await util_1.promisify(fs.writeFile)('./json/pool/' + file_name, JSON.stringify(tx, null, 4), 'utf-8');
+                share_data.pool[name] = tx;
+                await promisify(fs.writeFile)('./json/pool/'+file_name,JSON.stringify(tx,null,4),'utf-8');
             }
         }
     }
-    catch (e) {
+    catch(e){
         throw new Error(e);
     }
-};
+}
+*/
 const choose_txs = async (unit_mode, pool, L_Trie) => {
     const pool_txs = Object.keys(pool).map(key => pool[key]);
     const requested_bases = (await L_Trie.filter((val) => {
@@ -269,12 +279,12 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
                     else
                         return result;
                 }, []);
-                const pool = await exports.read_pool(10 ** 9);
+                const pool = await data_1.read_pool(10 ** 9);
                 const new_pool = Object.keys(pool).filter(key => invalid_tx_hashes.indexOf(key) === -1).reduce((res, key) => {
                     res[key] = pool[key];
                     return res;
                 }, {});
-                await exports.write_pool(new_pool);
+                await data_1.write_pool(new_pool);
                 if (invalid_tx_hashes.length > 0)
                     throw new Error('remove invalid txs');
             }
@@ -340,9 +350,10 @@ exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, pri
         const target_block = chain[height] || vr.block.empty_block;
         const req_tx_pure = target_block.txs[index] || vr.tx.empty_tx;
         const req_tx = vr.tx.pure2tx(req_tx_pure, target_block);
+        const empty_state = vr.state.create_state();
         const pre_StateData = await P.reduce(req_tx.meta.bases, async (result, key) => {
-            const getted = await S_Trie.get(key);
-            if (getted == null)
+            const getted = await data.read_state(S_Trie, key, empty_state);
+            if (vr.crypto.object_hash(getted) === vr.crypto.object_hash(empty_state))
                 return result;
             else
                 return result.concat(getted);

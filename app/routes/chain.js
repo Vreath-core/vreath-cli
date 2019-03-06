@@ -11,10 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
-const vr = __importStar(require("vreath"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
-const work_1 = require("../../logic/work");
+const data_1 = require("../../logic/data");
 const P = __importStar(require("p-iteration"));
 const request_promise_native_1 = __importDefault(require("request-promise-native"));
 const bunyan_1 = __importDefault(require("bunyan"));
@@ -38,7 +35,7 @@ exports.default = router.get('/', async (req, res) => {
             res.status(500).send('invalid data');
             return 0;
         }
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
+        const info = await data_1.read_chain_info();
         const my_diffs = info.pos_diffs;
         let height = 0;
         let sum = 0;
@@ -52,7 +49,7 @@ exports.default = router.get('/', async (req, res) => {
                 break;
             }
         }
-        const chain = await work_1.read_chain(2 * (10 ** 9));
+        const chain = await data_1.read_chain(2 * (10 ** 9));
         let block;
         let key_height = 0;
         for (block of chain.slice(0, height + 1).reverse()) {
@@ -71,7 +68,7 @@ exports.default = router.get('/', async (req, res) => {
 }).post('/', async (req, res) => {
     try {
         const new_chain = req.body;
-        const my_chain = await work_1.read_chain(2 * (10 ** 9));
+        const my_chain = await data_1.read_chain(2 * (10 ** 9));
         const same_height = (() => {
             let same_height = 0;
             let index;
@@ -85,7 +82,7 @@ exports.default = router.get('/', async (req, res) => {
             return same_height;
         })();
         const add_chain = new_chain.slice(same_height + 1);
-        const info = JSON.parse((await util_1.promisify(fs.readFile)('./json/chain/net_id_' + vr.con.constant.my_net_id.toString() + '/info.json', 'utf-8')));
+        const info = await data_1.read_chain_info();
         const my_diff_sum = info.pos_diffs.slice(same_height + 1).reduce((sum, diff) => math.chain(sum).add(diff).done(), 0);
         const new_diff_sum = add_chain.reduce((sum, block) => math.chain(sum).add(block.meta.pos_diff).done(), 0);
         if (math.largerEq(my_diff_sum, new_diff_sum)) {

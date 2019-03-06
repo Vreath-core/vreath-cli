@@ -12,10 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
 const vr = __importStar(require("vreath"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
-const logic = __importStar(require("../../logic/data"));
-const work_1 = require("../../logic/work");
+const data = __importStar(require("../../logic/data"));
+const work = __importStar(require("../../logic/work"));
 const P = __importStar(require("p-iteration"));
 const bunyan_1 = __importDefault(require("bunyan"));
 const log = bunyan_1.default.createLogger({
@@ -41,13 +39,13 @@ exports.default = router.post('/', async (req, res) => {
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const pool = await work_1.read_pool(10 ** 9);
-        const chain = await work_1.read_chain(2 * (10 ** 9));
-        const roots = JSON.parse(await util_1.promisify(fs.readFile)('./json/root.json', 'utf-8'));
-        const S_Trie = logic.state_trie_ins(roots.stateroot);
-        const StateData = await logic.get_tx_statedata(tx, chain, S_Trie);
-        const L_Trie = logic.lock_trie_ins(roots.lockroot);
-        const LockData = await logic.get_tx_lockdata(tx, chain, L_Trie);
+        const pool = await data.read_pool(10 ** 9);
+        const chain = await data.read_chain(2 * (10 ** 9));
+        const roots = await data.read_root();
+        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const StateData = await data.get_tx_statedata(tx, chain, S_Trie);
+        const L_Trie = data.lock_trie_ins(roots.lockroot);
+        const LockData = await data.get_tx_lockdata(tx, chain, L_Trie);
         if (tx.meta.kind === 'refresh') {
             const req_tx = vr.tx.find_req_tx(tx, chain);
             const checked = await (async () => {
@@ -66,7 +64,7 @@ exports.default = router.post('/', async (req, res) => {
                     return false;
             })();
             if (!checked) {
-                const valid_output = work_1.compute_output(req_tx, StateData, chain);
+                const valid_output = work.compute_output(req_tx, StateData, chain);
                 const suc = !valid_output.some(s => !vr.state.verify_state(s));
                 const valid_out_hash = vr.crypto.object_hash(valid_output);
                 if (suc != tx.meta.success || valid_out_hash != tx.meta.output)
@@ -74,7 +72,7 @@ exports.default = router.post('/', async (req, res) => {
             }
         }
         const new_pool = vr.pool.tx2pool(pool, tx, chain, StateData, LockData);
-        await work_1.write_pool(new_pool);
+        await data.write_pool(new_pool);
         res.status(200).send('success');
         return 1;
     }

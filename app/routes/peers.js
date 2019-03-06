@@ -11,9 +11,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = __importStar(require("express"));
-const fs = __importStar(require("fs"));
-const util_1 = require("util");
 const bunyan_1 = __importDefault(require("bunyan"));
+const data_1 = require("../../logic/data");
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -30,7 +29,7 @@ exports.default = router.post('/', async (req, res) => {
             res.status(500).send('invalid list');
             return 0;
         }
-        const my_list = JSON.parse(await util_1.promisify(fs.readFile)('./json/peer_list.json', 'utf-8'));
+        const my_list = await data_1.get_peer_list();
         const peers_ip = list.map(peer => peer.ip);
         const new_list = my_list.map(peer => {
             const i = peers_ip.indexOf(peer.ip);
@@ -39,7 +38,10 @@ exports.default = router.post('/', async (req, res) => {
             else
                 return list[i];
         }).sort((a, b) => b.timestamp - a.timestamp);
-        await util_1.promisify(fs.writeFile)('./json/peer_list.json', JSON.stringify(new_list, null, 4), 'utf-8');
+        let peer;
+        for (peer of new_list) {
+            await data_1.write_peer(peer);
+        }
         res.send(my_list);
         return 1;
     }

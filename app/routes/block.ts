@@ -1,9 +1,6 @@
 import * as express from 'express'
 import * as vr from 'vreath'
-import * as fs from 'fs'
-import {promisify} from 'util'
-import * as logic from '../../logic/data'
-import {read_chain, write_chain, chain_info, read_pool, write_pool} from '../../logic/work'
+import * as data from '../../logic/data'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
 import * as math from 'mathjs'
@@ -30,7 +27,7 @@ export default router.get('/',async (req,res)=>{
             res.status(500).send('invalid request data');
             return 0;
         }
-        const chain:vr.Block[] = await read_chain(2*(10**9));
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
         const block = chain[height];
         const hash = info.hash || block.hash;
         if(hash!=block.hash){
@@ -57,18 +54,18 @@ export default router.get('/',async (req,res)=>{
             res.status(500).send('unsupported　version');
             return 0;
         }
-        const info:chain_info = JSON.parse((await promisify(fs.readFile)('./json/chain/net_id_'+vr.con.constant.my_net_id.toString()+'/info.json','utf-8')));
+        const info:data.chain_info = await data.read_chain_info();
         if(block.meta.height!=info.last_height+1){
             res.status(500).send('invalid height block');
             return 0;
         }
-        const chain:vr.Block[] = await read_chain(2*(10**9));
-        const roots:{stateroot:string,lockroot:string} = JSON.parse(await promisify(fs.readFile)('./json/root.json','utf-8'));
-        const pool:vr.Pool = await read_pool(10**9)
-        const S_Trie = logic.state_trie_ins(roots.stateroot);
-        const StateData = await logic.get_block_statedata(block,chain,S_Trie);
-        const L_Trie = logic.lock_trie_ins(roots.lockroot);
-        const LockData = await logic.get_block_lockdata(block,chain,L_Trie);
+        const chain:vr.Block[] = await data.read_chain(2*(10**9));
+        const roots:{stateroot:string,lockroot:string} = await data.read_root();
+        const pool:vr.Pool = await data.read_pool(10**9)
+        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const StateData = await data.get_block_statedata(block,chain,S_Trie);
+        const L_Trie = data.lock_trie_ins(roots.lockroot);
+        const LockData = await data.get_block_lockdata(block,chain,L_Trie);
         const check = (()=>{
             if(block.meta.kind==='key') return vr.block.verify_key_block(block,chain,roots.stateroot,roots.lockroot,StateData);
             else if(block.meta.kind==='micro') return vr.block.verify_micro_block(block,chain,roots.stateroot,roots.lockroot,StateData,LockData);
@@ -82,22 +79,27 @@ export default router.get('/',async (req,res)=>{
             if(block.meta.kind==='key') return vr.block.accept_key_block(block,chain,StateData,LockData);
             else return vr.block.accept_micro_block(block,chain,StateData,LockData);
         })();
+
         await P.forEach(accepted[0], async (state:vr.State)=>{
-            if(state.kind==='state') await S_Trie.put(state.owner,state);
-            else await S_Trie.put(state.token,state);
+            await data.write_state(state);
+            const hash = vr.crypto.object_hash(state);
+            if(state.kind==='state') await data.put_state_to_trie(S_Trie,hash,state.kind,state.owner);
+            else if(state.kind==='info') await data.put_state_to_trie(S_Trie,hash,state.kind,state.token);
         });
 
         await P.forEach(accepted[1], async (lock:vr.Lock)=>{
-            await L_Trie.put(lock.address,lock);
+            await data.write_lock(lock);
+            const hash = vr.crypto.object_hash(lock);
+            await data.put_lock_to_trie(L_Trie,hash,lock.address);
         });
 
-        await write_chain(block);
+        await data.write_chain(block);
 
         const new_roots = {
             stateroot:S_Trie.now_root(),
             lockroot:L_Trie.now_root()
         }
-        await promisify(fs.writeFile)('./json/root.json',JSON.stringify(new_roots,null, 4),'utf-8');
+        await data.write_root(new_roots);
 
         const txs_hash = block.txs.map(pure=>pure.hash);
         const new_pool_keys = Object.keys(pool).filter(key=>txs_hash.indexOf(key)===-1);
@@ -105,7 +107,7 @@ export default router.get('/',async (req,res)=>{
             obj[key] = pool[key];
             return obj;
         },{});
-        await write_pool(new_pool);
+        await data.write_pool(new_pool);
 
         res.status(200).send('success');
         return 1;
