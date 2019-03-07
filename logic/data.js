@@ -111,7 +111,15 @@ exports.put_state_to_trie = async (S_Trie, hash, kind, key) => {
         throw new Error(e);
     }
 };
-exports.read_lock = async (L_Trie, key, empty) => {
+const empty_lock = {
+    address: '',
+    state: 'yet',
+    height: 0,
+    block_hash: '',
+    index: 0,
+    tx_hash: ''
+};
+exports.read_lock = async (L_Trie, key, empty = empty_lock) => {
     try {
         const hash = await L_Trie.get(key);
         if (hash == null)

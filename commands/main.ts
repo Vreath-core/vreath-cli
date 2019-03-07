@@ -17,6 +17,8 @@ import * as data from '../logic/data'
 import req_tx_com from '../app/repl/request-tx'
 import remit from '../app/repl/remit'
 import repl_balance from '../app/repl/balance'
+import repl_get_block from '../app/repl/get_block'
+import repl_get_chain_info from '../app/repl/get_chain_info'
 import share_data from '../share/share_data'
 import express from 'express'
 import * as bodyParser from 'body-parser'
@@ -495,12 +497,30 @@ yargs
         });
 
         replServer.defineCommand('balance',{
-            help: 'Check the balance of VRT',
+            help: 'Show your VRT balance',
             async action(){
                 const balance = await repl_balance(my_private);
                 console.log(balance);
             }
-        })
+        });
+
+        replServer.defineCommand('get-block',{
+            help:'Show the block specified by height',
+            async action(input){
+                const block = await repl_get_block(input);
+                console.log(block);
+            }
+        });
+
+        replServer.defineCommand('get-chain_info',{
+            help:'Show the chain info',
+            async action(){
+                const info = await repl_get_chain_info();
+                console.log(info);
+            }
+        });
+
+
     }
     catch(e){
         console.log(e);

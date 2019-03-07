@@ -117,7 +117,16 @@ export const put_state_to_trie = async (S_Trie:Trie,hash:string,kind:'state'|'in
     }
 }
 
-export const read_lock = async (L_Trie:Trie,key:string,empty:vr.Lock)=>{
+const empty_lock:vr.Lock = {
+    address:'',
+    state:'yet',
+    height:0,
+    block_hash:'',
+    index:0,
+    tx_hash:''
+}
+
+export const read_lock = async (L_Trie:Trie,key:string,empty:vr.Lock=empty_lock)=>{
     try{
         const hash:string = await L_Trie.get(key);
         if(hash==null) return empty;

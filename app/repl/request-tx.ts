@@ -25,7 +25,6 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
         const LockData = await data.get_tx_lockdata(tx,chain,L_Trie);
         const new_pool = vr.pool.tx2pool(pool,tx,chain,StateData,LockData);
         await data.write_pool(new_pool);
-
         if(new_pool[tx.hash]!=null){
             const peers = await data.get_peer_list();
             await P.forEach(peers,async peer=>{

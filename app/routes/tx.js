@@ -50,8 +50,8 @@ exports.default = router.post('/', async (req, res) => {
             const req_tx = vr.tx.find_req_tx(tx, chain);
             const checked = await (async () => {
                 const not_refed = await P.some(req_tx.meta.bases, async (key) => {
-                    const lock = await L_Trie.get(key);
-                    return lock == null || !(lock.state === "already" && lock.height === tx.meta.height && lock.block_hash === tx.meta.block_hash && lock.index === tx.meta.index && lock.tx_hash === tx.meta.req_tx_hash);
+                    const lock = await data.read_lock(L_Trie, key);
+                    return lock == null || lock.address == '' || !(lock.state === "already" && lock.height === tx.meta.height && lock.block_hash === tx.meta.block_hash && lock.index === tx.meta.index && lock.tx_hash === tx.meta.req_tx_hash);
                 });
                 if (!not_refed)
                     return true;

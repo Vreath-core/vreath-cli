@@ -28,6 +28,8 @@ const data = __importStar(require("../logic/data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
 const remit_1 = __importDefault(require("../app/repl/remit"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
+const get_block_1 = __importDefault(require("../app/repl/get_block"));
+const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
 const share_data_1 = __importDefault(require("../share/share_data"));
 const express_1 = __importDefault(require("express"));
 const bodyParser = __importStar(require("body-parser"));
@@ -492,10 +494,24 @@ yargs_1.default
             }
         });
         replServer.defineCommand('balance', {
-            help: 'Check the balance of VRT',
+            help: 'Show your VRT balance',
             async action() {
                 const balance = await balance_1.default(my_private);
                 console.log(balance);
+            }
+        });
+        replServer.defineCommand('get-block', {
+            help: 'Show the block specified by height',
+            async action(input) {
+                const block = await get_block_1.default(input);
+                console.log(block);
+            }
+        });
+        replServer.defineCommand('get-chain_info', {
+            help: 'Show the chain info',
+            async action() {
+                const info = await get_chain_info_1.default();
+                console.log(info);
             }
         });
     }

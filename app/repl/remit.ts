@@ -11,15 +11,21 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
         const type:vr.TxType = "change"
         const tokens = [vr.con.constant.native];
         const remitter = vr.crypto.generate_address(vr.con.constant.native,user_pub);
-        const receiver = splited[0].split('=')[1].trim().split(',').map(add=>{
+        const receiver_input = splited[0].split('=')[1].trim().split(',');
+        const receiver = receiver_input.map(add=>{
             if(add==="remitter") return remitter;
             else return add;
         });
+        const include_remitter = receiver.indexOf("remitter")!=-1;
         const bases = [remitter].concat(receiver).filter((val,i,array)=>array.indexOf(val)===i);
         const feeprice = Number(splited[1].split('=')[1].trim());
         const gas = Number(splited[2].split('=')[1].trim());
-        const amount = (splited[3]||"").split('=')[1].trim().split(',');
-        if(receiver.length!=amount.length) throw new Error('invalid amount');
+        const amount = (()=>{
+            const splitted = (splited[3]||"").split('=')[1].trim().split(',');
+            if(include_remitter) return splitted;
+            return ["0"].concat(splitted)
+        })();
+        if(bases.length!=amount.length) throw new Error('invalid amount');
         const input_raw = ["remit",JSON.stringify(amount.map(a=>Number(a)))];
         const log = splited[4].split('=')[1].trim();
         const chain:vr.Block[] = await data.read_chain(2*(10**9));
