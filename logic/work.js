@@ -190,7 +190,7 @@ export const write_pool = async (pool:vr.Pool)=>{
     }
 }
 */
-const choose_txs = async (unit_mode, pool, L_Trie) => {
+const choose_txs = async (unit_mode, pool, my_address, L_Trie) => {
     const pool_txs = Object.keys(pool).map(key => pool[key]);
     const requested_bases = (await L_Trie.filter((val) => {
         const getted = val;
@@ -229,7 +229,12 @@ const choose_txs = async (unit_mode, pool, L_Trie) => {
         }
     });
     const sorted = unit_prioritized.slice().sort((a, b) => {
-        return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
+        if (unit_mode && a.meta.address != my_address && b.meta.address === my_address)
+            return -1;
+        else if (unit_mode && a.meta.address === my_address && b.meta.address != my_address)
+            return 1;
+        else
+            return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
     });
     const choosed = sorted.reduce((txs, tx) => {
         if (math.chain(vr.con.constant.block_size).multiply(0.9).smaller(size_sum).done())
@@ -252,7 +257,8 @@ exports.make_block = async (chain, pubs, stateroot, lockroot, extra, pool, priva
         }
         else {
             const unit_mode = chain.length % 10 === 0;
-            const txs = await choose_txs(unit_mode, pool, L_Trie);
+            const unit_address = vr.crypto.generate_address(vr.con.constant.unit, public_key);
+            const txs = await choose_txs(unit_mode, pool, unit_address, L_Trie);
             const created_micro_block = vr.block.create_micro_block(chain, stateroot, lockroot, txs, extra, private_key, public_key);
             const txs_hash = txs.map(tx => tx.hash);
             const micro_block = exports.new_obj(created_micro_block, block => {

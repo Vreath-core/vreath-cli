@@ -187,7 +187,7 @@ export const write_pool = async (pool:vr.Pool)=>{
 }
 */
 
-const choose_txs = async (unit_mode:boolean,pool:vr.Pool,L_Trie:Trie)=>{
+const choose_txs = async (unit_mode:boolean,pool:vr.Pool,my_address:string,L_Trie:Trie)=>{
     const pool_txs:vr.Tx[] = Object.keys(pool).map(key=>pool[key]);
     const requested_bases:string[] = (await L_Trie.filter((val:vr.Lock)=>{
         const getted:vr.Lock = val;
@@ -217,7 +217,9 @@ const choose_txs = async (unit_mode:boolean,pool:vr.Pool,L_Trie:Trie)=>{
         }
     });
     const sorted = unit_prioritized.slice().sort((a,b)=>{
-        return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
+        if(unit_mode&&a.meta.address!=my_address&&b.meta.address===my_address) return -1;
+        else if(unit_mode&&a.meta.address===my_address&&b.meta.address!=my_address) return 1;
+        else return math.chain(vr.tx.get_tx_fee(b)).subtract(vr.tx.get_tx_fee(a)).done();
     });
     const choosed = sorted.reduce((txs:vr.Tx[],tx)=>{
         if(math.chain(vr.con.constant.block_size).multiply(0.9).smaller(size_sum).done() as boolean) return txs;
@@ -240,7 +242,8 @@ export const make_block = async (chain:vr.Block[],pubs:string[],stateroot:string
         }
         else{
             const unit_mode = chain.length%10 === 0;
-            const txs = await choose_txs(unit_mode,pool,L_Trie)
+            const unit_address = vr.crypto.generate_address(vr.con.constant.unit,public_key);
+            const txs = await choose_txs(unit_mode,pool,unit_address,L_Trie);
             const created_micro_block = vr.block.create_micro_block(chain,stateroot,lockroot,txs,extra,private_key,public_key);
             const txs_hash = txs.map(tx=>tx.hash);
             const micro_block = new_obj(
