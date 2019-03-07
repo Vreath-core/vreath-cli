@@ -512,7 +512,7 @@ yargs
             }
         });
 
-        replServer.defineCommand('get-chain_info',{
+        replServer.defineCommand('get-chain-info',{
             help:'Show the chain info',
             async action(){
                 const info = await repl_get_chain_info();
