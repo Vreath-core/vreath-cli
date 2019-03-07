@@ -29,7 +29,7 @@ exports.default = async (input, config, my_private) => {
             else
                 return add;
         });
-        const include_remitter = receiver.indexOf("remitter") != -1;
+        const include_remitter = receiver_input.indexOf("remitter") != -1;
         const bases = [remitter].concat(receiver).filter((val, i, array) => array.indexOf(val) === i);
         const feeprice = Number(splited[1].split('=')[1].trim());
         const gas = Number(splited[2].split('=')[1].trim());
