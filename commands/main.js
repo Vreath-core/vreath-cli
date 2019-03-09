@@ -30,6 +30,7 @@ const remit_1 = __importDefault(require("../app/repl/remit"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
 const get_block_1 = __importDefault(require("../app/repl/get_block"));
 const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
+const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
 const share_data_1 = __importDefault(require("../share/share_data"));
 const express_1 = __importDefault(require("express"));
 const bodyParser = __importStar(require("body-parser"));
@@ -512,6 +513,12 @@ yargs_1.default
             async action() {
                 const info = await get_chain_info_1.default();
                 console.log(info);
+            }
+        });
+        replServer.defineCommand('output-chain', {
+            help: 'output chain as zip of json files',
+            async action() {
+                await output_chain_1.default();
             }
         });
     }

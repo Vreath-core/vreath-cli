@@ -19,6 +19,7 @@ import remit from '../app/repl/remit'
 import repl_balance from '../app/repl/balance'
 import repl_get_block from '../app/repl/get_block'
 import repl_get_chain_info from '../app/repl/get_chain_info'
+import output_chain from '../app/repl/output_chain'
 import share_data from '../share/share_data'
 import express from 'express'
 import * as bodyParser from 'body-parser'
@@ -519,6 +520,13 @@ yargs
                 console.log(info);
             }
         });
+
+        replServer.defineCommand('output-chain',{
+            help:'output chain as zip of json files',
+            async action(){
+                await output_chain();
+            }
+        })
 
 
     }
