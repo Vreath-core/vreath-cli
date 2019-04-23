@@ -220,4 +220,3 @@ exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, 
         throw new Error('fail to create valid refresh tx');
     return ref_tx;
 };
-//# sourceMappingURL=work.js.map
