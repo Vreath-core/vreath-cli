@@ -1,165 +1,35 @@
-import levelup, { LevelUp } from 'levelup'
-import leveldown, { LevelDown } from 'leveldown'
-import * as P from 'p-iteration'
-import * as vr from 'vreath'
-import share_data from '../share/share_data';
+import * as P from 'p-iteration';
+import bigInt, {BigInteger} from 'big-integer';
+import * as vr from 'vreath';
 import { genesis_block } from '../genesis/block';
-import {new_obj} from './work'
-import * as math from 'mathjs'
+import {new_obj} from './work';
 import { peer } from '../app/routes/handshake';
-import aw from 'awaitify-stream'
+import block from '../app/routes/block';
+const aw = require('awaitify-stream');
 
-math.config({
-    number: 'BigNumber'
-  });
+export const id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
 
-const native = vr.con.constant.native;
-const unit = vr.con.constant.unit;
+export const trie_db = new vr.db(`./db/net_id_${id}/trie`);
+export const state_db = new vr.db(`./db/net_id_${id}/state`);
+export const lock_db =  new vr.db(`./db/net_id_${id}/lock`);
+export const block_db = new vr.db(`./db/net_id_${id}/block`);
+export const tx_db = new vr.db(`./db/net_id_${id}/tx_pool`);
+export const root_db = new vr.db(`./db/net_id_${id}/root`);
+export const unit_db = new vr.db(`./db/net_id_${id}/unit_store`);
+export const peer_list_db = new vr.db(`./db/net_id_${id}/peer_list`);
 
-const state_trie_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/state_trie`));
-const lock_trie_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/lock_trie`));
-const state_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/state`));
-const lock_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/lock`));
-const block_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/block`));
-const tx_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/tx_pool`));
-const root_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/root`));
-const unit_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/unit_store`));
-const peer_list_db = levelup(leveldown(`./db/net_id_${vr.con.constant.my_net_id}/peer_list`));
-
-class Trie extends vr.trie{}
 
 export type chain_info = {
-    net_id:number;
-    chain_id:number;
-    version:number;
-    compatible_version:number;
-    last_height:number;
+    version:string;
+    chain_id:string;
+    net_id:string;
+    compatible_version:string;
+    last_height:string;
     last_hash:string;
-    pos_diffs:number[];
+    pos_diffs:string[];
 }
 
-export const state_trie_ins = (root:string)=>{
-    try{
-        return new vr.trie(state_trie_db,root);
-    }
-    catch(e){
-        console.log(e);
-        return new vr.trie(state_trie_db);
-    }
-}
-
-export const lock_trie_ins = (root:string)=>{
-    try{
-        return new vr.trie(lock_trie_db,root);
-    }
-    catch(e){
-        console.log(e);
-        return new vr.trie(lock_trie_db);
-    }
-}
-
-const read_obj_from_db = async (db:LevelUp<LevelDown>,key:string)=>JSON.parse((await db.get(key)).toString('utf-8'));
-
-const write_obj_to_db = async <T>(db:LevelUp<LevelDown>,key:string,obj:T)=>await db.put(key,Buffer.from(JSON.stringify(obj),'utf-8'));
-
-const del_obj_from_db = async (db:LevelUp<LevelDown>,key:string)=>await db.del(key);
-
-const output_keys = (tx:vr.Tx)=>{
-    if(tx.meta.kind==="request") return [];
-    const states:vr.State[] = tx.raw.raw.map(r=>JSON.parse(r));
-    return states.map(s=>s.owner);
-}
-
-const pays = (tx:vr.Tx,chain:vr.Block[])=>{
-    if(tx.meta.kind==="request"){
-        const requester = vr.crypto.generate_address(native,vr.crypto.merge_pub_keys(tx.meta.pub_key));
-        return [requester];
-    }
-    else if(tx.meta.kind==="refresh"){
-        const req_tx = vr.tx.find_req_tx(tx,chain);
-        const requester = vr.crypto.generate_address(native,vr.crypto.merge_pub_keys(req_tx.meta.pub_key));
-        const refresher = vr.crypto.generate_address(native,vr.crypto.merge_pub_keys(tx.meta.pub_key));
-        return [requester,refresher];
-    }
-    else return [];
-}
-
-export const read_state = async (S_Trie:Trie,key:string,empty:vr.State)=>{
-    try{
-        const hash:string = await S_Trie.get(key);
-        if(hash==null) return empty;
-        const state:vr.State = await read_obj_from_db(state_db,hash||'');
-        if(state==null) return empty;
-        else return state;
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-export const write_state = async (state:vr.State)=>{
-    try{
-        const hash = vr.crypto.object_hash(state);
-        await write_obj_to_db(state_db,hash,state);
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-export const put_state_to_trie = async (S_Trie:Trie,hash:string,kind:'state'|'info',key:string)=>{
-    try{
-        if(kind==='state') await S_Trie.put(key,hash);
-        else if(kind==='info') await S_Trie.put(key,hash);
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-const empty_lock:vr.Lock = {
-    address:'',
-    state:'yet',
-    height:0,
-    block_hash:'',
-    index:0,
-    tx_hash:''
-}
-
-export const read_lock = async (L_Trie:Trie,key:string,empty:vr.Lock=empty_lock)=>{
-    try{
-        const hash:string = await L_Trie.get(key);
-        if(hash==null) return empty;
-        const lock:vr.Lock = await read_obj_from_db(lock_db,hash||'');
-        if(hash==null) return empty;
-        else return lock;
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-export const write_lock = async (lock:vr.Lock)=>{
-    try{
-        const hash = vr.crypto.object_hash(lock);
-        await write_obj_to_db(lock_db,hash,lock);
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-export const put_lock_to_trie = async (L_Trie:Trie,hash:string,key:string)=>{
-    try{
-        await L_Trie.put(key,hash);
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-
-
-export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
+/*export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
     try{
         const base = tx.meta.bases;
         const base_states:vr.State[] = await P.reduce(base, async (result:vr.State[],key:string)=>{
@@ -235,9 +105,22 @@ export const get_block_statedata = async (block:vr.Block,chain:vr.Block[],S_Trie
             }
             else return false;
         });
+        const pre_states = await (async ()=>{
+            if(block.meta.kind==='micro') return [];
+            const pre_key = vr.block.search_key_block(chain);
+            const pre_micros = vr.block.search_micro_block(chain,pre_key);
+            const empty_state_hash = vr.crypto.object_hash(vr.state.create_state());
+            const pre_changed = await P.reduce(pre_micros, async (res:vr.State[],block)=>{
+                const states = await P.map(block.txs,async tx=>await read_state(S_Trie,tx.meta.address,vr.state.create_state()));
+                const concated = res.concat(states.filter(state=>vr.crypto.object_hash(state)!=empty_state_hash));
+                const hashes = concated.map(state=>vr.crypto.object_hash(state));
+                return concated.filter((val,i)=>hashes.indexOf(vr.crypto.object_hash(val))===i);
+            },[]);
+            return pre_changed;
+        })();
         const native_token = await read_state(S_Trie,native,vr.state.create_info(0,native));
         const unit_token = await read_state(S_Trie,unit,vr.state.create_info(0,unit));
-        const concated = tx_states.concat(native_validator_state).concat(all_units).concat(native_token).concat(unit_token);
+        const concated = tx_states.concat(native_validator_state).concat(all_units).concat(pre_states).concat(native_token).concat(unit_token);
         const hashes = concated.map(s=>vr.crypto.object_hash(s))
         return concated.filter((val,i)=>hashes.indexOf(vr.crypto.object_hash(val))===i);
     }
@@ -283,48 +166,42 @@ export const get_block_lockdata = async (block:vr.Block,chain:vr.Block[],L_Trie:
         console.log(e);
         return [];
     }
-}
-
-export const get_native_balance = async (address:string,S_Trie:Trie)=>{
-    try{
-        const state:vr.State = await read_state(S_Trie,address,vr.state.create_state(0,address));
-        return state.amount;
-    }
-    catch(e){
-        console.log(e);
-        return 0;
-    }
+}*/
+/*
+export const get_native_balance = async (address:string,trie:vr.trie)=>{
+    const state:vr.State = await vr.data.read_from_trie(trie,state_db,address,0,vr.state.create_state("0",vr.con.constant.native,address));
+    return state.amount;
 }
 
 export const read_chain_info = async ()=>{
-    try{
-        const info:chain_info = await read_obj_from_db(block_db,'info');
-        if(info) return info;
-        return {
-            net_id:vr.con.constant.my_net_id,
-            chain_id:vr.con.constant.my_chain_id,
-            version:vr.con.constant.my_version,
-            compatible_version:vr.con.constant.compatible_version,
-            last_height:-1,
-            last_hash:'',
-            pos_diffs:[]
-        }
-    }
-    catch(e){
-        throw new Error(e);
+    const info:chain_info = await block_db.read_obj('info');
+    if(info) return info;
+    return {
+        net_id:vr.con.constant.my_net_id,
+        chain_id:vr.con.constant.my_chain_id,
+        version:vr.con.constant.my_version,
+        compatible_version:vr.con.constant.compatible_version,
+        last_height:-1,
+        last_hash:'',
+        pos_diffs:[]
     }
 }
 
 export const write_chain_info = async (info:chain_info)=>{
-    try{
-        await write_obj_to_db(block_db,'info',info);
-    }
-    catch(e){
-        throw new Error(e);
-    }
+    await block_db.write_obj('info',info);
 }
 
 export const read_chain = async (max_size:number)=>{
+    const info:chain_info = await block_db.read_obj('info');
+    let chain:vr.Block[] = [];
+    let block:vr.Block;
+    let size_sum:BigInteger = bigInt(0);
+    let i:BigInteger = bigInt(info.last_height,16);
+    for(i; !i.lesser(0); i=i.subtract(1)){
+        block = await block_db.read_obj(i.toString(16));
+        size_sum = size_sum.add(bigInt(vr.block.compute_block_size(block),16));
+        if()
+    }
     try{
         const pre_chain = share_data.chain;
         const info:chain_info = await read_obj_from_db(block_db,'info');
@@ -621,4 +498,4 @@ export const get_peer_list = async ()=>{
     catch(e){
         throw new Error(e);
     }
-}
+}*/
