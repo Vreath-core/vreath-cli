@@ -601,4 +601,3 @@ exports.get_peer_list = async () => {
         throw new Error(e);
     }
 };
-//# sourceMappingURL=data.js.map

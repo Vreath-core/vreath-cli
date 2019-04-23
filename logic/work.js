@@ -397,4 +397,3 @@ exports.make_ref_tx = async (pubs, feeprice, unit_price, height, index, log, pri
         throw new Error(e);
     }
 };
-//# sourceMappingURL=work.js.map
