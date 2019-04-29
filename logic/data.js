@@ -8,16 +8,17 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const aw = require('awaitify-stream');
+const path = __importStar(require("path"));
 exports.id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
-exports.trie_db = new vr.db(`./db/net_id_${exports.id}/trie`);
-exports.state_db = new vr.db(`./db/net_id_${exports.id}/state`);
-exports.lock_db = new vr.db(`./db/net_id_${exports.id}/lock`);
-exports.block_db = new vr.db(`./db/net_id_${exports.id}/block`);
-exports.tx_db = new vr.db(`./db/net_id_${exports.id}/tx_pool`);
-exports.root_db = new vr.db(`./db/net_id_${exports.id}/root`);
-exports.unit_db = new vr.db(`./db/net_id_${exports.id}/unit_store`);
-exports.peer_list_db = new vr.db(`./db/net_id_${exports.id}/peer_list`);
+exports.trie_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/trie`));
+exports.state_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/state`));
+exports.lock_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/lock`));
+exports.block_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/block`));
+exports.chain_info_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/chain_info`));
+exports.tx_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/tx_pool`));
+exports.root_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/root`));
+exports.unit_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/unit_store`));
+exports.peer_list_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/peer_list`));
 /*export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
     try{
         const base = tx.meta.bases;

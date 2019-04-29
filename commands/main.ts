@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 
-import * as vr from 'vreath'
+/*import * as vr from 'vreath'
 import setup from './setup'
 import add_peer from './add_peer'
 import generate_keys from './generate-keys'
@@ -9,7 +9,7 @@ import set_config from './config'
 import {peer,handshake_route,make_node_info, node_info} from '../app/routes/handshake'
 import peer_routes from '../app/routes/peers'
 import tx_routes from '../app/routes/tx'
-import block_routes from '../app/routes/block'
+import * as block_routes from '../app/routes/block'
 import unit_routes from '../app/routes/unit'
 import chain_routes from '../app/routes/chain'
 import * as works from '../logic/work'
@@ -23,20 +23,424 @@ import output_chain from '../app/repl/output_chain'
 import share_data from '../share/share_data'
 import express from 'express'
 import * as bodyParser from 'body-parser'
-import * as fs from 'fs'
 import * as P from 'p-iteration'
 import CryptoJS from 'crypto-js'
 import rp from 'request-promise-native'
 import * as repl from 'repl'
 import readlineSync from 'readline-sync'
-import * as math from 'mathjs'
+import yargs from 'yargs'*/
+import * as vr from 'vreath'
+import setup from './setup'
+import set_config from './config'
+import generate_keys from './generate-keys'
+import * as block_routes from '../app/routes/block'
+import * as data from '../logic/data'
+import {promisify} from 'util'
+import * as fs from 'fs'
+import * as path from 'path'
 import bunyan from 'bunyan'
 import yargs from 'yargs'
-/*import pidusage from 'pidusage'
-import heapdump from 'heapdump'
+import readlineSync from 'readline-sync'
+import CryptoJS from 'crypto-js'
+const PeerInfo = require('peer-info');
+const PeerId = require('peer-id');
+const PeerBook = require('peer-book')
+const libp2p = require('libp2p');
+const TCP = require('libp2p-tcp')
+const WS = require('libp2p-websockets')
+const SPDY = require('libp2p-spdy')
+const MPLEX = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+const MulticastDNS = require('libp2p-mdns')
+const DHT = require('libp2p-kad-dht')
+const defaultsDeep = require('@nodeutils/defaults-deep')
+const pull = require('pull-stream');
+const Pushable = require('pull-pushable');
 
-heapdump.writeSnapshot('./' + Date.now() + '.heapsnapshot');*/
+class Node extends libp2p {
+    constructor (_options:any) {
+      const defaults = {
+        // The libp2p modules for this libp2p bundle
+        modules: {
+          transport: [
+            TCP,
+            WS                   // It can take instances too!
+          ],
+          streamMuxer: [
+            SPDY,
+            MPLEX
+          ],
+          connEncryption: [
+            SECIO
+          ],
+          /** Encryption for private networks. Needs additional private key to work **/
+          // connProtector: new Protector(/*protector specific opts*/),
+          /** Enable custom content routers, such as delegated routing **/
+          // contentRouting: [
+          //   new DelegatedContentRouter(peerInfo.id)
+          // ],
+          /** Enable custom peer routers, such as delegated routing **/
+          // peerRouting: [
+          //   new DelegatedPeerRouter()
+          // ],
+          peerDiscovery: [
+            MulticastDNS
+          ],
+          dht: DHT                      // DHT enables PeerRouting, ContentRouting and DHT itself components
+        },
 
+        // libp2p config options (typically found on a config.json)
+        config: {                       // The config object is the part of the config that can go into a file, config.json.
+          peerDiscovery: {
+            autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
+            mdns: {                     // mdns options
+              interval: 1000,           // ms
+              enabled: true
+            },
+            webrtcStar: {               // webrtc-star options
+              interval: 1000,           // ms
+              enabled: false
+            }
+            // .. other discovery module options.
+          },
+          dht: {
+            kBucketSize: 20,
+          }
+        }
+      }
+      // overload any defaults of your bundle using https://github.com/nodeutils/defaults-deep
+      super(defaultsDeep(_options, defaults))
+    }
+}
+
+/*const topic = 'hello';
+const receiveMsg = (msg:{data:Buffer}) => console.log(msg.data.toString());
+
+const listener = new multistream.Listener();
+const conn = new Connection();
+listener.handle(conn, () => {
+    console.log('connection established')
+});
+const dialer = new multistream.Dialer()
+dialer.handle(conn, () => {
+    console.log('connection established')
+});
+console.log(conn);*/
+/*libp2p.pubsub.subscribe('hello', receiveMsg, (err:string) => {
+    if (err) {
+      return console.error(`failed to subscribe to ${topic}`, err)
+    }
+    console.log(`subscribed to ${topic}`)
+});*/
+
+const log = bunyan.createLogger({
+    name:'vreath-cli',
+    streams:[
+        {
+            path:path.join(__dirname,'../log/log.log')
+        }
+    ]
+});
+
+const config = JSON.parse(fs.readFileSync(path.join(__dirname,'../config/config.json'),'utf-8'));
+
+const peer_book = new PeerBook();
+
+yargs
+.usage('Usage: $0 <command> [options]')
+.command('setup','setup data', {}, async ()=>{
+    try{
+        const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
+        await setup((Buffer.from(my_password,'utf-8').toString('hex')));
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+})
+.command('run','run node', {}, async ()=>{
+    try{
+        const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
+        const my_key = vr.crypto.get_sha256(Buffer.from(my_password,'utf-8').toString('hex')).slice(0,122);
+        const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
+        const private_key = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
+        const peer_id = await promisify(PeerId.createFromPrivKey)(private_key);
+        const peerInfo = await promisify(PeerInfo.create)(peer_id);
+        peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+        const node = new Node({ peerInfo: peerInfo });
+        node.on('peer:connect', (peerInfo:any) => {
+            peer_book.put(peerInfo,true);
+        });
+        node.handle('/vreath/block', (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.map((data:Buffer) => data.toString()),
+                pull.log()
+            )
+        });
+
+        node.start((err:string)=>{
+            if(err) console.error(err)
+        });
+    }
+    catch(e){
+        console.log(e);
+        log.info(e);
+    }
+})
+.command('generate-keys','generate new key', {}, async ()=>{
+    try{
+        await generate_keys();
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+})
+.command('config [new_pub] [user_id] [miner_mode] [miner_id] [miner_interval] [miner_fee] [miner_unit_price] [validator_mode] [validator_id] [validator_min] [validator_fee] [validator_gas]','set config',{
+    'new_pub':{
+        describe:'new public key',
+        type:'string'
+    },
+    'user_id':{
+        describe:'key id used for user',
+        type:'number'
+    },
+    'miner_mode':{
+        describe:'flag for mining',
+        type:'boolean'
+    },
+    'miner_id':{
+        describe:'key id used for miner',
+        type:'number'
+    },
+    'miner_interval':{
+        describe:'mining interval',
+        type:'number'
+    },
+    'miner_fee':{
+        describe:'fee of refresh-tx',
+        type:'number'
+    },
+    'miner_unit_price':{
+        describe:'unit price',
+        type:'number'
+    },
+    'validator_mode':{
+        describe:'flag for validate',
+        type:'boolean'
+    },
+    'validator_id':{
+        describe:'key id used for validator',
+        type:'number'
+    },
+    'validator_min':{
+        describe:'minimum balance to buy units',
+        type:'number'
+    },
+    'validator_fee':{
+        describe:'fee for unit-buying-tx',
+        type:'number'
+    },
+    'validator_gas':{
+        describe:'gas for unit-buying-tx',
+        type:'number'
+    }
+}, async (argv)=>{
+    try{
+        await set_config(config,argv);
+        process.exit(1)
+    }
+    catch(e){
+        console.log(e);
+        process.exit(1)
+    }
+})
+.fail((msg,err)=>{
+    if(err) console.log(err);
+    else console.log(msg);
+    process.exit(1);
+}).help().recommendCommands().argv;
+
+
+/*(async ()=>{
+    const peer_id1:{id:string,privKey:string,pubKey:string} = (await promisify(PeerId.create)()).toJSON();
+    const peerInfo1 = await promisify(PeerInfo.create)(peer_id1);
+    peerInfo1.multiaddrs.add('/ip4/0.0.0.0/tcp/0');
+    const peer_id2:{id:string,privKey:string,pubKey:string} = (await promisify(PeerId.create)()).toJSON();
+    const peerInfo2 = await promisify(PeerInfo.create)(peer_id2);
+    peerInfo2.multiaddrs.add('/ip4/0.0.0.0/tcp/0');
+    const peer_book = new PeerBook();
+    peer_book.put(peerInfo1,true);
+    peer_book.put(peerInfo2,true);
+
+    {
+        const node = new Node({ peerInfo: peerInfo1 });
+
+        node.on('peer:connect', (peerInfo:any) => {
+            //console.log('received dial to me from:', peerInfo.id.toB58String());
+        });
+
+        node.handle('/vreath/block', (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.map((data:Buffer) => data.toString()),
+                pull.log()
+            )
+        });
+
+        node.start((err:string)=>{
+            console.error(err)
+        });
+    }
+    {
+        const node = new Node({ peerInfo: peerInfo2 });
+
+        node.on('peer:connect', (peerInfo:any) => {
+            //console.log('received dial to me from:', peerInfo.id.toB58String());
+        });
+
+        node.handle('/vreath/block', (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.map((data:Buffer) => data.toString()),
+                pull.log()
+            )
+        });
+
+        node.start((err:string)=>{
+            node.dialProtocol(peerInfo1,'/vreath/block',(err:string,conn:any) => {
+                if (err) { throw err }
+                pull(pull.values(['semver me please']), conn);
+                //console.log(conn);
+                //console.log('nodeA dialed to nodeB on protocol: /vreath/1.0.0')
+            });
+            console.error(err);
+        });
+    }
+})();*/
+/*
+PeerInfo.create({bits: 2048},(err:string, id:any) =>{
+    const peer_id = new PeerId
+    console.log(id);
+    /*const node = new Node(peerInfo);
+    Node.start((err:string)=>console.error(err));*/
+//});
+
+/*PeerInfo.create((err:string, peerInfo:any) => {
+    if (err)
+        throw new Error(err)
+    // Load your .proto file
+    protobuf.load(path.join(__dirname, './protocol.proto')).then((root) => {
+        console.log(peerInfo);
+        // Create Node
+        const node = new Node(peerInfo, root, config);
+
+        node.on('peer:connection', (conn:any, peer:any, type:any) => {
+            console.log('peer:connection');
+            console.log('start')
+            peer.rpc.get_block({height:"0"},(response:any, peer:any) => {
+                console.log('Response', response)
+            });
+        });
+
+        node.handle('get_block',block_routes.get);
+        node.handle('post_block',block_routes.post);
+
+        // Lets starts node
+        node.start().then(console.log, console.error);
+    }, console.error)
+});
+
+PeerInfo.create((err:string, peerInfo:any) => {
+    if (err)
+        throw new Error(err)
+    // Load your .proto file
+    protobuf.load(path.join(__dirname, './protocol.proto')).then((root) => {
+        console.log(peerInfo);
+        // Create Node
+        const node = new Node(peerInfo, root, config);
+
+        node.on('peer:connection', (conn:any, peer:any, type:any) => {
+            console.log('peer:connection');
+            console.log('start')
+            peer.rpc.get_block({height:"0"},(response:any, peer:any) => {
+                console.log('Response', response)
+            });
+        });
+
+        node.handle('get_block',block_routes.get);
+        node.handle('post_block',block_routes.post);
+
+        // Lets starts node
+        node.start().then(console.log, console.error);
+    }, console.error)
+});*/
+
+/*(async ()=>{
+    const peer_id1:{id:string,privKey:string,pubKey:string} = (await promisify(PeerId.create)()).toJSON();
+    const peerInfo1 = await promisify(PeerInfo.create)(peer_id1);
+    const peer_id2:{id:string,privKey:string,pubKey:string} = (await promisify(PeerId.create)()).toJSON();
+    const peerInfo2 = await promisify(PeerInfo.create)(peer_id2);
+
+    const config = {
+        name: 'vreath',  // Protocol name used for handshake
+        version: data.id,            // Protocol version used for handshake
+        service: 'Vreath',         // Name of service in .proto file
+        bootstrapers: [],            // Bootstrapping nodes
+        multicastDNS: {
+            interval: 1000,
+            enabled: true
+        }
+    };
+
+    protobuf.load(path.join(__dirname, './protocol.proto')).then((root) => {
+        // Create Node
+        const node = new Node(peerInfo1,root, config);
+
+        node.on('peer:connection', (conn:any, peer:any, type:any) => {
+            console.log('peer:connection');
+            console.log('start')
+            peer.rpc.get_block({height:"0"},(response:any, peer:any) => {
+                console.log('Response', response)
+            });
+        });
+
+        node.handle('get_block',block_routes.get);
+        node.handle('post_block',block_routes.post);
+
+        // Lets starts node
+        node.start().then(console.log, console.error);
+    }, console.error);
+
+    protobuf.load(path.join(__dirname, './protocol.proto')).then((root) => {
+        // Create Node
+        const node = new Node(peerInfo2,root, config);
+
+        node.on('peer:connection', (conn:any, peer:any, type:any) => {
+            console.log('peer:connection');
+            console.log('start')
+            peer.rpc.get_block({height:"0"},(response:any, peer:any) => {
+                console.log('Response', response)
+            });
+        });
+
+        node.handle('get_block',block_routes.get);
+        node.handle('post_block',block_routes.post);
+
+        // Lets starts node
+        node.start().then(()=>{
+            peerInfo1.rpc.get_block({height:"0"},(response:any, peer:any) => {
+                console.log('Response', response)
+            });
+        });
+    }, console.error);
+
+})();*/
+
+/*
 math.config({
     number: 'BigNumber'
 });
@@ -470,7 +874,7 @@ yargs
                 return 0;
             },60000*config.miner.interval);
         }*/
-        shake_hands();
+        /*shake_hands();
         get_new_blocks();
         if(config.validator.flag){
             staking(my_private);
@@ -637,3 +1041,4 @@ yargs
     else console.log(msg);
     process.exit(1);
 }).help().recommendCommands().argv;
+*/

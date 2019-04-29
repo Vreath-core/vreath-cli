@@ -21,7 +21,7 @@ exports.default = async () => {
     const two_password = readline_sync_1.default.question('enter password again:', { hideEchoBack: true, defaultInput: 'password' });
     if (one_password != two_password)
         throw new Error('passwords do not match');
-    const my_key = vr.crypto.hash(one_password).slice(0, 122);
+    const my_key = vr.crypto.get_sha256(Buffer.from(one_password, 'utf-8').toString('hex')).slice(0, 122);
     const private_key = vr.crypto.genereate_key();
     const public_key = vr.crypto.private2public(private_key);
     const encrypted_pri = crypto_js_1.default.AES.encrypt(private_key, my_key).toString();
@@ -34,4 +34,3 @@ exports.default = async () => {
     await util_1.promisify(fs.writeFile)('./keys/public/' + my_key + '.txt', public_key);
     await util_1.promisify(fs.writeFile)('./config/config.json', JSON.stringify(new_config, null, 4), 'utf-8');
 };
-//# sourceMappingURL=generate-keys.js.map

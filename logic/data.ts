@@ -1,22 +1,17 @@
-import * as P from 'p-iteration';
-import bigInt, {BigInteger} from 'big-integer';
 import * as vr from 'vreath';
-import { genesis_block } from '../genesis/block';
-import {new_obj} from './work';
-import { peer } from '../app/routes/handshake';
-import block from '../app/routes/block';
-const aw = require('awaitify-stream');
+import * as path from 'path'
 
 export const id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
 
-export const trie_db = new vr.db(`./db/net_id_${id}/trie`);
-export const state_db = new vr.db(`./db/net_id_${id}/state`);
-export const lock_db =  new vr.db(`./db/net_id_${id}/lock`);
-export const block_db = new vr.db(`./db/net_id_${id}/block`);
-export const tx_db = new vr.db(`./db/net_id_${id}/tx_pool`);
-export const root_db = new vr.db(`./db/net_id_${id}/root`);
-export const unit_db = new vr.db(`./db/net_id_${id}/unit_store`);
-export const peer_list_db = new vr.db(`./db/net_id_${id}/peer_list`);
+export const trie_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/trie`));
+export const state_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/state`));
+export const lock_db =  new vr.db(path.join(__dirname,`../db/net_id_${id}/lock`));
+export const block_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/block`));
+export const chain_info_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/chain_info`));
+export const tx_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/tx_pool`));
+export const root_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/root`));
+export const unit_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/unit_store`));
+export const peer_list_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/peer_list`));
 
 
 export type chain_info = {

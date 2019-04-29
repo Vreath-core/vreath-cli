@@ -8,31 +8,27 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const state_1 = require("./state");
 const gen_meta = {
-    kind: 'key',
-    version: vr.con.constant.my_version,
-    network_id: vr.con.constant.my_net_id,
-    chain_id: vr.con.constant.my_chain_id,
-    validator: vr.crypto.generate_address(vr.con.constant.native, state_1.genesis_pub),
-    height: 0,
-    previoushash: vr.crypto.hash(''),
+    kind: 0,
+    height: "00",
+    previoushash: vr.crypto.get_sha256(''),
     timestamp: 1545629491,
-    pos_diff: vr.con.constant.def_pos_diff,
-    validatorPub: [state_1.genesis_pub],
-    stateroot: state_1.genesis_roots.stateroot,
-    lockroot: state_1.genesis_roots.lockroot,
-    tx_root: vr.crypto.hash(''),
-    fee_sum: 0,
-    extra: 'Vreath bring cryptocurrency to everyone.'
+    pos_diff: vr.con.constant.def_pos_diff.toString(16),
+    trie_root: vr.crypto.get_sha256(''),
+    tx_root: vr.crypto.get_sha256(''),
+    fee_sum: "00",
+    extra: Buffer.from("Vreath bring cryptocurrency to everyone.").toString('hex')
 };
-const gen_hash = vr.crypto.object_hash(gen_meta);
-const gen_sign = 'c9e7c3ba9635d5a3a7550440053d0017c63cae89172777019a1797ee3d463bc834878ab06c5acd44195b1dd853f3a9e4eb888f98e6f83a4b79da135343c9df62';
+const gen_hash = vr.crypto.array2hash(vr.block.block_meta2array(gen_meta));
+const gen_sign_data = '8c223f35f7f51687ef0bc97a13627888cc6babbc7ab778a54a8c53fa3c43435c2a8ab2a8f88b02699296ebe243d8894b80c8087f47c4a51a630ce4d09796d5e4';
+const gen_recover_id = '00';
+const gen_sign = {
+    data: gen_sign_data,
+    v: gen_recover_id
+};
 exports.genesis_block = {
     hash: gen_hash,
-    validatorSign: [gen_sign],
+    signature: gen_sign,
     meta: gen_meta,
-    txs: [],
-    raws: []
+    txs: []
 };
-//# sourceMappingURL=block.js.map

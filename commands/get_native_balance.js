@@ -21,4 +21,3 @@ exports.default = async (config, id) => {
     const balance = await data_1.get_native_balance(address, S_Trie);
     return balance;
 };
-//# sourceMappingURL=get_native_balance.js.map

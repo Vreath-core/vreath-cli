@@ -8,4 +8,3 @@ exports.default = async (ip) => {
     };
     await data_1.write_peer(new_peer);
 };
-//# sourceMappingURL=add_peer.js.map

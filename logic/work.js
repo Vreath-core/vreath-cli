@@ -127,7 +127,7 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
                     const output_for_tx = req_base.map(key => {
                         const i = output_states_owners.indexOf(key);
                         if (i === -1)
-                            return vr.state.create_state("0", vr.crypto.slice_token_part(key), key, "0", []);
+                            return vr.state.create_state("00", vr.crypto.slice_token_part(key), key, "00", []);
                         else
                             return output_states[i];
                     });
@@ -166,7 +166,7 @@ exports.compute_output = async (req_tx, trie, state_db, block_db, last_height) =
     const address = vr.crypto.generate_address(main_token, vr.crypto.merge_pub_keys(public_keys));
     const bases = [address].concat(req_tx.meta.request.bases).filter((val, i, array) => array.indexOf(val) === i);
     const base_states = await P.map(bases, async (key) => {
-        return await vr.data.read_from_trie(trie, state_db, key, 0, vr.state.create_state("0", vr.crypto.slice_token_part(key), key));
+        return await vr.data.read_from_trie(trie, state_db, key, 0, vr.state.create_state("00", vr.crypto.slice_token_part(key), key));
     });
     const input_data = req_tx.meta.request.input;
     const output = await (async () => {
@@ -213,7 +213,7 @@ exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, 
     const my_public = vr.crypto.private2public(private_key);
     const my_address = vr.crypto.generate_address(vr.con.constant.unit, my_public);
     const nonce = await exports.get_nonce(req_tx.hash, height, req_block.hash, my_address, output_hash, unit_price);
-    if (nonce === "0")
+    if (nonce === "00")
         throw new Error('fail to get valid nonce');
     const ref_tx = vr.tx.create_ref_tx(height, index, success, output_hashes, [], nonce, gas_share, unit_price, private_key);
     if (!vr.tx.verify_ref_tx(ref_tx, output, block_db, trie, state_db, lock_db, last_height))

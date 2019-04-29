@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+
+message State {
+    string nonce = 1;//8 byte hex
+    string token = 2;//8 byte hex
+    string owner = 3;//40 byte hex
+    string amount = 4;//10 byte hex
+    repeated string data = 5;//free
+}
+
+message Token {
+    string nonce = 1;//8 byte hex
+    string name = 2;//8 byte hex
+    string issued = 3;//10 byte hex
+    string code = 4;//32 byte hex
+}
+
+message Lock {
+    string address = 1;//40 byte
+    uint32 state = 2;//1 bit
+    string height = 3;//8 byte
+    string block_hash = 4;//32 byte
+    uint32 index = 5;//1 byte
+    string tx_hash = 6;//32 byte
+}
+
+message TxRequest {
+    uint32 type = 1;//1 bit
+    string feeprice = 2;//10 byte
+    string gas = 3;//10 byte
+    repeated string bases = 4;//40 byte * n
+    repeated string input = 5;//free
+    string log = 6;//free
+}
+
+message TxRefresh {
+    string height = 1;//8 byte
+    uint32 index = 2;//1 byte
+    uint32 success = 3;//1 bit
+    repeated string output = 4;//32 byte * n
+    repeated string witness = 5;//free
+    string nonce = 6;//8 byte
+    uint32 gas_share = 7;//1 byte
+    string unit_price = 8;//10 byte
+}
+
+message TxMeta {
+    uint32 kind = 1;//1 bit
+    TxRequest request = 2;
+    TxRefresh refresh = 3;
+}
+
+message TxAdd {
+    string height = 1;//8 byte
+    string hash = 2;//32 byte
+    uint32 index = 3;//1 byte
+}
+
+message Sign {
+    string data = 1;//64 byte
+    string v = 2;//6 byte
+}
+
+message TX {
+    string hash = 1;//32 byte
+    repeated Sign signature = 2;//70 byte * n
+    TxMeta meta = 3;
+    TxAdd additional = 4;
+}
+
+message BlockMeta {
+    uint32 kind = 1;
+    string height = 2;//8 byte
+    string previoushash = 3;//32 byte
+    uint32 timestamp = 4;//0 ~ 9999999999
+    string pos_diff = 5;//8 byte
+    string trie_root = 6;//32 byte
+    string tx_root = 7;//32 byte
+    string fee_sum = 8;//10 byte
+    string extra = 9;//free
+}
+
+message Block {
+    srtring hash = 1;//32 byte
+    repeated Sign signature = 2;//70 byte
+    BlockMeta meta = 3;
+    repeated Tx txs = 4;
+}
+
+
+message in_get_block {
+    string height = 1;
+}
+
+enum out_get_block {
+    Block = 0;
+    string = 1;
+
+}
+
+
+
+service Vreath {
+    rpc get_block (in_get_block) returns (out_get_block) {}
+}
