@@ -10,31 +10,31 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const vr = __importStar(require("vreath"));
 const data = __importStar(require("../../logic/data"));
 const fs = __importStar(require("fs"));
-const P = __importStar(require("p-iteration"));
+const big_integer_1 = __importDefault(require("big-integer"));
 const archiver_1 = __importDefault(require("archiver"));
 exports.default = async () => {
     try {
-        const chain = await data.read_chain(2 * (10 ** 9));
-        const splitted = chain.reduce((blocks, block) => {
-            const last = blocks[blocks.length - 1];
-            if (last.length > 2000) {
-                blocks.push([block]);
-                return blocks;
-            }
-            else {
-                blocks[blocks.length - 1].push(block);
-                return blocks;
-            }
-        }, [[]]);
-        const dri_pass = `output_chain_${chain[chain.length - 1].meta.height}`;
+        const info = await data.chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        let height = big_integer_1.default(0);
+        let block;
+        const dri_pass = `output_chain_${vr.crypto.bigint2hex(height)}`;
         const output = fs.createWriteStream(`${dri_pass}.zip`);
         const archive = archiver_1.default('zip');
         archive.pipe(output);
-        await P.forEach(splitted, async (blocks) => {
-            archive.append(JSON.stringify(blocks, null, 4), { name: `${dri_pass}/block_${blocks[0].meta.height}_${blocks[blocks.length - 1].meta.height}` });
-        });
+        while (1) {
+            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            if (block == null)
+                continue;
+            archive.append(JSON.stringify(block, null, 4), { name: `${dri_pass}/block_${vr.crypto.bigint2hex(height)}` });
+            if (height.eq(big_integer_1.default(last_height, 16)))
+                break;
+        }
         archive.finalize();
     }
     catch (e) {

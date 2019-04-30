@@ -1,4 +1,4 @@
-import * as vr from 'vreath'
+/*import * as vr from 'vreath'
 import * as works from '../../logic/work'
 import * as data from '../../logic/data'
 import rp from 'request-promise-native'
@@ -56,4 +56,4 @@ export default async (input:string,config:{[key:string]:any},my_private:string)=
     catch(e){
         console.log(e);
     }
-}
+}*/

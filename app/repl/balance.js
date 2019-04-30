@@ -6,20 +6,27 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const data = __importStar(require("../../logic/data"));
+const big_integer_1 = __importDefault(require("big-integer"));
 exports.default = async (my_private) => {
     try {
-        const roots = await data.read_root();
-        const S_Trie = data.state_trie_ins(roots.stateroot);
+        const info = await data.chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        const root = await data.root_db.get(last_height, "hex");
+        if (root == null)
+            throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(data.trie_db, root);
         const pub = vr.crypto.private2public(my_private);
         const add = vr.crypto.generate_address(vr.con.constant.native, pub);
-        const state = await data.read_state(S_Trie, add, vr.state.create_state());
-        if (state == null || state.amount === 0)
-            return 0;
-        else
-            return state.amount || 0;
+        const state = await vr.data.read_from_trie(trie, data.state_db, add, 0, vr.state.create_state("00", vr.con.constant.native, add, "00"));
+        return big_integer_1.default(state.amount, 16).toString(10);
     }
     catch (e) {
         console.log(e);

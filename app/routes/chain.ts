@@ -1,4 +1,3 @@
-import * as express from 'express'
 import * as vr from 'vreath'
 import * as data from '../../logic/data'
 import {post as block_post} from './block'

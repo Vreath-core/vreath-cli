@@ -24,7 +24,8 @@ export const new_obj = <T>(obj:T,fn:(obj:T)=>T)=>{
 const choose_txs = async (unit_mode:boolean,trie:vr.trie,pool_db:vr.db,lock_db:vr.db,block_db:vr.db,my_address:string)=>{
     let requested_bases:string[] = [];
     let requested_tx_hashes:string[] = [];
-    const choosed:vr.Tx[] = await pool_db.filter('hex','utf8',async (key:string,tx:vr.Tx)=>{
+    let choosed:vr.Tx[] = [];
+    await pool_db.filter('hex','utf8',async (key:string,tx:vr.Tx)=>{
         if(tx.meta.kind===0){
             const requested_check = await P.some(tx.meta.request.bases, async (base:string)=>{
                 if(requested_bases.indexOf(base)!=-1) return true;
@@ -51,9 +52,9 @@ const choose_txs = async (unit_mode:boolean,trie:vr.trie,pool_db:vr.db,lock_db:v
 
         const tokens = tx.meta.request.bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
         const tokens_hash = vr.crypto.array2hash(tokens);
-        const unit_buying_tokens_hash = vr.crypto.array2hash([vr.con.constant.unit,vr.con.constant.native]);
-        if(tx.meta.kind===0&&((unit_mode&&tokens_hash!=unit_buying_tokens_hash)||(!unit_mode&&tokens_hash===unit_buying_tokens_hash))) return true;
-        else return false;
+        const unit_buying_tokens_hash = vr.crypto.array2hash([("0000000000000000"+vr.con.constant.unit).slice(-16),("0000000000000000"+vr.con.constant.native).slice(-12)]);
+        if(tx.meta.kind===1||((unit_mode&&tokens_hash===unit_buying_tokens_hash)||(!unit_mode&&tokens_hash!=unit_buying_tokens_hash))) choosed.push(tx);
+        return false;
     });
     const sorted = choosed.slice().sort((a,b)=>{
         const a_address = vr.tx.get_info_from_tx(a)[4];
@@ -67,7 +68,12 @@ const choose_txs = async (unit_mode:boolean,trie:vr.trie,pool_db:vr.db,lock_db:v
     let size_sum:BigInteger = bigInt(0);
     const size_checked = sorted.reduce((txs:vr.Tx[],tx)=>{
         if(bigInt(vr.con.constant.block_size).multiply(9).divide(10).lesser(size_sum)) return txs;
-        tx_size = bigInt(vr.tx.get_tx_fee(tx),16).divide(tx.meta.request.feeprice);
+        const meta = tx.meta;
+        const sign = tx.signature.map(s=>s.data+s.v);
+        const array = vr.tx.tx_meta2array(meta).splice(2,1).concat(tx.hash).concat(sign);
+        tx_size = array.reduce((sum:BigInteger,item:string)=>{
+            return sum.add(Math.ceil(Buffer.from(item,'hex').length))
+        },bigInt(0));
         size_sum =bigInt(size_sum).add(tx_size);
         return txs.concat(tx);
     },[]);
@@ -82,12 +88,14 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     const pre_micro_blocks = await vr.block.search_micro_block(block_db,pre_key_block,last_height);
     const key_validator = vr.block.get_info_from_block(pre_key_block)[4];
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
+        console.log('key');
         const key_block = await vr.block.create_key_block(private_key,block_db,last_height,trie,state_db,extra);
         if(!await vr.block.verify_key_block(key_block,block_db,trie,state_db,last_height)) throw new Error('fail to create valid key block');
         return [key_block,[]];
     }
     else{
-        const unit_mode = bigInt(last_height,16).mod(3).eq(0);
+        console.log('micro');
+        const unit_mode = bigInt(last_height,16).add(1).mod(3).eq(0);
         const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
         const txs = await choose_txs(unit_mode,trie,pool_db,lock_db,block_db,unit_address);
         let micro_block = await vr.block.create_micro_block(private_key,block_db,last_height,trie,txs,extra);
@@ -119,6 +127,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
                         else return output_states[i];
                     });
                     if(!await vr.tx.verify_ref_tx(tx,output_for_tx,block_db,trie,state_db,lock_db,last_height)){
+                        console.log('invalid');
                         result.push(tx.hash)
                     }
                     return result;
@@ -137,30 +146,28 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
 
 export const make_req_tx = async (tyep:vr.TxType,bases:string[],feeprice:string,gas:string,input:string[],log:string,private_key:string,trie:vr.trie,state_db:vr.db,lock_db:vr.db):Promise<vr.Tx>=>{
     const tokens = bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
-    if(tokens.some(t=>t!=vr.con.constant.native&&t!=vr.con.constant.unit)) throw new Error('unsupported token');
+    if(tokens.some(t=>bigInt(t,16).notEquals(bigInt(vr.con.constant.native))&&bigInt(t,16).notEquals(bigInt(vr.con.constant.unit)))) throw new Error('unsupported token');
     const tx = vr.tx.create_req_tx(tyep,bases,feeprice,gas,input,log,private_key);
     if(!await vr.tx.verify_req_tx(tx,trie,state_db,lock_db)) throw new Error('fail to create valid request tx');
     return tx;
 }
 
-export const compute_output = async (req_tx:vr.Tx,trie:vr.trie,state_db:vr.db,block_db:vr.db,last_height:string)=>{
+export const compute_output = async (req_tx:vr.Tx,trie:vr.trie,state_db:vr.db,block_db:vr.db,last_height:string):Promise<[0|1,vr.State[]]>=>{
     const tokens = req_tx.meta.request.bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
     const main_token = tokens[0];
-    const public_keys = vr.tx.get_info_from_tx(req_tx)[3];
-    const address = vr.crypto.generate_address(main_token,vr.crypto.merge_pub_keys(public_keys));
-    const bases = [address].concat(req_tx.meta.request.bases).filter((val,i,array)=>array.indexOf(val)===i);
+    const bases = req_tx.meta.request.bases.filter((val,i,array)=>array.indexOf(val)===i);
     const base_states = await P.map(bases, async (key)=>{
         return await vr.data.read_from_trie(trie,state_db,key,0,vr.state.create_state("00",vr.crypto.slice_token_part(key),key));
     });
     const input_data = req_tx.meta.request.input;
     const output = await (async ()=>{
-        if(main_token===vr.con.constant.native) return vr.contracts.native_prove(bases,base_states,input_data);
-        else if(main_token===vr.con.constant.unit) return await vr.contracts.unit_prove(bases,base_states,input_data,block_db,last_height);
+        if(bigInt(main_token,16).eq(bigInt(vr.con.constant.native,16))) return vr.contracts.native_prove(bases,base_states,input_data);
+        else if(bigInt(main_token,16).eq(bigInt(vr.con.constant.unit,16))) return await vr.contracts.unit_prove(bases,base_states,input_data,block_db,last_height);
         else return [];
     })();
-    const success = !output.some(s=>vr.state.verify_state(s));
-    if(success) return output;
-    else return [];
+    const success = !output.some(s=>vr.state.verify_state(s)) ? 1: 0;
+    const return_state = success===1 ? output : [];
+    return [success,return_state];
 }
 
 export const get_nonce = async (request:string,height:string,block_hash:string,refresher:string,output:string,unit_price:string)=>{
@@ -184,10 +191,11 @@ export const make_ref_tx = async (height:string,index:number,gas_share:number,un
     if(req_block==null||!vr.block.isBlock(req_block)) throw new Error('invalid height');
     const req_tx:vr.Tx = req_block.txs[index];
     if(req_tx==null||!vr.tx.isTx(req_tx)) throw new Error('invalid index');
-    const output = await compute_output(req_tx,trie,state_db,block_db,last_height);
+    const computed = await compute_output(req_tx,trie,state_db,block_db,last_height);
+    const success = computed[0];
+    const output = computed[1];
     const output_hashes = output.map(s=>vr.crypto.array2hash([s.nonce,s.token,s.owner,s.amount].concat(s.data)));
     const output_hash = vr.crypto.array2hash(output_hashes);
-    const success = output.length>0 ? 1: 0;
     const my_public = vr.crypto.private2public(private_key);
     const my_address = vr.crypto.generate_address(vr.con.constant.unit,my_public);
     const nonce = await get_nonce(req_tx.hash,height,req_block.hash,my_address,output_hash,unit_price);

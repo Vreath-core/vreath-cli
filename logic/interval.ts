@@ -39,7 +39,6 @@ export const staking = async (private_key:string,PeerBook:any,node:Node)=>{
         const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
         const root = await data.root_db.get(info.last_height);
-        console.log(info.last_height);
         if(root==null) throw new Error("root doesn't exist");
         const trie = vr.data.trie_ins(data.trie_db,root);
         const made = await works.make_block(private_key,data.block_db,info.last_height,trie,data.state_db,data.lock_db,"",data.tx_db);
@@ -54,7 +53,6 @@ export const staking = async (private_key:string,PeerBook:any,node:Node)=>{
     }
     catch(e){
         log.info(e);
-        console.log(e);
     }
     await works.sleep(1000);
     setImmediate(()=>staking.apply(null,[private_key,PeerBook,node]));
@@ -125,7 +123,6 @@ export const buying_unit = async (private_key:string,config:any,PeerBook:any,nod
     }
     catch(e){
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(()=>buying_unit.apply(null,[private_key,config,PeerBook,node]));
@@ -137,21 +134,21 @@ export const refreshing = async (private_key:string,config:any,PeerBook:any,node
     try{
         const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
-        const last_height = info.last_height
+        const last_height = info.last_height;
         let height = bigInt(last_height,16);
         let index:number = -1;
         let block:vr.Block|null;
         let refreshed:string[] = [];
         let target_tx:vr.Tx|null = null;
-        while(1){
-            if(target_tx!=null||height.eq(0)) break;
+        while(height.notEquals(0)){
+            if(target_tx!=null) break;
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
             if(block==null) continue;
             await P.forEach(block.txs, async (tx,i)=>{
                 const pooled = await data.tx_db.filter('hex','utf8', async (key:string,t:vr.Tx)=>{
                     return t.meta.kind===1&&tx.meta.refresh.height===t.meta.refresh.height&&tx.meta.refresh.index===t.meta.refresh.index&&tx.meta.refresh.output===t.meta.refresh.output;
                 });
-                if(tx.meta.kind===0&&refreshed.indexOf(tx.hash)===-1&&pooled.length!=0){
+                if(tx.meta.kind===0&&refreshed.indexOf(tx.hash)===-1&&pooled.length===0){
                     target_tx = tx;
                     index = i;
                 }
@@ -160,6 +157,7 @@ export const refreshing = async (private_key:string,config:any,PeerBook:any,node
                     refreshed.push(req_tx.hash);
                 }
             });
+            if(index!=-1) break;
             height = height.subtract(1);
         }
         if(target_tx==null||index===-1) throw new Error('no request tx is refreshed yet.');
@@ -180,7 +178,6 @@ export const refreshing = async (private_key:string,config:any,PeerBook:any,node
     }
     catch(e){
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(()=>refreshing.apply(null,[private_key,config,PeerBook,node]));
@@ -200,16 +197,12 @@ export const making_unit = async (private_key:string,config:any,PeerBook:any,nod
         let height = bigInt(last_height,16);
         let block:vr.Block|null;
         let unit_info:[string,string,string,string,string,number,string]|null = null;
-        while(1){
-            if(unit_info!=null&&height.eq(0)) break;
+        while(height.notEquals(0)){
+            if(unit_info!=null) break;
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
             if(block==null) continue;
             await P.forEach(block.txs, async (ref_tx,i)=>{
                 if(ref_tx.meta.kind===1){
-                    /*const ref_block:T.Block|null = await block_db.read_obj(unit[0]);
-                    if(ref_block==null) throw new Error("ref_block doesn't exist");
-                    const ref_tx:T.Tx|null = ref_block.txs[unit[1]];
-                    if(ref_tx==null) throw new Error("ref_tx doesn't exist");*/
                     const req_height = ref_tx.meta.refresh.height || "00";
                     const req_block:vr.Block|null = await data. block_db.read_obj(req_height);
                     if(req_block==null) throw new Error("req_block doesn't exist");
@@ -234,7 +227,7 @@ export const making_unit = async (private_key:string,config:any,PeerBook:any,nod
         await data.unit_db.write_obj(unit_info[6],unit);
         const peers = PeerBook.getAll();
         await P.forEach(peers, async (peer)=>{
-            node.dialProtocol(peer,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
+            node.dialProtocol(peer,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
                 if (err) { throw err }
                 pull(pull.values([unit]), conn);
             });
@@ -242,7 +235,6 @@ export const making_unit = async (private_key:string,config:any,PeerBook:any,nod
     }
     catch(e){
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(()=>making_unit.apply(null,[private_key,config,PeerBook,node]));

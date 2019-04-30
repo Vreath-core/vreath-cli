@@ -13,12 +13,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const setup_1 = __importDefault(require("./setup"));
-const config_1 = __importDefault(require("./config"));
 const generate_keys_1 = __importDefault(require("./generate-keys"));
 const tx_routes = __importStar(require("../app/routes/tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const unit_routes = __importStar(require("../app/routes/unit"));
+const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
+//import remit from '../app/repl/remit'
+const get_block_1 = __importDefault(require("../app/repl/get_block"));
+const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
+const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
+const balance_1 = __importDefault(require("../app/repl/balance"));
 const data = __importStar(require("../logic/data"));
 const intervals = __importStar(require("../logic/interval"));
 const util_1 = require("util");
@@ -26,8 +31,10 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const bunyan_1 = __importDefault(require("bunyan"));
 const yargs_1 = __importDefault(require("yargs"));
+const repl = __importStar(require("repl"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const crypto_js_1 = __importDefault(require("crypto-js"));
+const P = __importStar(require("p-iteration"));
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const PeerBook = require('peer-book');
@@ -206,6 +213,55 @@ yargs_1.default
                 intervals.refreshing(private_key, config, peer_book, node);
                 intervals.making_unit(private_key, config, peer_book, node);
             }
+            const replServer = repl.start({ prompt: '>', terminal: true });
+            replServer.defineCommand('request-tx', {
+                help: 'Create request tx',
+                async action(input) {
+                    const tx = await request_tx_1.default(input, private_key);
+                    const peers = peer_book.getAll();
+                    await P.forEach(peers, async (peer) => {
+                        node.dialProtocol(peer, `/vreath/${data.id}/tx/post`, (err, conn) => {
+                            if (err) {
+                                throw err;
+                            }
+                            pull(pull.values([JSON.stringify([tx, []])]), conn);
+                        });
+                    });
+                }
+            });
+            /*replServer.defineCommand('remit',{
+                help: 'Create request tx',
+                async action(input){
+                    await remit(input,config,my_private);
+                }
+            });*/
+            replServer.defineCommand('balance', {
+                help: 'Show your VRT balance',
+                async action() {
+                    const balance = await balance_1.default(private_key);
+                    console.log(balance);
+                }
+            });
+            replServer.defineCommand('get-block', {
+                help: 'Show the block specified by height',
+                async action(input) {
+                    const block = await get_block_1.default(input);
+                    console.log(block);
+                }
+            });
+            replServer.defineCommand('get-chain-info', {
+                help: 'Show the chain info',
+                async action() {
+                    const info = await get_chain_info_1.default();
+                    console.log(info);
+                }
+            });
+            replServer.defineCommand('output-chain', {
+                help: 'output chain as zip of json files',
+                async action() {
+                    await output_chain_1.default();
+                }
+            });
         });
     }
     catch (e) {
@@ -223,58 +279,18 @@ yargs_1.default
         process.exit(1);
     }
 })
-    .command('config [new_pub] [user_id] [miner_mode] [miner_id] [miner_interval] [miner_fee] [miner_unit_price] [validator_mode] [validator_id] [validator_min] [validator_fee] [validator_gas]', 'set config', {
-    'new_pub': {
-        describe: 'new public key',
+    .command('get-native-balance <address>', 'get native balance', {
+    'id': {
+        describe: 'address of native to check the balance',
         type: 'string'
-    },
-    'user_id': {
-        describe: 'key id used for user',
-        type: 'number'
-    },
-    'miner_mode': {
-        describe: 'flag for mining',
-        type: 'boolean'
-    },
-    'miner_id': {
-        describe: 'key id used for miner',
-        type: 'number'
-    },
-    'miner_interval': {
-        describe: 'mining interval',
-        type: 'number'
-    },
-    'miner_fee': {
-        describe: 'fee of refresh-tx',
-        type: 'number'
-    },
-    'miner_unit_price': {
-        describe: 'unit price',
-        type: 'number'
-    },
-    'validator_mode': {
-        describe: 'flag for validate',
-        type: 'boolean'
-    },
-    'validator_id': {
-        describe: 'key id used for validator',
-        type: 'number'
-    },
-    'validator_min': {
-        describe: 'minimum balance to buy units',
-        type: 'number'
-    },
-    'validator_fee': {
-        describe: 'fee for unit-buying-tx',
-        type: 'number'
-    },
-    'validator_gas': {
-        describe: 'gas for unit-buying-tx',
-        type: 'number'
     }
 }, async (argv) => {
     try {
-        await config_1.default(config, argv);
+        const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
+        const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
+        const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
+        const private_key = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
+        console.log(await balance_1.default(private_key));
         process.exit(1);
     }
     catch (e) {
@@ -282,6 +298,65 @@ yargs_1.default
         process.exit(1);
     }
 })
+    /*.command('config [new_pub] [user_id] [miner_mode] [miner_id] [miner_interval] [miner_fee] [miner_unit_price] [validator_mode] [validator_id] [validator_min] [validator_fee] [validator_gas]','set config',{
+        'new_pub':{
+            describe:'new public key',
+            type:'string'
+        },
+        'user_id':{
+            describe:'key id used for user',
+            type:'number'
+        },
+        'miner_mode':{
+            describe:'flag for mining',
+            type:'boolean'
+        },
+        'miner_id':{
+            describe:'key id used for miner',
+            type:'number'
+        },
+        'miner_interval':{
+            describe:'mining interval',
+            type:'number'
+        },
+        'miner_fee':{
+            describe:'fee of refresh-tx',
+            type:'number'
+        },
+        'miner_unit_price':{
+            describe:'unit price',
+            type:'number'
+        },
+        'validator_mode':{
+            describe:'flag for validate',
+            type:'boolean'
+        },
+        'validator_id':{
+            describe:'key id used for validator',
+            type:'number'
+        },
+        'validator_min':{
+            describe:'minimum balance to buy units',
+            type:'number'
+        },
+        'validator_fee':{
+            describe:'fee for unit-buying-tx',
+            type:'number'
+        },
+        'validator_gas':{
+            describe:'gas for unit-buying-tx',
+            type:'number'
+        }
+    }, async (argv)=>{
+        try{
+            await set_config(config,argv);
+            process.exit(1)
+        }
+        catch(e){
+            console.log(e);
+            process.exit(1)
+        }
+    })*/
     .fail((msg, err) => {
     if (err)
         console.log(err);

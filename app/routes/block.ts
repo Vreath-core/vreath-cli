@@ -36,7 +36,6 @@ export const post = async (message:Buffer)=>{
     if(block.meta.kind===0) await vr.block.accept_key_block(block,data.block_db,last_height,trie,data.state_db,data.lock_db);
     else if(block.meta.kind===1) await vr.block.accept_micro_block(block,data.block_db,last_height,trie,data.state_db,data.lock_db);
     await data.block_db.write_obj(block.meta.height,block);
-    console.log(await data.block_db.read_obj(block.meta.height));
     const new_info = await works.new_obj(info,(info)=>{
         info.last_height = block.meta.height;
         info.last_hash = block.hash;

@@ -1,23 +1,21 @@
 "use strict";
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const vr = __importStar(require("vreath"));
-const data_1 = require("../logic/data");
-exports.default = async (config, id) => {
-    const pub_keys = config.pub_keys || [];
-    const my_pub = pub_keys[id];
-    if (my_pub == null)
-        return 0;
-    const address = vr.crypto.generate_address(vr.con.constant.native, my_pub);
-    const roots = await data_1.read_root();
-    const stateroot = roots.stateroot;
-    const S_Trie = data_1.state_trie_ins(stateroot);
-    const balance = await data_1.get_native_balance(address, S_Trie);
-    return balance;
-};
+/*import * as vr from 'vreath'
+import { state_trie_ins, get_native_balance, read_root } from '../logic/data';
+
+export default async (config:any,id:number)=>{
+    try{
+        const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
+        if(info==null) throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        const root = await data.root_db.get(last_height,"hex");
+        if(root==null) throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(data.trie_db,root);
+        const pub = vr.crypto.private2public(my_private);
+        const add = vr.crypto.generate_address(vr.con.constant.native,pub);
+        const state:vr.State = await vr.data.read_from_trie(trie,data.state_db,add,0,vr.state.create_state("00",vr.con.constant.native,add,"00"));
+        return bigInt(state.amount,16).toString(10);
+    }
+    catch(e){
+        console.log(e);
+    }
+}*/ 

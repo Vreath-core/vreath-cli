@@ -51,7 +51,6 @@ exports.staking = async (private_key, PeerBook, node) => {
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const root = await data.root_db.get(info.last_height);
-        console.log(info.last_height);
         if (root == null)
             throw new Error("root doesn't exist");
         const trie = vr.data.trie_ins(data.trie_db, root);
@@ -69,7 +68,6 @@ exports.staking = async (private_key, PeerBook, node) => {
     }
     catch (e) {
         log.info(e);
-        console.log(e);
     }
     await works.sleep(1000);
     setImmediate(() => exports.staking.apply(null, [private_key, PeerBook, node]));
@@ -147,7 +145,6 @@ exports.buying_unit = async (private_key, config, PeerBook, node) => {
     }
     catch (e) {
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(() => exports.buying_unit.apply(null, [private_key, config, PeerBook, node]));
@@ -164,8 +161,8 @@ exports.refreshing = async (private_key, config, PeerBook, node) => {
         let block;
         let refreshed = [];
         let target_tx = null;
-        while (1) {
-            if (target_tx != null || height.eq(0))
+        while (height.notEquals(0)) {
+            if (target_tx != null)
                 break;
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
             if (block == null)
@@ -174,7 +171,7 @@ exports.refreshing = async (private_key, config, PeerBook, node) => {
                 const pooled = await data.tx_db.filter('hex', 'utf8', async (key, t) => {
                     return t.meta.kind === 1 && tx.meta.refresh.height === t.meta.refresh.height && tx.meta.refresh.index === t.meta.refresh.index && tx.meta.refresh.output === t.meta.refresh.output;
                 });
-                if (tx.meta.kind === 0 && refreshed.indexOf(tx.hash) === -1 && pooled.length != 0) {
+                if (tx.meta.kind === 0 && refreshed.indexOf(tx.hash) === -1 && pooled.length === 0) {
                     target_tx = tx;
                     index = i;
                 }
@@ -183,6 +180,8 @@ exports.refreshing = async (private_key, config, PeerBook, node) => {
                     refreshed.push(req_tx.hash);
                 }
             });
+            if (index != -1)
+                break;
             height = height.subtract(1);
         }
         if (target_tx == null || index === -1)
@@ -207,7 +206,6 @@ exports.refreshing = async (private_key, config, PeerBook, node) => {
     }
     catch (e) {
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(() => exports.refreshing.apply(null, [private_key, config, PeerBook, node]));
@@ -228,18 +226,14 @@ exports.making_unit = async (private_key, config, PeerBook, node) => {
         let height = big_integer_1.default(last_height, 16);
         let block;
         let unit_info = null;
-        while (1) {
-            if (unit_info != null && height.eq(0))
+        while (height.notEquals(0)) {
+            if (unit_info != null)
                 break;
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
             if (block == null)
                 continue;
             await P.forEach(block.txs, async (ref_tx, i) => {
                 if (ref_tx.meta.kind === 1) {
-                    /*const ref_block:T.Block|null = await block_db.read_obj(unit[0]);
-                    if(ref_block==null) throw new Error("ref_block doesn't exist");
-                    const ref_tx:T.Tx|null = ref_block.txs[unit[1]];
-                    if(ref_tx==null) throw new Error("ref_tx doesn't exist");*/
                     const req_height = ref_tx.meta.refresh.height || "00";
                     const req_block = await data.block_db.read_obj(req_height);
                     if (req_block == null)
@@ -268,7 +262,7 @@ exports.making_unit = async (private_key, config, PeerBook, node) => {
         await data.unit_db.write_obj(unit_info[6], unit);
         const peers = PeerBook.getAll();
         await P.forEach(peers, async (peer) => {
-            node.dialProtocol(peer, `/vreath/${data.id}/tx/post`, (err, conn) => {
+            node.dialProtocol(peer, `/vreath/${data.id}/unit/post`, (err, conn) => {
                 if (err) {
                     throw err;
                 }
@@ -278,7 +272,6 @@ exports.making_unit = async (private_key, config, PeerBook, node) => {
     }
     catch (e) {
         log.info(e);
-        console.log(e);
     }
     await works.sleep(2000);
     setImmediate(() => exports.making_unit.apply(null, [private_key, config, PeerBook, node]));
