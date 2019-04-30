@@ -70,4 +70,3 @@ exports.default = async (input, config, my_private) => {
         console.log(e);
     }
 };
-//# sourceMappingURL=remit.js.map

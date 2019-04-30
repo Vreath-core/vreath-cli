@@ -54,4 +54,3 @@ exports.default = async (input, config, my_private) => {
         console.log(e);
     }
 };
-//# sourceMappingURL=request-tx.js.map

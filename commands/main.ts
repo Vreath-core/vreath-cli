@@ -1,19 +1,7 @@
 #! /usr/bin/env node
 
 /*import * as vr from 'vreath'
-import setup from './setup'
-import add_peer from './add_peer'
-import generate_keys from './generate-keys'
 import get_native_balance from './get_native_balance'
-import set_config from './config'
-import {peer,handshake_route,make_node_info, node_info} from '../app/routes/handshake'
-import peer_routes from '../app/routes/peers'
-import tx_routes from '../app/routes/tx'
-import * as block_routes from '../app/routes/block'
-import unit_routes from '../app/routes/unit'
-import chain_routes from '../app/routes/chain'
-import * as works from '../logic/work'
-import * as data from '../logic/data'
 import req_tx_com from '../app/repl/request-tx'
 import remit from '../app/repl/remit'
 import repl_balance from '../app/repl/balance'
@@ -33,8 +21,12 @@ import * as vr from 'vreath'
 import setup from './setup'
 import set_config from './config'
 import generate_keys from './generate-keys'
+import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
+import * as chain_routes from '../app/routes/chain'
+import * as unit_routes from '../app/routes/unit'
 import * as data from '../logic/data'
+import * as intervals from '../logic/interval'
 import {promisify} from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -55,9 +47,8 @@ const MulticastDNS = require('libp2p-mdns')
 const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
-const Pushable = require('pull-pushable');
 
-class Node extends libp2p {
+export class Node extends libp2p {
     constructor (_options:any) {
       const defaults = {
         // The libp2p modules for this libp2p bundle
@@ -165,23 +156,88 @@ yargs
         const my_key = vr.crypto.get_sha256(Buffer.from(my_password,'utf-8').toString('hex')).slice(0,122);
         const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
         const private_key = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
-        const peer_id = await promisify(PeerId.createFromPrivKey)(private_key);
+        const peer_id = await promisify(PeerId.create)();
         const peerInfo = await promisify(PeerInfo.create)(peer_id);
         peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
         const node = new Node({ peerInfo: peerInfo });
         node.on('peer:connect', (peerInfo:any) => {
             peer_book.put(peerInfo,true);
         });
-        node.handle('/vreath/block', (protocol:string, conn:string) => {
+
+        node.handle(`/vreath/${data.id}/tx/post`, async (protocol:string, conn:any)=>{
             pull(
                 conn,
-                pull.map((data:Buffer) => data.toString()),
-                pull.log()
+                pull.drain(async (msg:Buffer)=>{
+                    await tx_routes.post(msg);
+                })
+            )
+        });
+
+        node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
+            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
+            pull(
+                conn,
+                pull.drain(async (msg:Buffer)=>{
+                    const block = await block_routes.get(msg);
+                    node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
+                        if (err) { throw err }
+                        pull(pull.values([block]), conn);
+                    })
+                })
+            )
+        });
+
+        node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.drain(async (msg:Buffer)=>{
+                    await block_routes.post(msg);
+                })
+            )
+        });
+
+        node.handle(`/vreath/${data.id}/chain/get`, async (protocol:string, conn:any) => {
+            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
+            pull(
+                conn,
+                pull.drain(async (msg:Buffer)=>{
+                    const chain = await chain_routes.get(msg);
+                    node.dialProtocol(peer_info,`/vreath/${data.id}/chain/post`,(err:string,conn:any) => {
+                        if (err) { throw err }
+                        pull(pull.values([chain]), conn);
+                    })
+                })
+            )
+        });
+
+        node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.drain(async (msg:Buffer)=>{
+                    await chain_routes.post(msg);
+                })
+            )
+        });
+
+        node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
+            pull(
+                conn,
+                pull.drain(async (msg:Buffer)=>{
+                    await unit_routes.post(msg);
+                })
             )
         });
 
         node.start((err:string)=>{
-            if(err) console.error(err)
+            if(err) console.error(err);
+            if(config.validator.flag){
+                intervals.staking(private_key,peer_book,node);
+                intervals.buying_unit(private_key,config,peer_book,node);
+            }
+            if(config.miner.flag){
+                intervals.refreshing(private_key,config,peer_book,node);
+                intervals.making_unit(private_key,config,peer_book,node);
+            }
         });
     }
     catch(e){
@@ -283,11 +339,19 @@ yargs
             //console.log('received dial to me from:', peerInfo.id.toB58String());
         });
 
-        node.handle('/vreath/block', (protocol:string, conn:string) => {
+        node.handle('/vreath/block', async (protocol:string, conn:any) => {
+            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
             pull(
                 conn,
-                pull.map((data:Buffer) => data.toString()),
-                pull.log()
+                pull.drain((msg:string)=>{
+                    console.log(msg.toString());
+                    node.dialProtocol(peer_info,'/vreath/block',(err:string,conn:any) => {
+                        if (err) { throw err }
+                        pull(pull.values(['semver me please']), conn);
+                        //console.log(conn);
+                        //console.log('nodeA dialed to nodeB on protocol: /vreath/1.0.0')
+                    });
+                })
             )
         });
 
@@ -302,7 +366,7 @@ yargs
             //console.log('received dial to me from:', peerInfo.id.toB58String());
         });
 
-        node.handle('/vreath/block', (protocol:string, conn:string) => {
+        node.handle('/vreath/block', async (protocol:string, conn:any) => {
             pull(
                 conn,
                 pull.map((data:Buffer) => data.toString()),
@@ -313,6 +377,7 @@ yargs
         node.start((err:string)=>{
             node.dialProtocol(peerInfo1,'/vreath/block',(err:string,conn:any) => {
                 if (err) { throw err }
+                console.log('go!');
                 pull(pull.values(['semver me please']), conn);
                 //console.log(conn);
                 //console.log('nodeA dialed to nodeB on protocol: /vreath/1.0.0')

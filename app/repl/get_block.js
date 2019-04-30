@@ -20,4 +20,3 @@ exports.default = async (input) => {
         console.log(e);
     }
 };
-//# sourceMappingURL=get_block.js.map

@@ -14,6 +14,7 @@ const vr = __importStar(require("vreath"));
 const P = __importStar(require("p-iteration"));
 const big_integer_1 = __importDefault(require("big-integer"));
 const lodash_1 = require("lodash");
+const data = __importStar(require("./data"));
 exports.sleep = (msec) => {
     return new Promise(function (resolve) {
         setTimeout(function () { resolve(); }, msec);
@@ -90,7 +91,7 @@ const choose_txs = async (unit_mode, trie, pool_db, lock_db, block_db, my_addres
     }, []);
     return size_checked;
 };
-exports.make_block = async (private_key, block_db, last_height, trie, state_db, lock_db, extra, pool_db, output_states) => {
+exports.make_block = async (private_key, block_db, last_height, trie, state_db, lock_db, extra, pool_db) => {
     const my_pub = vr.crypto.private2public(private_key);
     const native_address = vr.crypto.generate_address(vr.con.constant.native, my_pub);
     const pre_key_block = await vr.block.search_key_block(block_db, last_height);
@@ -100,7 +101,7 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
         const key_block = await vr.block.create_key_block(private_key, block_db, last_height, trie, state_db, extra);
         if (!await vr.block.verify_key_block(key_block, block_db, trie, state_db, last_height))
             throw new Error('fail to create valid key block');
-        return key_block;
+        return [key_block, []];
     }
     else {
         const unit_mode = big_integer_1.default(last_height, 16).mod(3).eq(0);
@@ -113,6 +114,12 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
             tx.additional.height = micro_block.meta.height;
             tx.additional.index = txs_hash.indexOf(tx.hash);
         });
+        const output_states = await P.reduce(txs_hash, async (res, key) => {
+            const get = await data.output_db.read_obj(key);
+            if (get == null)
+                return res;
+            return res.concat(get);
+        }, []);
         if (!await vr.block.verify_micro_block(micro_block, output_states, block_db, trie, state_db, lock_db, last_height)) {
             const output_states_owners = output_states.map(s => s.owner);
             const invalid_tx_hashes = await P.reduce(micro_block.txs, async (result, tx) => {
@@ -147,7 +154,7 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
             else
                 throw new Error('fail to create valid micro block');
         }
-        return micro_block;
+        return [micro_block, output_states];
     }
 };
 exports.make_req_tx = async (tyep, bases, feeprice, gas, input, log, private_key, trie, state_db, lock_db) => {
@@ -193,11 +200,11 @@ exports.get_nonce = async (request, height, block_hash, refresher, output, unit_
     }, 10000);
     while (1) {
         nonce = nonce.add(1);
-        hash = await vr.tx.mining(request, height, block_hash, nonce.toString(16), refresher, output, unit_price);
+        hash = await vr.tx.mining(request, height, block_hash, vr.crypto.bigint2hex(nonce), refresher, output, unit_price);
         if (!flag || big_integer_1.default(hash, 16).lesserOrEquals(big_integer_1.default(vr.con.constant.pow_target, 16)))
             break;
     }
-    return nonce.toString(16);
+    return vr.crypto.bigint2hex(nonce);
 };
 exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, block_db, trie, state_db, lock_db, last_height) => {
     const req_block = await block_db.read_obj(height);
@@ -218,5 +225,5 @@ exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, 
     const ref_tx = vr.tx.create_ref_tx(height, index, success, output_hashes, [], nonce, gas_share, unit_price, private_key);
     if (!vr.tx.verify_ref_tx(ref_tx, output, block_db, trie, state_db, lock_db, last_height))
         throw new Error('fail to create valid refresh tx');
-    return ref_tx;
+    return [ref_tx, output];
 };

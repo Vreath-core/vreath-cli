@@ -22,24 +22,24 @@ exports.default = async (my_password) => {
     const trie = vr.data.trie_ins(data.trie_db);
     await vr.data.write_trie(trie, data.state_db, data.lock_db, genesis.state[0], genesis.lock[0]);
     const root = trie.now_root();
+    await data.chain_info_db.del('00');
     const info = {
         net_id: vr.con.constant.my_net_id,
         chain_id: vr.con.constant.my_chain_id,
         version: vr.con.constant.my_version,
         compatible_version: vr.con.constant.compatible_version,
-        last_height: "0",
-        last_hash: genesis.block.hash,
-        pos_diffs: []
+        last_height: "00",
+        last_hash: genesis.block.hash
     };
     const now_info = (await data.chain_info_db.read_obj("00")) || info;
     const last_height = now_info.last_height;
     let i = big_integer_1.default(0);
     for (i; i.lesserOrEquals(big_integer_1.default(last_height, 16)); i = i.add(1)) {
-        await data.block_db.del(i.toString(16));
+        await data.block_db.del(vr.crypto.bigint2hex(i));
     }
     await data.chain_info_db.write_obj("00", info);
     await data.block_db.write_obj("00", genesis.block);
-    await data.root_db.put("00", root, "hex", "hex");
+    await data.root_db.put("00", root);
     await data.tx_db.filter('hex', 'utf8', async (key, val) => {
         await data.tx_db.del(key);
         return false;

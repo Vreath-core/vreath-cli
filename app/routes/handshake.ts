@@ -1,4 +1,4 @@
-import * as express from 'express'
+/*import * as express from 'express'
 import * as vr from 'vreath'
 import bunyan from 'bunyan'
 import { get_peer_list, write_peer } from '../../logic/data';
@@ -73,4 +73,4 @@ export const handshake_route = router.post('/',async (req,res)=>{
         log.info(e);
         res.status(500).send('error');
     }
-});
+});*/

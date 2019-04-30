@@ -9,6 +9,7 @@ export const lock_db =  new vr.db(path.join(__dirname,`../db/net_id_${id}/lock`)
 export const block_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/block`));
 export const chain_info_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/chain_info`));
 export const tx_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/tx_pool`));
+export const output_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/output`));
 export const root_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/root`));
 export const unit_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/unit_store`));
 export const peer_list_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/peer_list`));
@@ -21,7 +22,6 @@ export type chain_info = {
     compatible_version:string;
     last_height:string;
     last_hash:string;
-    pos_diffs:string[];
 }
 
 /*export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{

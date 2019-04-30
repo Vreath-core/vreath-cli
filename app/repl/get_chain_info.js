@@ -16,4 +16,3 @@ exports.default = async () => {
         console.log(e);
     }
 };
-//# sourceMappingURL=get_chain_info.js.map

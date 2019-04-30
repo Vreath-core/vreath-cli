@@ -1,10 +1,9 @@
-import { peer } from '../app/routes/handshake';
-import { write_peer } from '../logic/data';
+/*const PeerBook = require('peer-book')
 
 export default async (ip:string)=>{
-    const new_peer:peer = {
+    const new_peer:any = {
         ip:ip,
         timestamp:(new Date()).getTime()
     }
     await write_peer(new_peer);
-}
+}*/

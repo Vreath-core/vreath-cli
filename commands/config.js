@@ -46,4 +46,3 @@ exports.default = async (config, argv) => {
     };
     await util_1.promisify(fs.writeFile)('./config/config.json', JSON.stringify(new_config, null, 4), 'utf-8');
 };
-//# sourceMappingURL=config.js.map

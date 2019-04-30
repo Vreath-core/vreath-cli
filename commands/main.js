@@ -15,6 +15,12 @@ const vr = __importStar(require("vreath"));
 const setup_1 = __importDefault(require("./setup"));
 const config_1 = __importDefault(require("./config"));
 const generate_keys_1 = __importDefault(require("./generate-keys"));
+const tx_routes = __importStar(require("../app/routes/tx"));
+const block_routes = __importStar(require("../app/routes/block"));
+const chain_routes = __importStar(require("../app/routes/chain"));
+const unit_routes = __importStar(require("../app/routes/unit"));
+const data = __importStar(require("../logic/data"));
+const intervals = __importStar(require("../logic/interval"));
 const util_1 = require("util");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -35,7 +41,6 @@ const MulticastDNS = require('libp2p-mdns');
 const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
-const Pushable = require('pull-pushable');
 class Node extends libp2p {
     constructor(_options) {
         const defaults = {
@@ -90,6 +95,7 @@ class Node extends libp2p {
         super(defaultsDeep(_options, defaults));
     }
 }
+exports.Node = Node;
 /*const topic = 'hello';
 const receiveMsg = (msg:{data:Buffer}) => console.log(msg.data.toString());
 
@@ -138,19 +144,68 @@ yargs_1.default
         const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
         const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
         const private_key = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
-        const peer_id = await util_1.promisify(PeerId.createFromPrivKey)(private_key);
+        const peer_id = await util_1.promisify(PeerId.create)();
         const peerInfo = await util_1.promisify(PeerInfo.create)(peer_id);
         peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
         const node = new Node({ peerInfo: peerInfo });
         node.on('peer:connect', (peerInfo) => {
             peer_book.put(peerInfo, true);
         });
-        node.handle('/vreath/block', (protocol, conn) => {
-            pull(conn, pull.map((data) => data.toString()), pull.log());
+        node.handle(`/vreath/${data.id}/tx/post`, async (protocol, conn) => {
+            pull(conn, pull.drain(async (msg) => {
+                await tx_routes.post(msg);
+            }));
+        });
+        node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
+            const peer_info = await util_1.promisify(conn.getPeerInfo).bind(conn)();
+            pull(conn, pull.drain(async (msg) => {
+                const block = await block_routes.get(msg);
+                node.dialProtocol(peer_info, `/vreath/${data.id}/block/post`, (err, conn) => {
+                    if (err) {
+                        throw err;
+                    }
+                    pull(pull.values([block]), conn);
+                });
+            }));
+        });
+        node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
+            pull(conn, pull.drain(async (msg) => {
+                await block_routes.post(msg);
+            }));
+        });
+        node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
+            const peer_info = await util_1.promisify(conn.getPeerInfo).bind(conn)();
+            pull(conn, pull.drain(async (msg) => {
+                const chain = await chain_routes.get(msg);
+                node.dialProtocol(peer_info, `/vreath/${data.id}/chain/post`, (err, conn) => {
+                    if (err) {
+                        throw err;
+                    }
+                    pull(pull.values([chain]), conn);
+                });
+            }));
+        });
+        node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
+            pull(conn, pull.drain(async (msg) => {
+                await chain_routes.post(msg);
+            }));
+        });
+        node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
+            pull(conn, pull.drain(async (msg) => {
+                await unit_routes.post(msg);
+            }));
         });
         node.start((err) => {
             if (err)
                 console.error(err);
+            if (config.validator.flag) {
+                intervals.staking(private_key, peer_book, node);
+                intervals.buying_unit(private_key, config, peer_book, node);
+            }
+            if (config.miner.flag) {
+                intervals.refreshing(private_key, config, peer_book, node);
+                intervals.making_unit(private_key, config, peer_book, node);
+            }
         });
     }
     catch (e) {
@@ -252,11 +307,19 @@ yargs_1.default
             //console.log('received dial to me from:', peerInfo.id.toB58String());
         });
 
-        node.handle('/vreath/block', (protocol:string, conn:string) => {
+        node.handle('/vreath/block', async (protocol:string, conn:any) => {
+            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
             pull(
                 conn,
-                pull.map((data:Buffer) => data.toString()),
-                pull.log()
+                pull.drain((msg:string)=>{
+                    console.log(msg.toString());
+                    node.dialProtocol(peer_info,'/vreath/block',(err:string,conn:any) => {
+                        if (err) { throw err }
+                        pull(pull.values(['semver me please']), conn);
+                        //console.log(conn);
+                        //console.log('nodeA dialed to nodeB on protocol: /vreath/1.0.0')
+                    });
+                })
             )
         });
 
@@ -271,7 +334,7 @@ yargs_1.default
             //console.log('received dial to me from:', peerInfo.id.toB58String());
         });
 
-        node.handle('/vreath/block', (protocol:string, conn:string) => {
+        node.handle('/vreath/block', async (protocol:string, conn:any) => {
             pull(
                 conn,
                 pull.map((data:Buffer) => data.toString()),
@@ -282,6 +345,7 @@ yargs_1.default
         node.start((err:string)=>{
             node.dialProtocol(peerInfo1,'/vreath/block',(err:string,conn:any) => {
                 if (err) { throw err }
+                console.log('go!');
                 pull(pull.values(['semver me please']), conn);
                 //console.log(conn);
                 //console.log('nodeA dialed to nodeB on protocol: /vreath/1.0.0')

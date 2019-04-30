@@ -1,4 +1,4 @@
-import * as express from 'express'
+/*import * as express from 'express'
 import {peer} from './handshake'
 import bunyan from 'bunyan'
 import { get_peer_list, write_peer } from '../../logic/data';
@@ -39,4 +39,4 @@ export default router.post('/',async (req,res)=>{
         log.info(e);
         res.status(500).send('error');
     }
-});
+});*/

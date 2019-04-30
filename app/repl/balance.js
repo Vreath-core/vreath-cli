@@ -25,4 +25,3 @@ exports.default = async (my_private) => {
         console.log(e);
     }
 };
-//# sourceMappingURL=balance.js.map

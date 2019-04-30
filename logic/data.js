@@ -16,6 +16,7 @@ exports.lock_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/loc
 exports.block_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/block`));
 exports.chain_info_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/chain_info`));
 exports.tx_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/tx_pool`));
+exports.output_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/output`));
 exports.root_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/root`));
 exports.unit_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/unit_store`));
 exports.peer_list_db = new vr.db(path.join(__dirname, `../db/net_id_${exports.id}/peer_list`));

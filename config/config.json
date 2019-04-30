@@ -1,20 +1,14 @@
 {
-    "pub_keys": [],
-    "user": {
-        "use": 0
-    },
     "miner": {
         "flag": false,
-        "use": 0,
         "interval": 0.1,
-        "fee_price": 0,
-        "unit_price": 1
+        "gas_share": 0,
+        "unit_price": "e8d4a51000"
     },
     "validator": {
-        "flag": false,
-        "use": 0,
+        "flag": true,
         "minimum": 10,
-        "fee_price": 0,
-        "gas": 0
+        "fee_price": "0",
+        "gas": "0"
     }
 }

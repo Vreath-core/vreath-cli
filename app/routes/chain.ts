@@ -1,28 +1,56 @@
 import * as express from 'express'
 import * as vr from 'vreath'
-import {read_chain, chain_info, read_chain_info} from '../../logic/data'
+import * as data from '../../logic/data'
+import {post as block_post} from './block'
+import bigInt from 'big-integer'
 import * as P from 'p-iteration'
-import rp from 'request-promise-native'
-import bunyan from 'bunyan'
-import * as math from 'mathjs'
-
-math.config({
-    number: 'BigNumber'
-});
-
-const log = bunyan.createLogger({
-    name:'vreath-cli',
-    streams:[
-        {
-            path:'./log/log.log'
-        }
-    ]
-});
-
-const router = express.Router();
 
 
+export const get = async (msg:Buffer):Promise<{[key:string]:vr.Block}>=>{
+    const req_last_height = msg.toString('hex');
+    if(vr.checker.hex_check(req_last_height)) throw new Error('invalid data');
+    const info:data.chain_info|null = await data.chain_info_db.read_obj('00');
+    if(info==null) throw new Error("chain_info doesn't exist");
+    const last_height = info.last_height;
+    if(bigInt(last_height).lesser(req_last_height)) throw new Error('heavier chain');
+    let height = bigInt(req_last_height,16);
+    let block:vr.Block|null = null;
+    while(1){
+        block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+        if((block!=null&&block.meta.kind===0)||height.eq(0)) break;
+        height = height.subtract(1);
+    }
+    if(block==null) throw new Error('fail to search key block');
+    let chain:{[key:string]:vr.Block} = {};
+    let i = height;
+    while(i.lesserOrEquals(last_height)){
+        block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+        if(block==null) throw new Error("block doesn't exist");
+        chain[vr.crypto.bigint2hex(i)] = block;
+    }
+    return chain;
+}
 
+export const post = async (msg:Buffer)=>{
+    const new_chain:{[key:string]:[vr.Block,vr.State[]]}= JSON.parse(msg.toString('utf-8'));
+    if(Object.values(new_chain).some(info=>!vr.block.isBlock(info[0])||info[1].some(s=>!vr.state.isState(s)))) throw new Error('invalid data');
+    const heights:string[] = Object.keys(new_chain).sort((a,b)=>bigInt(a,16).subtract(bigInt(b,16)).toJSNumber());
+    const new_diff_sum = heights.reduce((sum,height)=>{
+        const block = new_chain[height][0];
+        return sum.add(bigInt(block.meta.pos_diff,16));
+    },bigInt(0));
+    const my_diff_sum = await P.reduce(heights, async (sum,height)=>{
+        const block:vr.Block|null = await data.block_db.read_obj(height);
+        if(block==null) throw new Error("block doesn't exist");
+        return sum.add(bigInt(block.meta.pos_diff,16));
+    },bigInt(0));
+    if(new_diff_sum.lesserOrEquals(my_diff_sum)) throw new Error("lighter chain");
+    await P.forEach(Object.values(new_chain), async (info)=>{
+        await block_post(Buffer.from(JSON.stringify(info)))
+    });
+    return 1;
+}
+/*
 export default router.get('/',async (req,res)=>{
     try{
         const req_diff_sum:number = req.body.diff_sum || 0;
@@ -98,4 +126,4 @@ export default router.get('/',async (req,res)=>{
         log.info(e);
         res.status(500).send('error');
     }
-});
+});*/
