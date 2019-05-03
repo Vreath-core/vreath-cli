@@ -237,12 +237,22 @@ yargs
         node.start((err:string)=>{
             if(err) console.error(err);
             if(config.validator.flag){
+                try{
                 intervals.staking(private_key,peer_book,node);
+                }
+                catch(e){console.log("staking"+e)}
+                try{
                 intervals.buying_unit(private_key,config,peer_book,node);
+                }
+                catch(e){console.log("buying"+e)}
             }
             if(config.miner.flag){
+                try{
                 intervals.refreshing(private_key,config,peer_book,node);
+                }catch(e){console.log("refreshing"+e)}
+                try{
                 intervals.making_unit(private_key,config,peer_book,node);
+                }catch(e){console.log("making"+e)}
             }
 
             const replServer = repl.start({prompt:'>',terminal:true});
@@ -280,7 +290,7 @@ yargs
                 help:'Show the block specified by height',
                 async action(input){
                     const block = await repl_get_block(input);
-                    console.log(block);
+                    console.log(JSON.stringify(block,null,4));
                 }
             });
 
@@ -288,7 +298,7 @@ yargs
                 help:'Show the chain info',
                 async action(){
                     const info = await repl_get_chain_info();
-                    console.log(info);
+                    console.log(JSON.stringify(info,null,4));
                 }
             });
 

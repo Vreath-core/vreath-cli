@@ -206,12 +206,32 @@ yargs_1.default
             if (err)
                 console.error(err);
             if (config.validator.flag) {
-                intervals.staking(private_key, peer_book, node);
-                intervals.buying_unit(private_key, config, peer_book, node);
+                try {
+                    intervals.staking(private_key, peer_book, node);
+                }
+                catch (e) {
+                    console.log("staking" + e);
+                }
+                try {
+                    intervals.buying_unit(private_key, config, peer_book, node);
+                }
+                catch (e) {
+                    console.log("buying" + e);
+                }
             }
             if (config.miner.flag) {
-                intervals.refreshing(private_key, config, peer_book, node);
-                intervals.making_unit(private_key, config, peer_book, node);
+                try {
+                    intervals.refreshing(private_key, config, peer_book, node);
+                }
+                catch (e) {
+                    console.log("refreshing" + e);
+                }
+                try {
+                    intervals.making_unit(private_key, config, peer_book, node);
+                }
+                catch (e) {
+                    console.log("making" + e);
+                }
             }
             const replServer = repl.start({ prompt: '>', terminal: true });
             replServer.defineCommand('request-tx', {
@@ -246,14 +266,14 @@ yargs_1.default
                 help: 'Show the block specified by height',
                 async action(input) {
                     const block = await get_block_1.default(input);
-                    console.log(block);
+                    console.log(JSON.stringify(block, null, 4));
                 }
             });
             replServer.defineCommand('get-chain-info', {
                 help: 'Show the chain info',
                 async action() {
                     const info = await get_chain_info_1.default();
-                    console.log(info);
+                    console.log(JSON.stringify(info, null, 4));
                 }
             });
             replServer.defineCommand('output-chain', {

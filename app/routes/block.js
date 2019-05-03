@@ -13,7 +13,6 @@ const works = __importStar(require("../../logic/work"));
 const P = __importStar(require("p-iteration"));
 exports.get = async (message) => {
     const height = message.toString('hex');
-    console.log('called');
     if (vr.checker.hex_check(height, 8, true)) {
         throw new Error('invalid request data');
     }
@@ -50,7 +49,7 @@ exports.post = async (message) => {
     if (block.meta.kind === 0)
         await vr.block.accept_key_block(block, data.block_db, last_height, trie, data.state_db, data.lock_db);
     else if (block.meta.kind === 1)
-        await vr.block.accept_micro_block(block, data.block_db, last_height, trie, data.state_db, data.lock_db);
+        await vr.block.accept_micro_block(block, output_state, data.block_db, trie, data.state_db, data.lock_db);
     await data.block_db.write_obj(block.meta.height, block);
     const new_info = await works.new_obj(info, (info) => {
         info.last_height = block.meta.height;

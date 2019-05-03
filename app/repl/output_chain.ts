@@ -12,7 +12,7 @@ export default async ()=>{
         const last_height = info.last_height;
         let height = bigInt(0);
         let block:vr.Block|null;
-        const dri_pass = `output_chain_${vr.crypto.bigint2hex(height)}`
+        const dri_pass = `output_chain_${last_height}`
         const output = fs.createWriteStream(`${dri_pass}.zip`);
         const archive = archiver('zip');
         archive.pipe(output);

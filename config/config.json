@@ -6,9 +6,9 @@
         "unit_price": "e8d4a51000"
     },
     "validator": {
-        "flag": true,
+        "flag": false,
         "minimum": 10,
-        "fee_price": "0",
-        "gas": "0"
+        "fee_price": "00",
+        "gas": "00"
     }
 }

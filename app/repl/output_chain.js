@@ -23,7 +23,7 @@ exports.default = async () => {
         const last_height = info.last_height;
         let height = big_integer_1.default(0);
         let block;
-        const dri_pass = `output_chain_${vr.crypto.bigint2hex(height)}`;
+        const dri_pass = `output_chain_${last_height}`;
         const output = fs.createWriteStream(`${dri_pass}.zip`);
         const archive = archiver_1.default('zip');
         archive.pipe(output);
