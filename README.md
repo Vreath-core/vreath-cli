@@ -19,8 +19,11 @@ Generate private key to use:
 `vreath generate-keys`  
 You have to set new password to encrypt the private key and keep it secretly!  
 
-Decrypt genesis peers:
-`vreath decrypt-genesis-peers`
+Decrypt genesis peers:  
+`vreath decrypt-genesis-peers`  
+
+Set your peer info:  
+`vreath set-peer-id`  
 
 Setup data such as the genesis block, genesis state and so on:  
 `vreath setup`  
