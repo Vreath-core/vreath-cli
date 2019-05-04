@@ -2,9 +2,9 @@ import * as vr from 'vreath'
 import * as data from '../logic/data'
 import * as genesis from '../genesis/index'
 import * as fs from 'fs'
+import * as path from 'path'
 import {promisify} from 'util'
 import * as P from 'p-iteration'
-import {new_obj} from '../logic/work';
 import bigInt from 'big-integer'
 
 export default async (my_password:string)=>{
@@ -46,6 +46,11 @@ export default async (my_password:string)=>{
     await data.unit_db.filter('hex','utf8',async (key:string,val:vr.Tx)=>{
         await data.unit_db.del(key);
         return false;
+    });
+    const genesis_peers:data.peer_info[]|null = JSON.parse(Buffer.from(await promisify(fs.readFile)(path.join(__dirname,'../genesis_peers.json'))).toString());
+    if(genesis_peers==null) throw new Error("genesis peers doesn't exist");
+    await P.forEach(genesis_peers, async (peer:data.peer_info)=>{
+        await data.peer_list_db.write_obj(Buffer.from(peer.id,'utf-8').toString('hex'),peer);
     });
     await promisify(fs.writeFile)('./log/log.log','','utf-8');
 }

@@ -3,11 +3,13 @@ import * as data from './data'
 import * as works from './work'
 import {Node} from '../commands/main'
 import * as tx_routes from '../app/routes/tx'
-import * as block_routes from '../app/routes/block'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
 import * as path from 'path'
+import {promisify} from 'util'
 import bigInt, {BigInteger} from 'big-integer';
+const PeerId = require('peer-id');
+const PeerInfo = require('peer-info');
 
 const log = bunyan.createLogger({
     name:'vreath-cli',
@@ -20,22 +22,28 @@ const log = bunyan.createLogger({
 
 const pull = require('pull-stream');
 
-export const get_new_chain = async (PeerBook:any,node:Node)=>{
-    const peers = PeerBook.getAll();
-    const peer = peers[0];
+export const get_new_chain = async (node:Node)=>{
+    let peer:data.peer_info|null = null;
+    await data.peer_list_db.filter('hex','utf8',(key,val:data.peer_info)=>{
+        if(peer=null) peer = val;
+        return false;
+    });
     if(peer==null) throw new Error('no peer');
+    const peer_id = await promisify(PeerId.createFromJSON)(peer);
+    const peer_info = new PeerInfo(peer_id);
+    peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
     const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
     if(info==null) throw new Error("chain_info doesn't exist");
-    node.dialProtocol(peer,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
+    node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
         if (err) { throw err }
         pull(pull.values([info.last_height]), conn);
     });
     await works.sleep(30000);
-    setImmediate(get_new_chain);
+    setImmediate(()=>get_new_chain.apply(null,[node]));
     return 0;
 }
 
-export const staking = async (private_key:string,PeerBook:any,node:Node)=>{
+export const staking = async (private_key:string,node:Node)=>{
     try{
         const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -62,23 +70,26 @@ export const staking = async (private_key:string,PeerBook:any,node:Node)=>{
             await data.tx_db.del(key);
             await data.output_db.del(key);
         });
-        const peers = PeerBook.getAll();
-        await P.forEach(peers, async (peer)=>{
-            node.dialProtocol(peer,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
+        await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer);
+            const peer_info = new PeerInfo(peer_id);
+            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
                 if (err) { throw err }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
+            return false;
         });
     }
     catch(e){
         log.info(e);
     }
     await works.sleep(1000);
-    setImmediate(()=>staking.apply(null,[private_key,PeerBook,node]));
+    setImmediate(()=>staking.apply(null,[private_key,node]));
     return 0;
 }
 
-export const buying_unit = async (private_key:string,config:any,PeerBook:any,node:Node)=>{
+export const buying_unit = async (private_key:string,config:any,node:Node)=>{
     try{
         const pub_key:string = vr.crypto.private2public(private_key);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native,pub_key)
@@ -142,24 +153,27 @@ export const buying_unit = async (private_key:string,config:any,PeerBook:any,nod
         await P.forEach(units, async (unit,i)=>{
             await data.unit_db.del(unit_addresses[i+1]);
         });
-        const peers = PeerBook.getAll();
-        await P.forEach(peers, async (peer)=>{
-            node.dialProtocol(peer,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
+        await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer);
+            const peer_info = new PeerInfo(peer_id);
+            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                 if (err) { throw err }
                 pull(pull.values([JSON.stringify([tx,[]])]), conn);
             });
+            return false;
         });
     }
     catch(e){
         log.info(e);
     }
     await works.sleep(2000);
-    setImmediate(()=>buying_unit.apply(null,[private_key,config,PeerBook,node]));
+    setImmediate(()=>buying_unit.apply(null,[private_key,config,node]));
     return 0;
 }
 
 
-export const refreshing = async (private_key:string,config:any,PeerBook:any,node:Node)=>{
+export const refreshing = async (private_key:string,config:any,node:Node)=>{
     try{
         const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -202,23 +216,26 @@ export const refreshing = async (private_key:string,config:any,PeerBook:any,node
         const made = await works.make_ref_tx(vr.crypto.bigint2hex(height),index,gas_share,unit_price,private_key,data.block_db,trie,data.state_db,data.lock_db,last_height);
         await data.tx_db.write_obj(made[0].hash,made[0]);
         await data.output_db.write_obj(made[0].hash,made[1]);
-        const peers = PeerBook.getAll();
-        await P.forEach(peers, async (peer)=>{
-            node.dialProtocol(peer,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
+        await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer);
+            const peer_info = new PeerInfo(peer_id);
+            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                 if (err) { throw err }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
+            return false;
         });
     }
     catch(e){
         log.info(e);
     }
     await works.sleep(2000);
-    setImmediate(()=>refreshing.apply(null,[private_key,config,PeerBook,node]));
+    setImmediate(()=>refreshing.apply(null,[private_key,config,node]));
     return 0;
 }
 
-export const making_unit = async (private_key:string,config:any,PeerBook:any,node:Node)=>{
+export const making_unit = async (private_key:string,config:any,node:Node)=>{
     try{
         const public_key = vr.crypto.private2public(private_key);
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit,public_key);
@@ -263,18 +280,21 @@ export const making_unit = async (private_key:string,config:any,PeerBook:any,nod
         if(bigInt(nonce,16).eq(0)) throw new Error('fail to get valid nonce');
         const unit:vr.Unit = [unit_info[4],unit_info[5],nonce,my_unit_address,unit_price];
         await data.unit_db.write_obj(unit_info[6],unit);
-        const peers = PeerBook.getAll();
-        await P.forEach(peers, async (peer)=>{
-            node.dialProtocol(peer,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
+        await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer);
+            const peer_info = new PeerInfo(peer_id);
+            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            node.dialProtocol(peer_info,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
                 if (err) { throw err }
                 pull(pull.values([unit]), conn);
             });
+            return false;
         });
     }
     catch(e){
         log.info(e);
     }
     await works.sleep(2000);
-    setImmediate(()=>making_unit.apply(null,[private_key,config,PeerBook,node]));
+    setImmediate(()=>making_unit.apply(null,[private_key,config,node]));
     return 0;
 }

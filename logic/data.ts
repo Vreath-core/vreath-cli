@@ -24,6 +24,14 @@ export type chain_info = {
     last_hash:string;
 }
 
+export type peer_info = {
+    id:string,
+    privKey:string,
+    pubKey:string
+}
+
+
+
 /*export const get_tx_statedata = async (tx:vr.Tx,chain:vr.Block[],S_Trie:Trie)=>{
     try{
         const base = tx.meta.bases;

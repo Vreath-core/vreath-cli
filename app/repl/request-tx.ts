@@ -1,8 +1,6 @@
 import * as vr from 'vreath'
 import * as works from '../../logic/work'
 import * as data from '../../logic/data'
-import rp from 'request-promise-native'
-import * as P from 'p-iteration'
 import bigInt from 'big-integer'
 
 export default async (input:string,my_private:string)=>{

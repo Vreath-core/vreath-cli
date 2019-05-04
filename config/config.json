@@ -7,8 +7,14 @@
     },
     "validator": {
         "flag": false,
-        "minimum": 10,
+        "minimum": "0a",
         "fee_price": "00",
         "gas": "00"
+    },
+    "peer": {
+        "id": "",
+        "privKey": "",
+        "pubKey": ""
+
     }
 }
