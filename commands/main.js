@@ -50,6 +50,7 @@ const Bootstrap = require('libp2p-bootstrap');
 const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
+const defered = require('pull-defer').through();
 const search_ip = require('ip');
 class Node extends libp2p {
     constructor(_options, _bootstrapList) {
@@ -165,9 +166,7 @@ yargs_1.default
         });*/
         node.start((err) => {
             node.on('peer:connect', (peer) => {
-                console.log(peer);
             });
-            node.on('peer:discovery', (peer) => console.log('Discovered:', peer.id.toB58String()));
             node.handle(`/vreath/${data.id}/tx/post`, async (protocol, conn) => {
                 pull(conn, pull.drain(async (msg) => {
                     await tx_routes.post(msg);
@@ -192,14 +191,11 @@ yargs_1.default
             });
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
                 const peer_info = await util_1.promisify(conn.getPeerInfo).bind(conn)();
-                pull(conn, pull.drain(async (msg) => {
-                    const chain = await chain_routes.get(msg);
-                    node.dialProtocol(peer_info, `/vreath/${data.id}/chain/post`, (err, conn) => {
-                        if (err) {
-                            throw err;
-                        }
-                        pull(pull.values([chain]), conn);
-                    });
+                const g = defered();
+                pull(conn, pull.map((msg) => {
+                    g.resolve(chain_routes.get(msg));
+                }), g, pull.drain((chain) => {
+                    pull(pull.values([chain]), conn);
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
