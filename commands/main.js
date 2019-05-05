@@ -52,8 +52,6 @@ const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 const toPromise = require('stream-to-promise');
-const Pushable = require('pull-pushable');
-const p = Pushable();
 const search_ip = require('ip');
 class Node extends libp2p {
     constructor(_options, _bootstrapList) {
@@ -193,16 +191,29 @@ yargs_1.default
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
-                pull(p, conn);
-                const read = pull(conn, pull.map((msg) => {
-                    return msg;
-                }));
-                const pro = toPromise(toStream(read));
-                pro.then((msg) => {
+                const stream = toStream(conn);
+                const promise = toPromise(stream);
+                promise.then((msg) => {
                     return chain_routes.get(msg);
                 }).then((chain) => {
-                    p.push(chain);
+                    stream.write(chain);
                 });
+                /*pull(
+                    p,
+                    conn
+                )
+                const read = pull(
+                    conn,
+                    pull.drain((msg:Buffer)=>{
+                        return msg;
+                    })
+                );
+                const pro = toPromise(toStream(read));
+                pro.then((msg:Buffer)=>{
+                    return chain_routes.get(msg);
+                }).then((chain:vr.Block[])=>{
+                    p.push(chain);
+                });*/
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain(async (msg) => {

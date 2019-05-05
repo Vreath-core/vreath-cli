@@ -14,8 +14,6 @@ const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 const toPromise = require('stream-to-promise');
-const Pushable = require('pull-pushable')
-const p = Pushable();
 
 const log = bunyan.createLogger({
     name:'vreath-cli',
@@ -39,21 +37,27 @@ export const get_new_chain = async (node:Node)=>{
         if(info==null) throw new Error("chain_info doesn't exist");
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { throw err }
-            pull(
+            const stream = toStream(conn)
+            const promise = toPromise(stream);
+            stream.write(info.last_height);
+            promise.then((msg:Buffer)=>{
+                return chain_routes.post(msg);
+            });
+            /*pull(
                 p,
                 conn
             );
-            p.push(info.last_height);
-            const read = pull(
+            p.push(info.last_height);*/
+            /*const read = pull(
                 conn,
-                pull.map((msg:Buffer)=>{
+                pull.drain((msg:Buffer)=>{
                     return msg;
                 })
             );
             const pro = toPromise(toStream(read));
             pro.then((msg:Buffer)=>{
                 chain_routes.post(msg);
-            });
+            });*/
         });
     }
     catch(e){
