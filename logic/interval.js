@@ -31,26 +31,27 @@ const log = bunyan_1.default.createLogger({
 });
 const pull = require('pull-stream');
 exports.get_new_chain = async (node) => {
-    let peer = null;
-    await data.peer_list_db.filter('hex', 'utf8', (key, val) => {
-        if (peer = null)
-            peer = val;
-        return false;
-    });
-    if (peer == null)
-        throw new Error('no peer');
-    const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer);
-    const peer_info = new PeerInfo(peer_id);
-    peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
-    const info = await data.chain_info_db.read_obj("00");
-    if (info == null)
-        throw new Error("chain_info doesn't exist");
-    node.dialProtocol(peer_info, `/vreath/${data.id}/chain/get`, (err, conn) => {
-        if (err) {
-            throw err;
-        }
-        pull(pull.values([info.last_height]), conn);
-    });
+    try {
+        const peers = await data.peer_list_db.filter();
+        const peer = peers[0];
+        if (peer == null)
+            throw new Error('no peer');
+        const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+        const peer_info = new PeerInfo(peer_id);
+        peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+        const info = await data.chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        node.dialProtocol(peer_info, `/vreath/${data.id}/chain/get`, (err, conn) => {
+            if (err) {
+                throw err;
+            }
+            pull(pull.values([info.last_height]), conn);
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
     await works.sleep(30000);
     setImmediate(() => exports.get_new_chain.apply(null, [node]));
     return 0;
@@ -87,9 +88,9 @@ exports.staking = async (private_key, node) => {
             await data.output_db.del(key);
         });
         await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer);
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
-            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/block/post`, (err, conn) => {
                 if (err) {
                     throw err;
@@ -175,9 +176,9 @@ exports.buying_unit = async (private_key, config, node) => {
             await data.unit_db.del(unit_addresses[i + 1]);
         });
         await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer);
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
-            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
                 if (err) {
                     throw err;
@@ -245,9 +246,9 @@ exports.refreshing = async (private_key, config, node) => {
         await data.tx_db.write_obj(made[0].hash, made[0]);
         await data.output_db.write_obj(made[0].hash, made[1]);
         await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer);
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
-            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
                 if (err) {
                     throw err;
@@ -320,9 +321,9 @@ exports.making_unit = async (private_key, config, node) => {
         const unit = [unit_info[4], unit_info[5], nonce, my_unit_address, unit_price];
         await data.unit_db.write_obj(unit_info[6], unit);
         await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer);
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
-            peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/unit/post`, (err, conn) => {
                 if (err) {
                     throw err;

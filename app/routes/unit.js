@@ -36,7 +36,7 @@ exports.post = async (msg) => {
         throw new Error("root doesn't exist");
     const trie = vr.data.trie_ins(data.trie_db, root);
     const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("0", vr.con.constant.unit, unit_address, "0"));
-    if (!big_integer_1.default(hash, 16).lesserOrEquals(vr.con.constant.pow_target) || unit_state.data.length != 0)
+    if (!big_integer_1.default(hash, 16).lesserOrEquals(big_integer_1.default(vr.con.constant.pow_target)) || unit_state.data.length != 0)
         throw new Error('invalid unit');
     await data.unit_db.write_obj(unit_address, unit);
     return 1;

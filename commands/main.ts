@@ -48,18 +48,17 @@ const Bootstrap = require('libp2p-bootstrap')
 const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
+const search_ip = require('ip');
 
 export class Node extends libp2p {
-    constructor (_options:any,_bootstrapList:data.peer_info[]) {
+    constructor (_options:any,_bootstrapList:string[]) {
       const defaults = {
         // The libp2p modules for this libp2p bundle
         modules: {
           transport: [
-            TCP,
-            WS                   // It can take instances too!
+            TCP           // It can take instances too!
           ],
           streamMuxer: [
-            SPDY,
             MPLEX
           ],
           connEncryption: [
@@ -76,16 +75,14 @@ export class Node extends libp2p {
           //   new DelegatedPeerRouter()
           // ],
           peerDiscovery: [
-            MulticastDNS,
             Bootstrap
-          ],
-          dht: DHT                      // DHT enables PeerRouting, ContentRouting and DHT itself components
+          ]           // DHT enables PeerRouting, ContentRouting and DHT itself components
         },
 
         // libp2p config options (typically found on a config.json)
         config: {                       // The config object is the part of the config that can go into a file, config.json.
           peerDiscovery: {
-            autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
+            /* *//*autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
             mdns: {                     // mdns options
               interval: 1000,           // ms
               enabled: true
@@ -93,17 +90,17 @@ export class Node extends libp2p {
             webrtcStar: {               // webrtc-star options
               interval: 1000,           // ms
               enabled: false
-            },
+            },*/
             bootstrap: {
-                interval: 10000,
+                interval: 2000,
                 enabled: true,
                 list: _bootstrapList
             }
             // .. other discovery module options.
           },
-          dht: {
+          /*dht: {
             kBucketSize: 20,
-          }
+          }*/
         }
       }
       // overload any defaults of your bundle using https://github.com/nodeutils/defaults-deep
@@ -163,84 +160,90 @@ yargs
         const private_key = CryptoJS.AES.decrypt(get_private,my_key).toString(CryptoJS.enc.Utf8);
         const peer_id = await promisify(PeerId.createFromJSON)(config.peer);
         const peer_info = new PeerInfo(peer_id);
-        peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+        const ip = search_ip.address();
+        peer_info.multiaddrs.add(`/ip4/${ip}/tcp/5577`);
         const bootstrapList:data.peer_info[] = JSON.parse(Buffer.from(await promisify(fs.readFile)(path.join(__dirname,'../genesis_peers.json'),'utf-8')).toString());
+        const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
         await data.peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-        const node = new Node({ peerInfo: peer_info},bootstrapList);
+        const node = new Node({ peerInfo: peer_info},peer_address_list);
         /*node.on('peer:connect', (peerInfo:any) => {
             await data.peer_list_db.write_obj()
         });*/
 
-        node.on('peer:connect', (peer:any) => {
-            console.log(peer);
-        });
-
-        node.handle(`/vreath/${data.id}/tx/post`, async (protocol:string, conn:any)=>{
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    await tx_routes.post(msg);
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
-            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    const block = await block_routes.get(msg);
-                    node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
-                        if (err) { throw err }
-                        pull(pull.values([block]), conn);
-                    })
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    await block_routes.post(msg);
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/chain/get`, async (protocol:string, conn:any) => {
-            const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    const chain = await chain_routes.get(msg);
-                    node.dialProtocol(peer_info,`/vreath/${data.id}/chain/post`,(err:string,conn:any) => {
-                        if (err) { throw err }
-                        pull(pull.values([chain]), conn);
-                    })
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    await chain_routes.post(msg);
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
-            pull(
-                conn,
-                pull.drain(async (msg:Buffer)=>{
-                    await unit_routes.post(msg);
-                })
-            )
-        });
-
         node.start((err:string)=>{
+
+            node.on('peer:connect', (peer:any) => {
+                console.log(peer);
+            });
+
+            node.on('peer:discovery', (peer:any) => console.log('Discovered:', peer.id.toB58String()))
+
+            node.handle(`/vreath/${data.id}/tx/post`, async (protocol:string, conn:any)=>{
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        await tx_routes.post(msg);
+                    })
+                )
+            });
+
+            node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
+                const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        const block = await block_routes.get(msg);
+                        node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
+                            if (err) { throw err }
+                            pull(pull.values([block]), conn);
+                        })
+                    })
+                )
+            });
+
+            node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        await block_routes.post(msg);
+                    })
+                )
+            });
+
+            node.handle(`/vreath/${data.id}/chain/get`, async (protocol:string, conn:any) => {
+                const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        const chain = await chain_routes.get(msg);
+                        node.dialProtocol(peer_info,`/vreath/${data.id}/chain/post`,(err:string,conn:any) => {
+                            if (err) { throw err }
+                            pull(pull.values([chain]), conn);
+                        })
+                    })
+                )
+            });
+
+            node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        await chain_routes.post(msg);
+                    })
+                )
+            });
+
+            node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
+                pull(
+                    conn,
+                    pull.drain(async (msg:Buffer)=>{
+                        await unit_routes.post(msg);
+                    })
+                )
+            });
+
             if(err) console.error(err);
+            intervals.get_new_chain(node);
             if(config.validator.flag){
                 intervals.staking(private_key,node);
                 intervals.buying_unit(private_key,config,node);
@@ -257,9 +260,9 @@ yargs
                 async action(input){
                     const tx = await req_tx_com(input,private_key);
                     await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
-                        const peer_id = await promisify(PeerId.createFromJSON)(peer);
+                        const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
                         const peer_info = new PeerInfo(peer_id);
-                        peer_info.multiaddrs.add('/ip4/0.0.0.0/tcp/5577');
+                        peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
                         node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                             if (err) { throw err }
                             pull(pull.values([JSON.stringify([tx,[]])]), conn);
@@ -305,7 +308,7 @@ yargs
                 async action(){
                     await output_chain();
                 }
-            })
+            });
         });
     }
     catch(e){

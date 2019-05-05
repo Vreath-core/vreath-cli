@@ -50,7 +50,7 @@ export default async (my_password:string)=>{
     const genesis_peers:data.peer_info[]|null = JSON.parse(Buffer.from(await promisify(fs.readFile)(path.join(__dirname,'../genesis_peers.json'))).toString());
     if(genesis_peers==null) throw new Error("genesis peers doesn't exist");
     await P.forEach(genesis_peers, async (peer:data.peer_info)=>{
-        await data.peer_list_db.write_obj(Buffer.from(peer.id,'utf-8').toString('hex'),peer);
+        await data.peer_list_db.write_obj(Buffer.from(peer.identity.id,'utf-8').toString('hex'),peer);
     });
     await promisify(fs.writeFile)('./log/log.log','','utf-8');
 }

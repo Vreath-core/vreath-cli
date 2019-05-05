@@ -11,7 +11,7 @@ export const get = async (msg:Buffer):Promise<{[key:string]:vr.Block}>=>{
     const info:data.chain_info|null = await data.chain_info_db.read_obj('00');
     if(info==null) throw new Error("chain_info doesn't exist");
     const last_height = info.last_height;
-    if(bigInt(last_height).lesser(req_last_height)) throw new Error('heavier chain');
+    if(bigInt(last_height,16).lesser(bigInt(req_last_height,16))) throw new Error('heavier chain');
     let height = bigInt(req_last_height,16);
     let block:vr.Block|null = null;
     while(1){
@@ -22,7 +22,7 @@ export const get = async (msg:Buffer):Promise<{[key:string]:vr.Block}>=>{
     if(block==null) throw new Error('fail to search key block');
     let chain:{[key:string]:vr.Block} = {};
     let i = height;
-    while(i.lesserOrEquals(last_height)){
+    while(i.lesserOrEquals(bigInt(last_height,16))){
         block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
         if(block==null) throw new Error("block doesn't exist");
         chain[vr.crypto.bigint2hex(i)] = block;
@@ -31,6 +31,7 @@ export const get = async (msg:Buffer):Promise<{[key:string]:vr.Block}>=>{
 }
 
 export const post = async (msg:Buffer)=>{
+    console.log('posted');
     const new_chain:{[key:string]:[vr.Block,vr.State[]]}= JSON.parse(msg.toString('utf-8'));
     if(Object.values(new_chain).some(info=>!vr.block.isBlock(info[0])||info[1].some(s=>!vr.state.isState(s)))) throw new Error('invalid data');
     const heights:string[] = Object.keys(new_chain).sort((a,b)=>bigInt(a,16).subtract(bigInt(b,16)).toJSNumber());

@@ -57,7 +57,7 @@ exports.default = async (my_password) => {
     if (genesis_peers == null)
         throw new Error("genesis peers doesn't exist");
     await P.forEach(genesis_peers, async (peer) => {
-        await data.peer_list_db.write_obj(Buffer.from(peer.id, 'utf-8').toString('hex'), peer);
+        await data.peer_list_db.write_obj(Buffer.from(peer.identity.id, 'utf-8').toString('hex'), peer);
     });
     await util_1.promisify(fs.writeFile)('./log/log.log', '', 'utf-8');
 };

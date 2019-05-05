@@ -23,7 +23,7 @@ exports.get = async (msg) => {
     if (info == null)
         throw new Error("chain_info doesn't exist");
     const last_height = info.last_height;
-    if (big_integer_1.default(last_height).lesser(req_last_height))
+    if (big_integer_1.default(last_height, 16).lesser(big_integer_1.default(req_last_height, 16)))
         throw new Error('heavier chain');
     let height = big_integer_1.default(req_last_height, 16);
     let block = null;
@@ -37,7 +37,7 @@ exports.get = async (msg) => {
         throw new Error('fail to search key block');
     let chain = {};
     let i = height;
-    while (i.lesserOrEquals(last_height)) {
+    while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
         block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
         if (block == null)
             throw new Error("block doesn't exist");
@@ -46,6 +46,7 @@ exports.get = async (msg) => {
     return chain;
 };
 exports.post = async (msg) => {
+    console.log('posted');
     const new_chain = JSON.parse(msg.toString('utf-8'));
     if (Object.values(new_chain).some(info => !vr.block.isBlock(info[0]) || info[1].some(s => !vr.state.isState(s))))
         throw new Error('invalid data');
