@@ -4,6 +4,9 @@
   "version": "0.0.1",
   "author": "Sora Suegami",
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
+  "scripts": {
+    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../../ && npm link ./"
+  },
   "dependencies": {
     "@nodeutils/defaults-deep": "^1.1.0",
     "@types/archiver": "^2.1.2",
