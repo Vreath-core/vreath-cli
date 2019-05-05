@@ -6,7 +6,7 @@ import * as P from 'p-iteration'
 
 
 export const get = async (msg:Buffer):Promise<{[key:string]:vr.Block}>=>{
-    const req_last_height = msg.toString('hex');
+    const req_last_height = msg.toString();
     if(vr.checker.hex_check(req_last_height)) throw new Error('invalid data');
     const info:data.chain_info|null = await data.chain_info_db.read_obj('00');
     if(info==null) throw new Error("chain_info doesn't exist");

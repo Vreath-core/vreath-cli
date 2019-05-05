@@ -16,7 +16,7 @@ const block_1 = require("./block");
 const big_integer_1 = __importDefault(require("big-integer"));
 const P = __importStar(require("p-iteration"));
 exports.get = async (msg) => {
-    const req_last_height = msg.toString('hex');
+    const req_last_height = msg.toString();
     if (vr.checker.hex_check(req_last_height))
         throw new Error('invalid data');
     const info = await data.chain_info_db.read_obj('00');
