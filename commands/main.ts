@@ -48,7 +48,8 @@ const Bootstrap = require('libp2p-bootstrap')
 const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
-const defered = require('pull-defer').through();
+const Pushable = require('pull-pushable')
+const p = Pushable();
 const search_ip = require('ip');
 
 export class Node extends libp2p {
@@ -209,16 +210,14 @@ yargs
             });
 
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol:string, conn:any) => {
-                const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
-                const g = defered();
+                pull(
+                    p,
+                    conn
+                )
                 pull(
                     conn,
-                    pull.map((msg:Buffer)=>{
-                        g.resolve(chain_routes.get(msg))
-                    }),
-                    g,
-                    pull.drain((chain:vr.Block[])=>{
-                        pull(pull.values([chain]),conn)
+                    pull.drain((msg:Buffer)=>{
+                        chain_routes.get(msg,p);
                     })
                 )
             });

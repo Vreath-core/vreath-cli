@@ -14,6 +14,7 @@ const vr = __importStar(require("vreath"));
 const data = __importStar(require("./data"));
 const works = __importStar(require("./work"));
 const tx_routes = __importStar(require("../app/routes/tx"));
+const chain_routes = __importStar(require("../app/routes/chain"));
 const P = __importStar(require("p-iteration"));
 const bunyan_1 = __importDefault(require("bunyan"));
 const path = __importStar(require("path"));
@@ -21,6 +22,8 @@ const util_1 = require("util");
 const big_integer_1 = __importDefault(require("big-integer"));
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
+const Pushable = require('pull-pushable');
+const p = Pushable();
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -46,7 +49,12 @@ exports.get_new_chain = async (node) => {
             if (err) {
                 throw err;
             }
-            pull(pull.values([info.last_height]), conn);
+            pull(p, conn);
+            p.push(info.last_height);
+            pull(conn, pull.drain((msg) => {
+                console.log('get!');
+                chain_routes.post(msg);
+            }));
         });
     }
     catch (e) {

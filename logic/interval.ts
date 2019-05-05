@@ -3,6 +3,7 @@ import * as data from './data'
 import * as works from './work'
 import {Node} from '../commands/main'
 import * as tx_routes from '../app/routes/tx'
+import * as chain_routes from '../app/routes/chain'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
 import * as path from 'path'
@@ -10,6 +11,8 @@ import {promisify} from 'util'
 import bigInt, {BigInteger} from 'big-integer';
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
+const Pushable = require('pull-pushable')
+const p = Pushable();
 
 const log = bunyan.createLogger({
     name:'vreath-cli',
@@ -34,7 +37,18 @@ export const get_new_chain = async (node:Node)=>{
         if(info==null) throw new Error("chain_info doesn't exist");
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { throw err }
-            pull(pull.values([info.last_height]), conn);
+            pull(
+                p,
+                conn
+            );
+            p.push(info.last_height);
+            pull(
+                conn,
+                pull.drain((msg:Buffer)=>{
+                    console.log('get!');
+                    chain_routes.post(msg);
+                })
+            )
         });
     }
     catch(e){

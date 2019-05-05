@@ -50,7 +50,8 @@ const Bootstrap = require('libp2p-bootstrap');
 const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
-const defered = require('pull-defer').through();
+const Pushable = require('pull-pushable');
+const p = Pushable();
 const search_ip = require('ip');
 class Node extends libp2p {
     constructor(_options, _bootstrapList) {
@@ -190,12 +191,9 @@ yargs_1.default
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
-                const peer_info = await util_1.promisify(conn.getPeerInfo).bind(conn)();
-                const g = defered();
-                pull(conn, pull.map((msg) => {
-                    g.resolve(chain_routes.get(msg));
-                }), g, pull.drain((chain) => {
-                    pull(pull.values([chain]), conn);
+                pull(p, conn);
+                pull(conn, pull.drain((msg) => {
+                    chain_routes.get(msg, p);
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
