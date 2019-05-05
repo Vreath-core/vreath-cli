@@ -11,7 +11,7 @@ Our token has no value now since we could reset the blockchain.
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
 `cd ./vreath-cli`  
-`npm build`  
+`npm run build`  
 
 ## Quick Start
 Generate private key to use:  

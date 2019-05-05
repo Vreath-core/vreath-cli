@@ -5,7 +5,7 @@
   "author": "Sora Suegami",
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
   "scripts": {
-    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../../ && npm link ./"
+    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../node-cryptonight-lite && npm run rebuild && cd ../../ && npm link ./"
   },
   "dependencies": {
     "@nodeutils/defaults-deep": "^1.1.0",
