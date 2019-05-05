@@ -49,12 +49,11 @@ exports.get_new_chain = async (node) => {
             if (err) {
                 throw err;
             }
-            pull(p, conn);
-            p.push(info.last_height);
-            pull(conn, pull.drain((msg) => {
+            pull(p, conn, pull.drain((msg) => {
                 console.log('get!');
                 chain_routes.post(msg);
             }));
+            p.push(info.last_height);
         });
     }
     catch (e) {

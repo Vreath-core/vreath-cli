@@ -40,6 +40,7 @@
     "peer-id": "^0.12.2",
     "peer-info": "^0.15.1",
     "protobufjs": "^6.8.8",
+    "pull-defer": "^0.2.3",
     "pull-pushable": "^2.2.0",
     "pull-stream": "^3.6.9",
     "readline-sync": "^1.4.9",

@@ -5,7 +5,7 @@ import bigInt from 'big-integer'
 import * as P from 'p-iteration'
 
 
-export const get = async (msg:Buffer,p:any):Promise<{[key:string]:vr.Block}>=>{
+export const get = async (msg:Buffer,p:any,deferred:any):Promise<{[key:string]:vr.Block}>=>{
     const req_last_height = msg.toString();
     if(vr.checker.hex_check(req_last_height)) throw new Error('invalid data');
     const info:data.chain_info|null = await data.chain_info_db.read_obj('00');
@@ -27,7 +27,7 @@ export const get = async (msg:Buffer,p:any):Promise<{[key:string]:vr.Block}>=>{
         if(block==null) throw new Error("block doesn't exist");
         chain[vr.crypto.bigint2hex(i)] = block;
     }
-    p.push(chain);
+    deferred.resolve(()=>p.push(chain));
     return chain;
 }
 

@@ -15,7 +15,7 @@ const data = __importStar(require("../../logic/data"));
 const block_1 = require("./block");
 const big_integer_1 = __importDefault(require("big-integer"));
 const P = __importStar(require("p-iteration"));
-exports.get = async (msg, p) => {
+exports.get = async (msg, p, deferred) => {
     const req_last_height = msg.toString();
     if (vr.checker.hex_check(req_last_height))
         throw new Error('invalid data');
@@ -43,7 +43,7 @@ exports.get = async (msg, p) => {
             throw new Error("block doesn't exist");
         chain[vr.crypto.bigint2hex(i)] = block;
     }
-    p.push(chain);
+    deferred.resolve(() => p.push(chain));
     return chain;
 };
 exports.post = async (msg) => {

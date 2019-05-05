@@ -48,6 +48,7 @@ const Bootstrap = require('libp2p-bootstrap')
 const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
+const deferred = require('pull-defer').sink()
 const Pushable = require('pull-pushable')
 const p = Pushable();
 const search_ip = require('ip');
@@ -216,9 +217,10 @@ yargs
                 )
                 pull(
                     conn,
-                    pull.drain((msg:Buffer)=>{
-                        chain_routes.get(msg,p);
-                    })
+                    pull.map((msg:Buffer)=>{
+                        chain_routes.get(msg,p,deferred);
+                    }),
+                    deferred
                 )
             });
 

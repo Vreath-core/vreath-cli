@@ -50,6 +50,7 @@ const Bootstrap = require('libp2p-bootstrap');
 const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
+const deferred = require('pull-defer').sink();
 const Pushable = require('pull-pushable');
 const p = Pushable();
 const search_ip = require('ip');
@@ -192,9 +193,9 @@ yargs_1.default
             });
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
                 pull(p, conn);
-                pull(conn, pull.drain((msg) => {
-                    chain_routes.get(msg, p);
-                }));
+                pull(conn, pull.map((msg) => {
+                    chain_routes.get(msg, p, deferred);
+                }), deferred);
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain(async (msg) => {

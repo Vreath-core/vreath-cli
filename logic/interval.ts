@@ -39,16 +39,13 @@ export const get_new_chain = async (node:Node)=>{
             if (err) { throw err }
             pull(
                 p,
-                conn
-            );
-            p.push(info.last_height);
-            pull(
                 conn,
                 pull.drain((msg:Buffer)=>{
                     console.log('get!');
                     chain_routes.post(msg);
                 })
-            )
+            );
+            p.push(info.last_height);
         });
     }
     catch(e){
