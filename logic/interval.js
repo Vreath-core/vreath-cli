@@ -22,6 +22,9 @@ const util_1 = require("util");
 const big_integer_1 = __importDefault(require("big-integer"));
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
+const pull = require('pull-stream');
+const toStream = require('pull-stream-to-stream');
+const toPromise = require('stream-to-promise');
 const Pushable = require('pull-pushable');
 const p = Pushable();
 const log = bunyan_1.default.createLogger({
@@ -32,7 +35,6 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-const pull = require('pull-stream');
 exports.get_new_chain = async (node) => {
     try {
         const peers = await data.peer_list_db.filter();
@@ -49,11 +51,15 @@ exports.get_new_chain = async (node) => {
             if (err) {
                 throw err;
             }
-            pull(p, conn, pull.drain((msg) => {
-                console.log('get!');
-                chain_routes.post(msg);
-            }));
+            pull(p, conn);
             p.push(info.last_height);
+            const read = pull(conn, pull.map((msg) => {
+                return msg;
+            }));
+            const pro = toPromise(toStream(read));
+            pro.then((msg) => {
+                chain_routes.post(msg);
+            });
         });
     }
     catch (e) {

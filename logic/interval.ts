@@ -11,6 +11,9 @@ import {promisify} from 'util'
 import bigInt, {BigInteger} from 'big-integer';
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
+const pull = require('pull-stream');
+const toStream = require('pull-stream-to-stream');
+const toPromise = require('stream-to-promise');
 const Pushable = require('pull-pushable')
 const p = Pushable();
 
@@ -23,7 +26,6 @@ const log = bunyan.createLogger({
     ]
 });
 
-const pull = require('pull-stream');
 
 export const get_new_chain = async (node:Node)=>{
     try{
@@ -39,13 +41,19 @@ export const get_new_chain = async (node:Node)=>{
             if (err) { throw err }
             pull(
                 p,
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    console.log('get!');
-                    chain_routes.post(msg);
-                })
+                conn
             );
             p.push(info.last_height);
+            const read = pull(
+                conn,
+                pull.map((msg:Buffer)=>{
+                    return msg;
+                })
+            );
+            const pro = toPromise(toStream(read));
+            pro.then((msg:Buffer)=>{
+                chain_routes.post(msg);
+            });
         });
     }
     catch(e){

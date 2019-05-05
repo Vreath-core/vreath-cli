@@ -48,7 +48,8 @@ const Bootstrap = require('libp2p-bootstrap')
 const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
-const deferred = require('pull-defer').sink()
+const toStream = require('pull-stream-to-stream');
+const toPromise = require('stream-to-promise');
 const Pushable = require('pull-pushable')
 const p = Pushable();
 const search_ip = require('ip');
@@ -215,13 +216,18 @@ yargs
                     p,
                     conn
                 )
-                pull(
+                const read = pull(
                     conn,
                     pull.map((msg:Buffer)=>{
-                        chain_routes.get(msg,p,deferred);
-                    }),
-                    deferred
-                )
+                        return msg;
+                    })
+                );
+                const pro = toPromise(toStream(read));
+                pro.then((msg:Buffer)=>{
+                    return chain_routes.get(msg);
+                }).then((chain:vr.Block[])=>{
+                    p.push(chain);
+                });
             });
 
             node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
