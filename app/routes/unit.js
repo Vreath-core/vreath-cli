@@ -19,7 +19,7 @@ const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
         {
-            path: path.join(__dirname, '../log/log.log')
+            path: path.join(__dirname, '../../log/log.log')
         }
     ]
 });
