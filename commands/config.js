@@ -30,6 +30,11 @@ exports.default = async (config, argv) => {
             minimum: validator_min,
             fee_price: validator_fee,
             gas: validator_gas
+        },
+        peer: {
+            id: config.peer.id,
+            privKey: config.peer.privKey,
+            pubKey: config.peer.pubKey
         }
     };
     await util_1.promisify(fs.writeFile)('./config/config.json', JSON.stringify(new_config, null, 4), 'utf-8');
