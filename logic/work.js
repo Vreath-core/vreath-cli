@@ -145,7 +145,7 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
     else {
         const unit_mode = big_integer_1.default(last_height, 16).add(1).mod(3).eq(0);
         const unit_address = vr.crypto.generate_address(vr.con.constant.unit, my_pub);
-        const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address));
+        //const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
         //if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());
         const txs = await choose_txs(unit_mode, trie, pool_db, lock_db, block_db, unit_address);
         let micro_block = await vr.block.create_micro_block(private_key, block_db, last_height, trie, txs, extra);
