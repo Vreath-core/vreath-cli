@@ -132,10 +132,10 @@ export const buying_unit = async (private_key:string,config:any,node:Node)=>{
         const minimum:string = config.validator.minimum;
         if(bigInt(validator_amount,16).lesser(bigInt(minimum,16))) throw new Error("You don't have enough amount");
 
-        /*await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
+        await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
             if(tx.meta.kind===0&&tx.meta.request.bases[0]===unit_validator) throw new Error("already bought units");
             return false;
-        });*/
+        });
 
         let units:vr.Unit[] = [];
         let unit_addresses:string[] = [unit_validator];
@@ -149,8 +149,9 @@ export const buying_unit = async (private_key:string,config:any,node:Node)=>{
             const unit_state = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address,"00"));
             if(unit_state.data.length!=0){
                 await data.unit_db.del(unit_address);
+                return false;
             }
-            if(maxed){
+            else if(maxed){
                 units[0] = unit;
                 unit_addresses[0] = unit_address;
             }

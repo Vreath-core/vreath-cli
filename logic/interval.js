@@ -151,10 +151,11 @@ exports.buying_unit = async (private_key, config, node) => {
         const minimum = config.validator.minimum;
         if (big_integer_1.default(validator_amount, 16).lesser(big_integer_1.default(minimum, 16)))
             throw new Error("You don't have enough amount");
-        /*await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
-            if(tx.meta.kind===0&&tx.meta.request.bases[0]===unit_validator) throw new Error("already bought units");
+        await data.tx_db.filter('hex', 'utf8', async (key, tx) => {
+            if (tx.meta.kind === 0 && tx.meta.request.bases[0] === unit_validator)
+                throw new Error("already bought units");
             return false;
-        });*/
+        });
         let units = [];
         let unit_addresses = [unit_validator];
         let price_sum = big_integer_1.default(0);
@@ -167,8 +168,9 @@ exports.buying_unit = async (private_key, config, node) => {
             const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
             if (unit_state.data.length != 0) {
                 await data.unit_db.del(unit_address);
+                return false;
             }
-            if (maxed) {
+            else if (maxed) {
                 units[0] = unit;
                 unit_addresses[0] = unit_address;
             }
