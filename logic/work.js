@@ -31,7 +31,9 @@ const choose_txs = async (unit_mode, trie, pool_db, lock_db, block_db, my_addres
     let requested_bases = [];
     let requested_tx_hashes = [];
     let choosed = [];
-    await pool_db.filter('hex', 'utf8', async (key, tx) => {
+    const txs = await pool_db.filter();
+    let tx;
+    for (tx of txs) {
         if (tx.meta.kind === 0) {
             const requested_check = await P.some(tx.meta.request.bases, async (base) => {
                 if (requested_bases.indexOf(base) != -1)
@@ -43,31 +45,62 @@ const choose_txs = async (unit_mode, trie, pool_db, lock_db, block_db, my_addres
                 requested_bases = requested_bases.concat(tx.meta.request.bases);
             }
             else
-                return false;
+                continue;
         }
         else if (tx.meta.kind === 1) {
             const block = await block_db.read_obj(tx.meta.refresh.height);
             if (block == null)
-                return false;
+                continue;
             const req_tx = block.txs[tx.meta.refresh.index];
             if (req_tx == null)
-                return false;
+                continue;
             const hash = req_tx.hash;
             if (requested_tx_hashes.indexOf(hash) === -1) {
                 requested_tx_hashes.push(hash);
             }
             else
-                return false;
+                continue;
         }
         else
-            return false;
+            continue;
         const tokens = tx.meta.request.bases.map(key => vr.crypto.slice_token_part(key)).filter((val, i, array) => array.indexOf(val) === i);
         const tokens_hash = vr.crypto.array2hash(tokens);
         const unit_buying_tokens_hash = vr.crypto.array2hash([("0000000000000000" + vr.con.constant.unit).slice(-16), ("0000000000000000" + vr.con.constant.native).slice(-12)]);
         if (tx.meta.kind === 1 || ((unit_mode && tokens_hash === unit_buying_tokens_hash) || (!unit_mode && tokens_hash != unit_buying_tokens_hash)))
             choosed.push(tx);
+    }
+    /*await pool_db.filter('hex','utf8',async (key:string,tx:vr.Tx)=>{
+        if(tx.meta.kind===0){
+            const requested_check = await P.some(tx.meta.request.bases, async (base:string)=>{
+                if(requested_bases.indexOf(base)!=-1) return true;
+                const lock = await vr.data.read_from_trie(trie,lock_db,base,1,vr.lock.create_lock(base));
+                return lock.state===1;
+            });
+            if(!requested_check){
+                requested_bases = requested_bases.concat(tx.meta.request.bases);
+            }
+            else return false;
+        }
+        else if(tx.meta.kind===1){
+            const block:vr.Block|null = await block_db.read_obj(tx.meta.refresh.height);
+            if(block==null) return false;
+            const req_tx = block.txs[tx.meta.refresh.index];
+            if(req_tx==null) return false;
+            const hash = req_tx.hash;
+            if(requested_tx_hashes.indexOf(hash)===-1){
+                requested_tx_hashes.push(hash);
+            }
+            else return false;
+        }
+        else return false;
+
+
+        const tokens = tx.meta.request.bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
+        const tokens_hash = vr.crypto.array2hash(tokens);
+        const unit_buying_tokens_hash = vr.crypto.array2hash([("0000000000000000"+vr.con.constant.unit).slice(-16),("0000000000000000"+vr.con.constant.native).slice(-12)]);
+        if(tx.meta.kind===1||((unit_mode&&tokens_hash===unit_buying_tokens_hash)||(!unit_mode&&tokens_hash!=unit_buying_tokens_hash))) choosed.push(tx);
         return false;
-    });
+    });*/
     const sorted = choosed.slice().sort((a, b) => {
         const a_address = vr.tx.get_info_from_tx(a)[4];
         const b_address = vr.tx.get_info_from_tx(b)[4];
