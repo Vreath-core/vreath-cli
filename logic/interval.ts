@@ -13,7 +13,6 @@ const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-const toPromise = require('stream-to-promise');
 
 const log = bunyan.createLogger({
     name:'vreath-cli',
@@ -41,7 +40,6 @@ export const get_new_chain = async (node:Node)=>{
             stream.write(info.last_height);
             //stream.emit('end');
             stream.on('data',(msg:Buffer)=>{
-                console.log('got!');
                 if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });
             /*promise.then((msg:Buffer)=>{
@@ -134,10 +132,10 @@ export const buying_unit = async (private_key:string,config:any,node:Node)=>{
         const minimum:string = config.validator.minimum;
         if(bigInt(validator_amount,16).lesser(bigInt(minimum,16))) throw new Error("You don't have enough amount");
 
-        await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
+        /*await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
             if(tx.meta.kind===0&&tx.meta.request.bases[0]===unit_validator) throw new Error("already bought units");
             return false;
-        });
+        });*/
 
         let units:vr.Unit[] = [];
         let unit_addresses:string[] = [unit_validator];
@@ -316,7 +314,7 @@ export const making_unit = async (private_key:string,config:any,node:Node)=>{
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
                 if (err) { throw err }
-                pull(pull.values([unit]), conn);
+                pull(pull.values([JSON.stringify(unit)]), conn);
             });
             return false;
         });

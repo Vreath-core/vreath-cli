@@ -13,6 +13,7 @@ export default async (my_private:string)=>{
         const pub = vr.crypto.private2public(my_private);
         const add = vr.crypto.generate_address(vr.con.constant.native,pub);
         const state:vr.State = await vr.data.read_from_trie(trie,data.state_db,add,0,vr.state.create_state("00",vr.con.constant.native,add,"00"));
+        console.log(state);
         return bigInt(state.amount,16).toString(10);
     }
     catch(e){

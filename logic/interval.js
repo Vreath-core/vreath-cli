@@ -24,7 +24,6 @@ const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-const toPromise = require('stream-to-promise');
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -53,7 +52,6 @@ exports.get_new_chain = async (node) => {
             stream.write(info.last_height);
             //stream.emit('end');
             stream.on('data', (msg) => {
-                console.log('got!');
                 if (msg != null && msg.length > 0)
                     return chain_routes.post(msg);
             });
@@ -153,11 +151,10 @@ exports.buying_unit = async (private_key, config, node) => {
         const minimum = config.validator.minimum;
         if (big_integer_1.default(validator_amount, 16).lesser(big_integer_1.default(minimum, 16)))
             throw new Error("You don't have enough amount");
-        await data.tx_db.filter('hex', 'utf8', async (key, tx) => {
-            if (tx.meta.kind === 0 && tx.meta.request.bases[0] === unit_validator)
-                throw new Error("already bought units");
+        /*await data.tx_db.filter('hex','utf8',async (key,tx:vr.Tx)=>{
+            if(tx.meta.kind===0&&tx.meta.request.bases[0]===unit_validator) throw new Error("already bought units");
             return false;
-        });
+        });*/
         let units = [];
         let unit_addresses = [unit_validator];
         let price_sum = big_integer_1.default(0);
@@ -357,7 +354,7 @@ exports.making_unit = async (private_key, config, node) => {
                 if (err) {
                     throw err;
                 }
-                pull(pull.values([unit]), conn);
+                pull(pull.values([JSON.stringify(unit)]), conn);
             });
             return false;
         });

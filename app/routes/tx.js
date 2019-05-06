@@ -6,26 +6,44 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const data = __importStar(require("../../logic/data"));
+const path = __importStar(require("path"));
+const bunyan_1 = __importDefault(require("bunyan"));
+const log = bunyan_1.default.createLogger({
+    name: 'vreath-cli',
+    streams: [
+        {
+            path: path.join(__dirname, '../log/log.log')
+        }
+    ]
+});
 exports.post = async (msg) => {
-    const msg_data = JSON.parse(msg.toString('utf-8'));
-    const tx = msg_data[0];
-    const output_state = msg_data[1];
-    if (tx == null || !vr.tx.isTx(tx) || output_state == null || output_state.some(s => !vr.state.isState(s)))
-        throw new Error('invalid type of data');
-    const info = await data.chain_info_db.read_obj("00");
-    if (info == null)
-        throw new Error("chain_info doesn't exist");
-    const last_height = info.last_height;
-    const root = await data.root_db.get(last_height, "hex");
-    if (root == null)
-        throw new Error("root doesn't exist");
-    const trie = vr.data.trie_ins(data.trie_db, root);
-    await vr.pool.tx2pool(data.tx_db, tx, output_state, data.block_db, trie, data.state_db, data.lock_db, last_height);
-    await data.output_db.write_obj(tx.hash, output_state);
-    return 1;
+    try {
+        const msg_data = JSON.parse(msg.toString('utf-8'));
+        const tx = msg_data[0];
+        const output_state = msg_data[1];
+        if (tx == null || !vr.tx.isTx(tx) || output_state == null || output_state.some(s => !vr.state.isState(s)))
+            throw new Error('invalid type of data');
+        const info = await data.chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        const root = await data.root_db.get(last_height, "hex");
+        if (root == null)
+            throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(data.trie_db, root);
+        await vr.pool.tx2pool(data.tx_db, tx, output_state, data.block_db, trie, data.state_db, data.lock_db, last_height);
+        await data.output_db.write_obj(tx.hash, output_state);
+        return 1;
+    }
+    catch (e) {
+        log.info(e);
+    }
 };
 /*
 export default router.post('/',async (req,res)=>{

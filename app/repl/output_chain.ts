@@ -21,6 +21,7 @@ export default async ()=>{
             if(block==null) continue;
             archive.append(JSON.stringify(block,null,4),{name:`${dri_pass}/block_${vr.crypto.bigint2hex(height)}`});
             if(height.eq(bigInt(last_height,16))) break;
+            height = height.add(1);
         }
         archive.finalize();
     }

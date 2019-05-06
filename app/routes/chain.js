@@ -16,99 +16,120 @@ const works = __importStar(require("../../logic/work"));
 const block_1 = require("./block");
 const big_integer_1 = __importDefault(require("big-integer"));
 const P = __importStar(require("p-iteration"));
+const path = __importStar(require("path"));
+const bunyan_1 = __importDefault(require("bunyan"));
+const log = bunyan_1.default.createLogger({
+    name: 'vreath-cli',
+    streams: [
+        {
+            path: path.join(__dirname, '../log/log.log')
+        }
+    ]
+});
 exports.get = async (msg, stream) => {
-    const req_last_height = msg.toString();
-    if (vr.checker.hex_check(req_last_height))
-        throw new Error('invalid data');
-    const info = await data.chain_info_db.read_obj('00');
-    if (info == null)
-        throw new Error("chain_info doesn't exist");
-    const last_height = info.last_height;
-    if (big_integer_1.default(last_height, 16).lesser(big_integer_1.default(req_last_height, 16)))
-        throw new Error('heavier chain');
-    let height = big_integer_1.default(req_last_height, 16);
-    let block = null;
-    while (1) {
-        block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
-        if ((block != null && block.meta.kind === 0) || height.eq(0))
-            break;
-        height = height.subtract(1);
-    }
-    if (block == null)
-        throw new Error('fail to search key block');
-    let chain = [];
-    let i = height;
-    while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
-        block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+    try {
+        const req_last_height = msg.toString();
+        if (vr.checker.hex_check(req_last_height))
+            throw new Error('invalid data');
+        const info = await data.chain_info_db.read_obj('00');
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        if (big_integer_1.default(last_height, 16).lesser(big_integer_1.default(req_last_height, 16)))
+            throw new Error('heavier chain');
+        let height = big_integer_1.default(req_last_height, 16);
+        let block = null;
+        while (1) {
+            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            if ((block != null && block.meta.kind === 0) || height.eq(0))
+                break;
+            height = height.subtract(1);
+        }
         if (block == null)
-            throw new Error("block doesn't exist");
-        chain.push(block);
-        i = i.add(1);
-    }
-    const states = await P.reduce(chain, async (result, block) => {
-        if (block.meta.height === "00")
-            return result;
-        return await P.reduce(block.txs, async (res, tx) => {
-            if (tx.meta.kind != 0) {
-                res[tx.hash] = [];
-                return res;
-            }
-            else {
-                const outputs = await data.output_db.read_obj(tx.hash);
-                if (outputs == null)
+            throw new Error('fail to search key block');
+        let chain = [];
+        let i = height;
+        while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
+            block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+            if (block == null)
+                throw new Error("block doesn't exist");
+            chain.push(block);
+            i = i.add(1);
+        }
+        const states = await P.reduce(chain, async (result, block) => {
+            if (block.meta.height === "00")
+                return result;
+            return await P.reduce(block.txs, async (res, tx) => {
+                if (tx.meta.kind != 0) {
+                    res[tx.hash] = [];
                     return res;
-                res[tx.hash] = outputs;
-                return res;
-            }
-        }, result);
-    }, {});
-    stream.write(JSON.stringify([chain, states]));
-    stream.end();
+                }
+                else {
+                    const outputs = await data.output_db.read_obj(tx.hash);
+                    if (outputs == null)
+                        return res;
+                    res[tx.hash] = outputs;
+                    return res;
+                }
+            }, result);
+        }, {});
+        stream.write(JSON.stringify([chain, states]));
+        stream.end();
+    }
+    catch (e) {
+        log.info(e);
+    }
 };
 exports.post = async (msg) => {
-    console.log('posted');
-    const parsed = JSON.parse(msg.toString('utf-8'));
-    const new_chain = parsed[0];
-    const output_states = parsed[1];
-    if (new_chain.some(block => !vr.block.isBlock(block)) || Object.values(output_states).some(states => states.some(s => !vr.state.isState(s))))
-        throw new Error('invalid data');
-    const heights = new_chain.map(block => block.meta.height).sort((a, b) => big_integer_1.default(a, 16).subtract(big_integer_1.default(b, 16)).toJSNumber());
-    const new_diff_sum = new_chain.reduce((sum, block) => {
-        return sum.add(big_integer_1.default(block.meta.pos_diff, 16));
-    }, big_integer_1.default(0));
-    const my_diff_sum = await P.reduce(heights, async (sum, height) => {
-        const block = await data.block_db.read_obj(height);
-        if (block == null)
-            throw new Error("block doesn't exist");
-        return sum.add(big_integer_1.default(block.meta.pos_diff, 16));
-    }, big_integer_1.default(0));
-    if (new_diff_sum.lesserOrEquals(my_diff_sum))
-        throw new Error("lighter chain");
-    await P.forEach(new_chain, async (block) => {
-        const outputs = await P.reduce(block.txs, async (res, tx) => {
-            if (tx.meta.kind != 1)
-                return res;
-            const given = output_states[tx.hash];
-            if (given != null)
-                return res.concat(given);
-            else {
-                const req_tx = await vr.tx.find_req_tx(tx, data.block_db);
-                const info = await data.chain_info_db.read_obj("00");
-                if (info == null)
-                    throw new Error("chain_info doesn't exist");
-                const last_height = info.last_height;
-                const root = await data.root_db.get(last_height);
-                if (root == null)
-                    throw new Error("root doesn't exist");
-                const trie = vr.data.trie_ins(data.trie_db, root);
-                const computed = await works.compute_output(req_tx, trie, data.state_db, data.block_db);
-                const output = computed[1];
-                return res.concat(output);
-            }
-        }, []);
-        return await block_1.post(Buffer.from(JSON.stringify([block, outputs])));
-    });
-    return 1;
+    try {
+        const parsed = JSON.parse(msg.toString('utf-8'));
+        const new_chain = parsed[0];
+        const output_states = parsed[1];
+        if (new_chain.some(block => !vr.block.isBlock(block)) || Object.values(output_states).some(states => states.some(s => !vr.state.isState(s))))
+            throw new Error('invalid data');
+        const heights = new_chain.map(block => block.meta.height).sort((a, b) => big_integer_1.default(a, 16).subtract(big_integer_1.default(b, 16)).toJSNumber());
+        const new_diff_sum = new_chain.reduce((sum, block) => {
+            return sum.add(big_integer_1.default(block.meta.pos_diff, 16));
+        }, big_integer_1.default(0));
+        const my_diff_sum = await P.reduce(heights, async (sum, height) => {
+            const block = await data.block_db.read_obj(height);
+            if (block == null)
+                return sum;
+            return sum.add(big_integer_1.default(block.meta.pos_diff, 16));
+        }, big_integer_1.default(0));
+        if (new_diff_sum.lesserOrEquals(my_diff_sum))
+            throw new Error("lighter chain");
+        let block;
+        for (block of new_chain) {
+            const outputs = await P.reduce(block.txs, async (res, tx) => {
+                if (tx.meta.kind != 1)
+                    return res;
+                const given = output_states[tx.hash];
+                if (given != null && given.length > 0)
+                    return res.concat(given);
+                else {
+                    //console.log(JSON.stringify(await data.block_db.read_obj(tx.meta.refresh.height),null,4));
+                    const info = await data.chain_info_db.read_obj("00");
+                    if (info == null)
+                        throw new Error("chain_info doesn't exist");
+                    const last_height = info.last_height;
+                    const root = await data.root_db.get(last_height);
+                    if (root == null)
+                        throw new Error("root doesn't exist");
+                    const trie = vr.data.trie_ins(data.trie_db, root);
+                    const req_tx = await vr.tx.find_req_tx(tx, data.block_db);
+                    const computed = await works.compute_output(req_tx, trie, data.state_db, data.block_db);
+                    const output = computed[1];
+                    return res.concat(output);
+                }
+            }, []);
+            await block_1.post(Buffer.from(JSON.stringify([block, outputs])));
+        }
+        return 1;
+    }
+    catch (e) {
+        log.info(e);
+    }
 };
 /*
 export default router.get('/',async (req,res)=>{
