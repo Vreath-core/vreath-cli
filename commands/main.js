@@ -51,7 +51,6 @@ const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-const toPromise = require('stream-to-promise');
 const search_ip = require('ip');
 class Node extends libp2p {
     constructor(_options, _bootstrapList) {
@@ -192,12 +191,17 @@ yargs_1.default
             });
             node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
                 const stream = toStream(conn);
-                const promise = toPromise(stream);
-                promise.then((msg) => {
-                    return chain_routes.get(msg);
-                }).then((chain) => {
-                    stream.write(chain);
+                stream.on('data', (msg) => {
+                    chain_routes.get(msg, stream);
                 });
+                /*stream.pipe(StreamFromPromise(new Promise()))
+                promise.then((msg:Buffer)=>{
+                    return chain_routes.get(msg);
+                }).then((chain:vr.Block[])=>{
+                    stream.emit('resume');
+                    stream.write(chain);
+                    stream.end();
+                })*/
                 /*pull(
                     p,
                     conn

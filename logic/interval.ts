@@ -38,11 +38,17 @@ export const get_new_chain = async (node:Node)=>{
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { throw err }
             const stream = toStream(conn)
-            const promise = toPromise(stream);
             stream.write(info.last_height);
-            promise.then((msg:Buffer)=>{
-                return chain_routes.post(msg);
+            //stream.emit('end');
+            stream.on('data',(msg:Buffer)=>{
+                console.log('got!');
+                if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });
+            /*promise.then((msg:Buffer)=>{
+                console.log('got!');
+                if(msg!=null&&msg.length>0) return chain_routes.post(msg);
+            });
+            promise.catch((e:string)=>console.log(e));*/
             /*pull(
                 p,
                 conn
@@ -93,7 +99,6 @@ export const staking = async (private_key:string,node:Node)=>{
         const txs_hash = block.txs.map(tx=>tx.hash);
         await P.forEach(txs_hash, async (key:string)=>{
             await data.tx_db.del(key);
-            await data.output_db.del(key);
         });
         await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);

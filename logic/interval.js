@@ -50,11 +50,18 @@ exports.get_new_chain = async (node) => {
                 throw err;
             }
             const stream = toStream(conn);
-            const promise = toPromise(stream);
             stream.write(info.last_height);
-            promise.then((msg) => {
-                return chain_routes.post(msg);
+            //stream.emit('end');
+            stream.on('data', (msg) => {
+                console.log('got!');
+                if (msg != null && msg.length > 0)
+                    return chain_routes.post(msg);
             });
+            /*promise.then((msg:Buffer)=>{
+                console.log('got!');
+                if(msg!=null&&msg.length>0) return chain_routes.post(msg);
+            });
+            promise.catch((e:string)=>console.log(e));*/
             /*pull(
                 p,
                 conn
@@ -108,7 +115,6 @@ exports.staking = async (private_key, node) => {
         const txs_hash = block.txs.map(tx => tx.hash);
         await P.forEach(txs_hash, async (key) => {
             await data.tx_db.del(key);
-            await data.output_db.del(key);
         });
         await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
             const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
