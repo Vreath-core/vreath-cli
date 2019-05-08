@@ -35,13 +35,17 @@ export const get_new_chain = async (node:Node)=>{
         const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
-            if (err) { throw err }
+            if (err) { log.info(err); }
             const stream = toStream(conn)
             stream.write(info.last_height);
             //stream.emit('end');
             stream.on('data',(msg:Buffer)=>{
                 if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });
+
+            stream.on('error',(e:string)=>{
+                log.info(e);
+            })
             /*promise.then((msg:Buffer)=>{
                 console.log('got!');
                 if(msg!=null&&msg.length>0) return chain_routes.post(msg);
@@ -103,7 +107,7 @@ export const staking = async (private_key:string,node:Node)=>{
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
-                if (err) { throw err }
+                if (err) { log.info(err); }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
             return false;
@@ -187,7 +191,7 @@ export const buying_unit = async (private_key:string,config:any,node:Node)=>{
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
-                if (err) { throw err }
+                if (err) { log.info(err); }
                 pull(pull.values([JSON.stringify([tx,[]])]), conn);
             });
             return false;
@@ -250,7 +254,7 @@ export const refreshing = async (private_key:string,config:any,node:Node)=>{
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
-                if (err) { throw err }
+                if (err) { log.info(err); }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
             return false;
@@ -314,7 +318,7 @@ export const making_unit = async (private_key:string,config:any,node:Node)=>{
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
-                if (err) { throw err }
+                if (err) { log.info(err); }
                 pull(pull.values([JSON.stringify(unit)]), conn);
             });
             return false;

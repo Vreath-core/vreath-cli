@@ -46,7 +46,7 @@ exports.get_new_chain = async (node) => {
             throw new Error("chain_info doesn't exist");
         node.dialProtocol(peer_info, `/vreath/${data.id}/chain/get`, (err, conn) => {
             if (err) {
-                throw err;
+                log.info(err);
             }
             const stream = toStream(conn);
             stream.write(info.last_height);
@@ -54,6 +54,9 @@ exports.get_new_chain = async (node) => {
             stream.on('data', (msg) => {
                 if (msg != null && msg.length > 0)
                     return chain_routes.post(msg);
+            });
+            stream.on('error', (e) => {
+                log.info(e);
             });
             /*promise.then((msg:Buffer)=>{
                 console.log('got!');
@@ -120,7 +123,7 @@ exports.staking = async (private_key, node) => {
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/block/post`, (err, conn) => {
                 if (err) {
-                    throw err;
+                    log.info(err);
                 }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
@@ -209,7 +212,7 @@ exports.buying_unit = async (private_key, config, node) => {
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
                 if (err) {
-                    throw err;
+                    log.info(err);
                 }
                 pull(pull.values([JSON.stringify([tx, []])]), conn);
             });
@@ -279,7 +282,7 @@ exports.refreshing = async (private_key, config, node) => {
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
                 if (err) {
-                    throw err;
+                    log.info(err);
                 }
                 pull(pull.values([JSON.stringify(made)]), conn);
             });
@@ -354,7 +357,7 @@ exports.making_unit = async (private_key, config, node) => {
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info, `/vreath/${data.id}/unit/post`, (err, conn) => {
                 if (err) {
-                    throw err;
+                    log.info(err);
                 }
                 pull(pull.values([JSON.stringify(unit)]), conn);
             });

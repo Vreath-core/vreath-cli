@@ -106,25 +106,6 @@ class Node extends libp2p {
     }
 }
 exports.Node = Node;
-/*const topic = 'hello';
-const receiveMsg = (msg:{data:Buffer}) => console.log(msg.data.toString());
-
-const listener = new multistream.Listener();
-const conn = new Connection();
-listener.handle(conn, () => {
-    console.log('connection established')
-});
-const dialer = new multistream.Dialer()
-dialer.handle(conn, () => {
-    console.log('connection established')
-});
-console.log(conn);*/
-/*libp2p.pubsub.subscribe('hello', receiveMsg, (err:string) => {
-    if (err) {
-      return console.error(`failed to subscribe to ${topic}`, err)
-    }
-    console.log(`subscribed to ${topic}`)
-});*/
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
@@ -194,30 +175,6 @@ yargs_1.default
                 stream.on('data', (msg) => {
                     chain_routes.get(msg, stream);
                 });
-                /*stream.pipe(StreamFromPromise(new Promise()))
-                promise.then((msg:Buffer)=>{
-                    return chain_routes.get(msg);
-                }).then((chain:vr.Block[])=>{
-                    stream.emit('resume');
-                    stream.write(chain);
-                    stream.end();
-                })*/
-                /*pull(
-                    p,
-                    conn
-                )
-                const read = pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        return msg;
-                    })
-                );
-                const pro = toPromise(toStream(read));
-                pro.then((msg:Buffer)=>{
-                    return chain_routes.get(msg);
-                }).then((chain:vr.Block[])=>{
-                    p.push(chain);
-                });*/
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain(async (msg) => {
@@ -229,8 +186,9 @@ yargs_1.default
                     await unit_routes.post(msg);
                 }));
             });
-            if (err)
-                console.error(err);
+            node.on('error', (err) => {
+                log.info(err);
+            });
             intervals.get_new_chain(node);
             if (config.validator.flag) {
                 intervals.staking(private_key, node);
