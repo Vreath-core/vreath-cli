@@ -14,15 +14,16 @@ const log = bunyan.createLogger({
     ]
 });
 
-export const get = async (message:Buffer)=>{
+export const get = async (msg:Buffer,stream:any):Promise<void>=>{
     try{
-        const height = message.toString('hex');
+        const height = msg.toString('hex');
         if(vr.checker.hex_check(height,8,true)){
             throw new Error('invalid request data');
         }
         const block:vr.Block|null = await data.block_db.read_obj(height);
         if(block==null) throw new Error('invalid height');
-        return block;
+        stream.write(JSON.stringify([block]));
+        stream.end();
     }
     catch(e){
         log.info(e);

@@ -222,7 +222,7 @@ exports.buying_unit = async (private_key, config, node) => {
     catch (e) {
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(5000);
     setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node]));
     return 0;
 };
@@ -292,7 +292,7 @@ exports.refreshing = async (private_key, config, node) => {
     catch (e) {
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(4000);
     setImmediate(() => exports.refreshing.apply(null, [private_key, config, node]));
     return 0;
 };
@@ -367,7 +367,7 @@ exports.making_unit = async (private_key, config, node) => {
     catch (e) {
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(5000);
     setImmediate(() => exports.making_unit.apply(null, [private_key, config, node]));
     return 0;
 };

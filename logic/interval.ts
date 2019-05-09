@@ -200,7 +200,7 @@ export const buying_unit = async (private_key:string,config:any,node:Node)=>{
     catch(e){
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(5000);
     setImmediate(()=>buying_unit.apply(null,[private_key,config,node]));
     return 0;
 }
@@ -263,7 +263,7 @@ export const refreshing = async (private_key:string,config:any,node:Node)=>{
     catch(e){
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(4000);
     setImmediate(()=>refreshing.apply(null,[private_key,config,node]));
     return 0;
 }
@@ -327,7 +327,8 @@ export const making_unit = async (private_key:string,config:any,node:Node)=>{
     catch(e){
         log.info(e);
     }
-    await works.sleep(2000);
+    await works.sleep(5000);
     setImmediate(()=>making_unit.apply(null,[private_key,config,node]));
     return 0;
 }
+

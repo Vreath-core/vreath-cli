@@ -21,7 +21,6 @@ const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const unit_routes = __importStar(require("../app/routes/unit"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
-//import remit from '../app/repl/remit'
 const get_block_1 = __importDefault(require("../app/repl/get_block"));
 const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
 const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
@@ -148,42 +147,35 @@ yargs_1.default
         node.start((err) => {
             node.on('peer:connect', (peer) => {
             });
-            node.handle(`/vreath/${data.id}/tx/post`, async (protocol, conn) => {
+            node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain(async (msg) => {
-                    await tx_routes.post(msg);
+                    tx_routes.post(msg);
                 }));
             });
             node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
-                const peer_info = await util_1.promisify(conn.getPeerInfo).bind(conn)();
-                pull(conn, pull.drain(async (msg) => {
-                    const block = await block_routes.get(msg);
-                    node.dialProtocol(peer_info, `/vreath/${data.id}/block/post`, (err, conn) => {
-                        if (err) {
-                            throw err;
-                        }
-                        pull(pull.values([block]), conn);
-                    });
+                pull(conn, pull.drain((msg) => {
+                    block_routes.get(msg, node);
                 }));
             });
             node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
-                pull(conn, pull.drain(async (msg) => {
-                    await block_routes.post(msg);
+                pull(conn, pull.drain((msg) => {
+                    block_routes.post(msg);
                 }));
             });
-            node.handle(`/vreath/${data.id}/chain/get`, async (protocol, conn) => {
+            node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
                 stream.on('data', (msg) => {
                     chain_routes.get(msg, stream);
                 });
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
-                pull(conn, pull.drain(async (msg) => {
-                    await chain_routes.post(msg);
+                pull(conn, pull.drain((msg) => {
+                    chain_routes.post(msg);
                 }));
             });
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
-                pull(conn, pull.drain(async (msg) => {
-                    await unit_routes.post(msg);
+                pull(conn, pull.drain((msg) => {
+                    unit_routes.post(msg);
                 }));
             });
             node.on('error', (err) => {
@@ -253,7 +245,6 @@ yargs_1.default
         });
     }
     catch (e) {
-        console.log(e);
         log.info(e);
     }
 })

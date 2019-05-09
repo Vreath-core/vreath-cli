@@ -24,16 +24,17 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-exports.get = async (message) => {
+exports.get = async (msg, stream) => {
     try {
-        const height = message.toString('hex');
+        const height = msg.toString('hex');
         if (vr.checker.hex_check(height, 8, true)) {
             throw new Error('invalid request data');
         }
         const block = await data.block_db.read_obj(height);
         if (block == null)
             throw new Error('invalid height');
-        return block;
+        stream.write(JSON.stringify([block]));
+        stream.end();
     }
     catch (e) {
         log.info(e);

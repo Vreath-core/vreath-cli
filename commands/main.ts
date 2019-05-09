@@ -1,13 +1,5 @@
 #! /usr/bin/env node
 
-/*import * as vr from 'vreath'
-import req_tx_com from '../app/repl/request-tx'
-import remit from '../app/repl/remit'
-import repl_balance from '../app/repl/balance'
-import repl_get_block from '../app/repl/get_block'
-import repl_get_chain_info from '../app/repl/get_chain_info'
-import output_chain from '../app/repl/output_chain'
-import share_data from '../share/share_data'*/
 import * as vr from 'vreath'
 import setup from './setup'
 import generate_keys from './generate-keys'
@@ -18,7 +10,6 @@ import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
 import * as unit_routes from '../app/routes/unit'
 import req_tx_com from '../app/repl/request-tx'
-//import remit from '../app/repl/remit'
 import repl_get_block from '../app/repl/get_block'
 import repl_get_chain_info from '../app/repl/get_chain_info'
 import output_chain from '../app/repl/output_chain'
@@ -157,25 +148,20 @@ yargs
             node.on('peer:connect', (peer:any) => {
             });
 
-            node.handle(`/vreath/${data.id}/tx/post`, async (protocol:string, conn:any)=>{
+            node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
                 pull(
                     conn,
                     pull.drain(async (msg:Buffer)=>{
-                        await tx_routes.post(msg);
+                        tx_routes.post(msg);
                     })
                 )
             });
 
             node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
-                const peer_info = await promisify(conn.getPeerInfo).bind(conn)();
                 pull(
                     conn,
-                    pull.drain(async (msg:Buffer)=>{
-                        const block = await block_routes.get(msg);
-                        node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
-                            if (err) { throw err }
-                            pull(pull.values([block]), conn);
-                        })
+                    pull.drain((msg:Buffer)=>{
+                        block_routes.get(msg,node);
                     })
                 )
             });
@@ -183,13 +169,13 @@ yargs
             node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
                 pull(
                     conn,
-                    pull.drain(async (msg:Buffer)=>{
-                        await block_routes.post(msg);
+                    pull.drain((msg:Buffer)=>{
+                        block_routes.post(msg);
                     })
                 )
             });
 
-            node.handle(`/vreath/${data.id}/chain/get`, async (protocol:string, conn:any) => {
+            node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
                 const stream = toStream(conn);
                 stream.on('data',(msg:Buffer)=>{
                     chain_routes.get(msg,stream);
@@ -199,8 +185,8 @@ yargs
             node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
                 pull(
                     conn,
-                    pull.drain(async (msg:Buffer)=>{
-                        await chain_routes.post(msg);
+                    pull.drain((msg:Buffer)=>{
+                        chain_routes.post(msg);
                     })
                 )
             });
@@ -208,8 +194,8 @@ yargs
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
                 pull(
                     conn,
-                    pull.drain(async (msg:Buffer)=>{
-                        await unit_routes.post(msg);
+                    pull.drain((msg:Buffer)=>{
+                        unit_routes.post(msg);
                     })
                 )
             });
@@ -287,7 +273,6 @@ yargs
         });
     }
     catch(e){
-        console.log(e);
         log.info(e);
     }
 })
