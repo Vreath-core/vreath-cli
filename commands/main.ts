@@ -140,24 +140,22 @@ yargs
         const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
         await data.peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
         const node = new Node({ peerInfo: peer_info},peer_address_list);
-        node.on('peer:connect', (peerInfo:any) => {
-            const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-            const id_obj = {
-                id:ids.id._idB58String,
-                privKey:ids.id._privKey,
-                pubKey:ids.id._pubKey
-            };
-            const multiaddrs = peerInfo.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
-            const peer_obj:data.peer_info = {
-                identity:id_obj,
-                multiaddrs:multiaddrs
-            }
-            data.peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
-        });
 
         node.start((err:string)=>{
 
-            node.on('peer:connect', (peer:any) => {
+            node.on('peer:connect', (peerInfo:any) => {
+                const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
+                const id_obj = {
+                    id:ids.id._idB58String,
+                    privKey:ids.id._privKey,
+                    pubKey:ids.id._pubKey
+                };
+                const multiaddrs = peerInfo.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
+                const peer_obj:data.peer_info = {
+                    identity:id_obj,
+                    multiaddrs:multiaddrs
+                }
+                data.peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
             });
 
             node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
