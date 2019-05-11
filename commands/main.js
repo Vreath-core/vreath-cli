@@ -211,7 +211,7 @@ yargs_1.default
                         peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
                         node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
                             if (err) {
-                                throw err;
+                                log.info(err);
                             }
                             pull(pull.values([JSON.stringify([tx, []])]), conn);
                         });
