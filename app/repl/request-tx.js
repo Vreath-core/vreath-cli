@@ -16,7 +16,7 @@ const data = __importStar(require("../../logic/data"));
 const big_integer_1 = __importDefault(require("big-integer"));
 exports.default = async (input, my_private) => {
     try {
-        const splited = input.split('--').slice(1);
+        const splited = input.trim().split('--').slice(1);
         let bases = splited[0].trim().split(',');
         if (bases[0] === '' && bases.length === 1)
             bases = [];

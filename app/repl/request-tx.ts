@@ -5,7 +5,7 @@ import bigInt from 'big-integer'
 
 export default async (input:string,my_private:string)=>{
     try{
-        const splited = input.split('--').slice(1);
+        const splited = input.trim().split('--').slice(1);
         let bases = splited[0].trim().split(',');
         if(bases[0]===''&&bases.length===1) bases = [];
         const my_public = vr.crypto.private2public(my_private);

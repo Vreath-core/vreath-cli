@@ -27,8 +27,8 @@ export type chain_info = {
 export type peer_info = {
     identity:{
         id:string,
-        privKey:string,
-        pubKey:string
+        privKey:string|null,
+        pubKey:string|null
     },
     multiaddrs:string[]
 }
