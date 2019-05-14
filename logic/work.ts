@@ -55,7 +55,7 @@ const choose_txs = async (unit_mode:boolean,trie:vr.trie,pool_db:vr.db,lock_db:v
 
         const tokens = tx.meta.request.bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
         const tokens_hash = vr.crypto.array2hash(tokens);
-        const unit_buying_tokens_hash = vr.crypto.array2hash([("0000000000000000"+vr.con.constant.unit).slice(-16),("0000000000000000"+vr.con.constant.native).slice(-12)]);
+        const unit_buying_tokens_hash = vr.crypto.array2hash([("0000000000000000"+vr.con.constant.unit).slice(-16),("0000000000000000"+vr.con.constant.native).slice(-16)]);
         if(tx.meta.kind===1||((unit_mode&&tokens_hash===unit_buying_tokens_hash)||(!unit_mode&&tokens_hash!=unit_buying_tokens_hash))) choosed.push(tx);
     }
     const sorted = choosed.slice().sort((a,b)=>{
@@ -89,6 +89,9 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     const pre_key_block = await vr.block.search_key_block(block_db,last_height);
     const pre_micro_blocks = await vr.block.search_micro_block(block_db,pre_key_block,last_height);
     const key_validator = vr.block.get_info_from_block(pre_key_block)[4];
+    const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
+    const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
+    if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
         //console.log('key');
         const key_block = await vr.block.create_key_block(private_key,block_db,last_height,trie,state_db,extra);
