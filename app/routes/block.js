@@ -55,14 +55,14 @@ exports.post = async (message) => {
         if (root == null)
             throw new Error('root is empty at the last height');
         const trie = vr.data.trie_ins(data.trie_db, root);
-        const verified = await (async () => {
+        let verified = await (async () => {
             if (block.meta.kind === 0)
                 return await vr.block.verify_key_block(block, data.block_db, trie, data.state_db, last_height);
             else if (block.meta.kind === 1)
                 return await vr.block.verify_micro_block(block, output_state, data.block_db, trie, data.state_db, data.lock_db, last_height);
             else
                 return false;
-        });
+        })();
         if (!verified) {
             throw new Error('invalid block');
         }

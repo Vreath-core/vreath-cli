@@ -161,7 +161,7 @@ yargs
             node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
                 pull(
                     conn,
-                    pull.drain(async (msg:Buffer)=>{
+                    pull.drain((msg:Buffer)=>{
                         tx_routes.post(msg);
                     })
                 )

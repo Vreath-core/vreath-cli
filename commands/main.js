@@ -158,7 +158,7 @@ yargs_1.default
                 data.peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
             });
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
-                pull(conn, pull.drain(async (msg) => {
+                pull(conn, pull.drain((msg) => {
                     tx_routes.post(msg);
                 }));
             });

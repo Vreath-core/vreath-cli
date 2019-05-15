@@ -37,7 +37,7 @@ export const get = async (msg:Buffer,stream:any):Promise<void>=>{
         let i = height;
         while(i.lesserOrEquals(bigInt(last_height,16))){
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
-            if(block==null) throw new Error("block doesn't exist");
+            if(block==null) break;
             chain.push(block);
             i = i.add(1);
         }
@@ -87,7 +87,6 @@ export const post = async (msg:Buffer)=>{
                 const given = output_states[tx.hash];
                 if(given!=null&&given.length>0) return res.concat(given);
                 else{
-                    //console.log(JSON.stringify(await data.block_db.read_obj(tx.meta.refresh.height),null,4));
                     const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
                     if(info==null) throw new Error("chain_info doesn't exist");
                     const last_height = info.last_height

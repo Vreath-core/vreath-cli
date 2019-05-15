@@ -103,12 +103,10 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
     const pre_key_block = await vr.block.search_key_block(block_db, last_height);
     const pre_micro_blocks = await vr.block.search_micro_block(block_db, pre_key_block, last_height);
     const key_validator = vr.block.get_info_from_block(pre_key_block)[4];
-    const unit_address = vr.crypto.generate_address(vr.con.constant.unit, my_pub);
-    const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address));
-    if (unit_state != null)
-        console.log(big_integer_1.default(unit_state.amount, 16).toString());
+    /*const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
+    const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
+    if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());*/
     if (native_address != key_validator || pre_micro_blocks.length >= vr.con.constant.max_blocks) {
-        //console.log('key');
         const key_block = await vr.block.create_key_block(private_key, block_db, last_height, trie, state_db, extra);
         if (!await vr.block.verify_key_block(key_block, block_db, trie, state_db, last_height))
             throw new Error('fail to create valid key block');
@@ -117,8 +115,6 @@ exports.make_block = async (private_key, block_db, last_height, trie, state_db, 
     else {
         const unit_mode = big_integer_1.default(last_height, 16).add(1).mod(3).eq(0);
         const unit_address = vr.crypto.generate_address(vr.con.constant.unit, my_pub);
-        //const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
-        //if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());
         const txs = await choose_txs(unit_mode, trie, pool_db, lock_db, block_db, unit_address);
         let micro_block = await vr.block.create_micro_block(private_key, block_db, last_height, trie, txs, extra);
         const txs_hash = txs.map(tx => tx.hash);

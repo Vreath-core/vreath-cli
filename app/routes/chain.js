@@ -52,7 +52,7 @@ exports.get = async (msg, stream) => {
         while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
             if (block == null)
-                throw new Error("block doesn't exist");
+                break;
             chain.push(block);
             i = i.add(1);
         }
@@ -108,7 +108,6 @@ exports.post = async (msg) => {
                 if (given != null && given.length > 0)
                     return res.concat(given);
                 else {
-                    //console.log(JSON.stringify(await data.block_db.read_obj(tx.meta.refresh.height),null,4));
                     const info = await data.chain_info_db.read_obj("00");
                     if (info == null)
                         throw new Error("chain_info doesn't exist");
