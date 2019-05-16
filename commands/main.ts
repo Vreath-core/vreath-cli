@@ -223,6 +223,7 @@ yargs
                 intervals.refreshing(private_key,config,node);
                 intervals.making_unit(private_key,config,node);
             }
+            intervals.maintenance(node);
 
             const replServer = repl.start({prompt:'>',terminal:true});
 

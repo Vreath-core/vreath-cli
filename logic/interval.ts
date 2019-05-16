@@ -3,6 +3,7 @@ import * as data from './data'
 import * as works from './work'
 import {Node} from '../commands/main'
 import * as tx_routes from '../app/routes/tx'
+import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
@@ -39,34 +40,13 @@ export const get_new_chain = async (node:Node)=>{
             const stream = toStream(conn)
             const new_height = vr.crypto.bigint2hex(bigInt(info.last_height,16).add(1));
             stream.write(new_height);
-            //stream.emit('end');
             stream.on('data',(msg:Buffer)=>{
                 if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });
 
             stream.on('error',(e:string)=>{
                 log.info(e);
-            })
-            /*promise.then((msg:Buffer)=>{
-                console.log('got!');
-                if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });
-            promise.catch((e:string)=>console.log(e));*/
-            /*pull(
-                p,
-                conn
-            );
-            p.push(info.last_height);*/
-            /*const read = pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    return msg;
-                })
-            );
-            const pro = toPromise(toStream(read));
-            pro.then((msg:Buffer)=>{
-                chain_routes.post(msg);
-            });*/
         });
     }
     catch(e){
@@ -333,3 +313,49 @@ export const making_unit = async (private_key:string,config:any,node:Node)=>{
     return 0;
 }
 
+export const maintenance = async (node:Node)=>{
+    try{
+        const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
+        if(info==null) throw new Error("chain_info doesn't exist");
+        const last_height = bigInt(info.last_height,16);
+        let block:vr.Block|null;
+        let i = last_height;
+        let found:boolean = false;
+        while(!i.lesserOrEquals(0)){
+            block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+            if(block==null){
+                //console.log(i.toString()+" block doesn't exist");
+                found = true;
+                break;
+            }
+            i = i.subtract(1);
+        }
+        if(!found) throw new Error('all block exist');
+        const peers:data.peer_info[] = await data.peer_list_db.filter();
+        const peer = peers[0];
+        if(peer==null) throw new Error('no peer');
+        const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+        const peer_info = new PeerInfo(peer_id);
+        peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+        node.dialProtocol(peer_info,`/vreath/${data.id}/block/get`,(err:string,conn:any) => {
+            if (err) { log.info(err); }
+            const stream = toStream(conn)
+            const height = vr.crypto.bigint2hex(i);
+            stream.write(height);
+            //stream.emit('end');
+            stream.on('data',(msg:Buffer)=>{
+                if(msg!=null&&msg.length>0) return block_routes.post(msg);
+            });
+
+            stream.on('error',(e:string)=>{
+                log.info(e);
+            });
+        });
+    }
+    catch(e){
+        log.info(e);
+    }
+    await works.sleep(30000);
+    setImmediate(()=>maintenance.apply(null,[node]));
+    return 0;
+}

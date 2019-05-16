@@ -14,6 +14,7 @@ const vr = __importStar(require("vreath"));
 const data = __importStar(require("./data"));
 const works = __importStar(require("./work"));
 const tx_routes = __importStar(require("../app/routes/tx"));
+const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const P = __importStar(require("p-iteration"));
 const bunyan_1 = __importDefault(require("bunyan"));
@@ -51,7 +52,6 @@ exports.get_new_chain = async (node) => {
             const stream = toStream(conn);
             const new_height = vr.crypto.bigint2hex(big_integer_1.default(info.last_height, 16).add(1));
             stream.write(new_height);
-            //stream.emit('end');
             stream.on('data', (msg) => {
                 if (msg != null && msg.length > 0)
                     return chain_routes.post(msg);
@@ -59,26 +59,6 @@ exports.get_new_chain = async (node) => {
             stream.on('error', (e) => {
                 log.info(e);
             });
-            /*promise.then((msg:Buffer)=>{
-                console.log('got!');
-                if(msg!=null&&msg.length>0) return chain_routes.post(msg);
-            });
-            promise.catch((e:string)=>console.log(e));*/
-            /*pull(
-                p,
-                conn
-            );
-            p.push(info.last_height);*/
-            /*const read = pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    return msg;
-                })
-            );
-            const pro = toPromise(toStream(read));
-            pro.then((msg:Buffer)=>{
-                chain_routes.post(msg);
-            });*/
         });
     }
     catch (e) {
@@ -370,5 +350,56 @@ exports.making_unit = async (private_key, config, node) => {
     }
     await works.sleep(5000);
     setImmediate(() => exports.making_unit.apply(null, [private_key, config, node]));
+    return 0;
+};
+exports.maintenance = async (node) => {
+    try {
+        const info = await data.chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = big_integer_1.default(info.last_height, 16);
+        let block;
+        let i = last_height;
+        let found = false;
+        while (!i.lesserOrEquals(0)) {
+            block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+            if (block == null) {
+                //console.log(i.toString()+" block doesn't exist");
+                found = true;
+                break;
+            }
+            i = i.subtract(1);
+        }
+        if (!found)
+            throw new Error('all block exist');
+        const peers = await data.peer_list_db.filter();
+        const peer = peers[0];
+        if (peer == null)
+            throw new Error('no peer');
+        const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+        const peer_info = new PeerInfo(peer_id);
+        peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+        node.dialProtocol(peer_info, `/vreath/${data.id}/block/get`, (err, conn) => {
+            if (err) {
+                log.info(err);
+            }
+            const stream = toStream(conn);
+            const height = vr.crypto.bigint2hex(i);
+            stream.write(height);
+            //stream.emit('end');
+            stream.on('data', (msg) => {
+                if (msg != null && msg.length > 0)
+                    return block_routes.post(msg);
+            });
+            stream.on('error', (e) => {
+                log.info(e);
+            });
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
+    await works.sleep(30000);
+    setImmediate(() => exports.maintenance.apply(null, [node]));
     return 0;
 };

@@ -200,6 +200,7 @@ yargs_1.default
                 intervals.refreshing(private_key, config, node);
                 intervals.making_unit(private_key, config, node);
             }
+            intervals.maintenance(node);
             const replServer = repl.start({ prompt: '>', terminal: true });
             replServer.defineCommand('request-tx', {
                 help: 'Create request tx',
