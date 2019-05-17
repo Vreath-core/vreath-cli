@@ -93,7 +93,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     /*const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
     const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
     if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());*/
-    if(bigInt(pre_key_block.meta.height,16).eq(0)&&native_address===key_validator){
+    if(bigInt(last_height,16).eq(0)&&native_address===key_validator){
         await req_tx_com("-- --0 --0 --0,0 --",private_key);
     }
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
