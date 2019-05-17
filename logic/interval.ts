@@ -324,7 +324,7 @@ export const maintenance = async (node:Node)=>{
         while(!i.lesserOrEquals(0)){
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
             if(block==null){
-                //console.log(i.toString()+" block doesn't exist");
+                console.log(i.toString()+" block doesn't exist");
                 found = true;
                 break;
             }

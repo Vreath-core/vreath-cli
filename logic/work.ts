@@ -3,6 +3,7 @@ import * as P from 'p-iteration'
 import bigInt, {BigInteger} from 'big-integer';
 import {cloneDeep} from 'lodash'
 import * as data from './data'
+import req_tx_com from '../app/repl/request-tx'
 
 export const sleep = (msec:number)=>{
     return new Promise(function(resolve) {
@@ -92,6 +93,9 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     /*const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
     const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
     if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());*/
+    if(bigInt(pre_key_block.meta.height,16).eq(0)&&native_address===key_validator){
+        await req_tx_com("-- --0 --0 --0,0 --",private_key);
+    }
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
         const key_block = await vr.block.create_key_block(private_key,block_db,last_height,trie,state_db,extra);
         if(!await vr.block.verify_key_block(key_block,block_db,trie,state_db,last_height)) throw new Error('fail to create valid key block');
