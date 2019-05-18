@@ -31,10 +31,46 @@ If you want to make units as miner and get the mining fees, enable the miner mod
 `vreath config --miner_mode=true`  
 It puts stress on your CPU or GPU.  
 
-Run your PC as node:  
+Run your PC as a node:  
 `vreath run`  
 
 ## Usage --Commands
+- vreath generate-keys  
+New private key and public key are generated.  
+You have to set new password to encrypt the private key and keep it secretly.  
+
+- vreath set-peer-id  
+Peer id is set in config.json.  
+
+- vreath setup  
+The database is initialized: blocks, states and so on are removed.  
+
+- vreath run  
+Your PC runs as a node.  
+After it begins well, the following repl-commands are available.  
+
 ## Usage --Repl
+- .get-block (block height)  
+The block having the specified height is displayed.  
+(A block height is counted from zero.)  
+For example, `.get-block 9` shows you the tenth block.
+
+- .get-chain-info  
+The meta data about your blockchain is displayed.  
+
+    - net_id: the network id.  
+    - chain_id: the chain id.  
+    - version: the version of your protocol.  
+    - compatible_version: the compatible version of your protocol.  
+    - last_height: the height of the last block.  
+    - last_hash: the hash of the last block.  
+
+- .output-chain  
+A zip file of your chain is output.  
+
+- .balance  
+Your balance of VRT is displayed.  
+
+
 ## License
 [MIT](https://github.com/Vreath-core/vreath-cli/blob/master/LICENSE)
