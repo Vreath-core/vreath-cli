@@ -71,6 +71,8 @@ A zip file of your chain is output.
 - .balance  
 Your balance of VRT is displayed.  
 
+- .request-tx --(addresses to request) --(feeprice) --(gas) --(input data) --(log data)  
+A request transaction is published.  
 
 ## License
 [MIT](https://github.com/Vreath-core/vreath-cli/blob/master/LICENSE)
