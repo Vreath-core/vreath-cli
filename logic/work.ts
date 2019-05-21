@@ -98,7 +98,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     }
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
         const key_block = await vr.block.create_key_block(private_key,block_db,last_height,trie,state_db,extra);
-        if(!await vr.block.verify_key_block(key_block,block_db,trie,state_db,last_height)) throw new Error('fail to create valid key block');
+        if(!await vr.block.verify_key_block(key_block,block_db,trie,state_db,data.lock_db,last_height)) throw new Error('fail to create valid key block');
         return [key_block,[]];
     }
     else{
