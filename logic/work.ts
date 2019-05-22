@@ -194,12 +194,16 @@ export const get_nonce = async (request:string,height:string,block_hash:string,r
     return vr.crypto.bigint2hex(nonce);
 }
 
-export const make_ref_tx = async (height:string,index:number,gas_share:number,unit_price:string,private_key:string,block_db:vr.db,trie:vr.trie,state_db:vr.db,lock_db:vr.db,last_height:string):Promise<[vr.Tx,vr.State[]]>=>{
+export const make_ref_tx = async (height:string,index:number,gas_share:number,unit_price:string,private_key:string,block_db:vr.db,trie_db:vr.db,root_db:vr.db,state_db:vr.db,lock_db:vr.db,last_height:string):Promise<[vr.Tx,vr.State[]]>=>{
     const req_block:vr.Block|null = await block_db.read_obj(height);
     if(req_block==null||!vr.block.isBlock(req_block)) throw new Error('invalid height');
     const req_tx:vr.Tx = req_block.txs[index];
     if(req_tx==null||!vr.tx.isTx(req_tx)) throw new Error('invalid index');
-    const computed = await compute_output(req_tx,trie,state_db,block_db);
+    const req_root = await root_db.get(height,'hex') || "";
+    const req_trie = vr.data.trie_ins(trie_db,req_root);
+    const root = await root_db.get(last_height,'hex') || "";
+    const trie = vr.data.trie_ins(trie_db,root);
+    const computed = await compute_output(req_tx,req_trie,state_db,block_db);
     const success = computed[0];
     const output = computed[1];
     const output_hashes = output.map(s=>vr.crypto.array2hash([s.nonce,s.token,s.owner,s.amount].concat(s.data)));

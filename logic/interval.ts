@@ -222,10 +222,7 @@ export const refreshing = async (private_key:string,config:any,node:Node)=>{
         });
         const gas_share:number = config.miner.gas_share;
         const unit_price:string = config.miner.unit_price;
-        const root = await data.root_db.get(last_height);
-        if(root==null) throw new Error("root doesn't exist");
-        const trie = vr.data.trie_ins(data.trie_db,root);
-        const made = await works.make_ref_tx(vr.crypto.bigint2hex(height),index,gas_share,unit_price,private_key,data.block_db,trie,data.state_db,data.lock_db,last_height);
+        const made = await works.make_ref_tx(vr.crypto.bigint2hex(height),index,gas_share,unit_price,private_key,data.block_db,data.trie_db,data.root_db,data.state_db,data.lock_db,last_height);
         await data.tx_db.write_obj(made[0].hash,made[0]);
         await data.output_db.write_obj(made[0].hash,made[1]);
         await data.peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
