@@ -92,7 +92,7 @@ exports.post = async (msg) => {
         let block;
         for (block of new_chain) {
             if (big_integer_1.default(block.meta.height, 16).lesser(big_integer_1.default(last_key_block.meta.height, 16)))
-                break;
+                continue;
             const outputs = await P.reduce(block.txs, async (res, tx) => {
                 if (tx.meta.kind != 1)
                     return res;

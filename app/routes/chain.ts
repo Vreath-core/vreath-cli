@@ -75,7 +75,7 @@ export const post = async (msg:Buffer)=>{
         const last_key_block = await vr.block.search_key_block(data.block_db,info.last_height);
         let block:vr.Block;
         for(block of new_chain){
-            if(bigInt(block.meta.height,16).lesser(bigInt(last_key_block.meta.height,16))) break;
+            if(bigInt(block.meta.height,16).lesser(bigInt(last_key_block.meta.height,16))) continue;
             const outputs = await P.reduce(block.txs,async (res:vr.State[],tx)=>{
                 if(tx.meta.kind!=1) return res;
                 const given = output_states[tx.hash];
