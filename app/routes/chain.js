@@ -85,10 +85,13 @@ exports.post = async (msg) => {
         }, big_integer_1.default(0));
         if (new_diff_sum.lesserOrEquals(my_diff_sum))
             throw new Error("lighter chain");
-        const info = await data.chain_info_db.read_obj('00');
+        let info = await data.chain_info_db.read_obj('00');
         if (info == null)
             throw new Error('chain_info is empty');
         const last_key_block = await vr.block.search_key_block(data.block_db, info.last_height);
+        info.last_hash = last_key_block.meta.previoushash;
+        info.last_height = vr.crypto.bigint2hex(big_integer_1.default(last_key_block.meta.height, 16).subtract(1));
+        await data.chain_info_db.write_obj("00", info);
         let block;
         for (block of new_chain) {
             if (big_integer_1.default(block.meta.height, 16).lesser(big_integer_1.default(last_key_block.meta.height, 16)))
