@@ -17,24 +17,14 @@ const log = bunyan.createLogger({
 });
 
 
-export const get = async (msg:Buffer,stream:any):Promise<void>=>{
+export const get = async (stream:any):Promise<void>=>{
     try{
-        const req_last_height = msg.toString();
-        if(vr.checker.hex_check(req_last_height)) throw new Error('invalid data');
         const info:data.chain_info|null = await data.chain_info_db.read_obj('00');
         if(info==null) throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
-        if(bigInt(last_height,16).lesser(bigInt(req_last_height,16))) throw new Error('heavier chain');
-        let height = bigInt(req_last_height,16);
-        let block:vr.Block|null = null;
-        while(1){
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
-            if((block!=null&&block.meta.kind===0)||height.eq(0)) break;
-            height = height.subtract(1);
-        }
-        if(block==null) throw new Error('fail to search key block');
+        let i = bigInt(0);
+        let block:vr.Block|null;
         let chain:vr.Block[] = [];
-        let i = height;
         while(i.lesserOrEquals(bigInt(last_height,16))){
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
             if(block==null) break;
@@ -87,10 +77,8 @@ export const post = async (msg:Buffer)=>{
                 const given = output_states[tx.hash];
                 if(given!=null&&given.length>0) return res.concat(given);
                 else{
-                    const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
-                    if(info==null) throw new Error("chain_info doesn't exist");
-                    const last_height = info.last_height
-                    const root = await data.root_db.get(last_height);
+                    const req_height = tx.meta.refresh.height;
+                    const root = await data.root_db.get(req_height);
                     if(root==null) throw new Error("root doesn't exist");
                     const trie = vr.data.trie_ins(data.trie_db,root);
                     const req_tx = await vr.tx.find_req_tx(tx,data.block_db);

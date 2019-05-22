@@ -26,29 +26,15 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-exports.get = async (msg, stream) => {
+exports.get = async (stream) => {
     try {
-        const req_last_height = msg.toString();
-        if (vr.checker.hex_check(req_last_height))
-            throw new Error('invalid data');
         const info = await data.chain_info_db.read_obj('00');
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
-        if (big_integer_1.default(last_height, 16).lesser(big_integer_1.default(req_last_height, 16)))
-            throw new Error('heavier chain');
-        let height = big_integer_1.default(req_last_height, 16);
-        let block = null;
-        while (1) {
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
-            if ((block != null && block.meta.kind === 0) || height.eq(0))
-                break;
-            height = height.subtract(1);
-        }
-        if (block == null)
-            throw new Error('fail to search key block');
+        let i = big_integer_1.default(0);
+        let block;
         let chain = [];
-        let i = height;
         while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
             block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
             if (block == null)
@@ -108,11 +94,8 @@ exports.post = async (msg) => {
                 if (given != null && given.length > 0)
                     return res.concat(given);
                 else {
-                    const info = await data.chain_info_db.read_obj("00");
-                    if (info == null)
-                        throw new Error("chain_info doesn't exist");
-                    const last_height = info.last_height;
-                    const root = await data.root_db.get(last_height);
+                    const req_height = tx.meta.refresh.height;
+                    const root = await data.root_db.get(req_height);
                     if (root == null)
                         throw new Error("root doesn't exist");
                     const trie = vr.data.trie_ins(data.trie_db, root);

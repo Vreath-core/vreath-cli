@@ -38,8 +38,6 @@ export const get_new_chain = async (node:Node)=>{
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { log.info(err); }
             const stream = toStream(conn)
-            const new_height = vr.crypto.bigint2hex(bigInt(info.last_height,16).add(1));
-            stream.write(new_height);
             stream.on('data',(msg:Buffer)=>{
                 if(msg!=null&&msg.length>0) return chain_routes.post(msg);
             });

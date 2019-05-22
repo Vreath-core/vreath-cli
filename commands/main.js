@@ -174,9 +174,7 @@ yargs_1.default
             });
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
-                stream.on('data', (msg) => {
-                    chain_routes.get(msg, stream);
-                });
+                chain_routes.get(stream);
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {

@@ -187,9 +187,7 @@ yargs
 
             node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
                 const stream = toStream(conn);
-                stream.on('data',(msg:Buffer)=>{
-                    chain_routes.get(msg,stream);
-                });
+                chain_routes.get(stream);
             });
 
             node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {

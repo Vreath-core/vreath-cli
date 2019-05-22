@@ -50,8 +50,6 @@ exports.get_new_chain = async (node) => {
                 log.info(err);
             }
             const stream = toStream(conn);
-            const new_height = vr.crypto.bigint2hex(big_integer_1.default(info.last_height, 16).add(1));
-            stream.write(new_height);
             stream.on('data', (msg) => {
                 if (msg != null && msg.length > 0)
                     return chain_routes.post(msg);
