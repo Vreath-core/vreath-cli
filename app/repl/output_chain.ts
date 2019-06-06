@@ -5,9 +5,9 @@ import * as P from 'p-iteration'
 import bigInt from 'big-integer'
 import archiver from 'archiver'
 
-export default async ()=>{
+export default async (chain_info_db:vr.db,block_db:vr.db)=>{
     try{
-        const info:data.chain_info|null = await data.chain_info_db.read_obj("00");
+        const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
         let height = bigInt(0);
@@ -17,7 +17,7 @@ export default async ()=>{
         const archive = archiver('zip');
         archive.pipe(output);
         while(1){
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            block = await block_db.read_obj(vr.crypto.bigint2hex(height));
             if(block==null) continue;
             archive.append(JSON.stringify(block,null,4),{name:`${dri_pass}/block_${vr.crypto.bigint2hex(height)}`});
             if(height.eq(bigInt(last_height,16))) break;

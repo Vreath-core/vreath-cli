@@ -33,16 +33,16 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-exports.get_new_chain = async (node) => {
+exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db) => {
     try {
-        const peers = await data.peer_list_db.filter();
+        const peers = await peer_list_db.filter();
         const peer = peers[0];
         if (peer == null)
             throw new Error('no peer');
         const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
         const peer_info = new PeerInfo(peer_id);
         peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         node.dialProtocol(peer_info, `/vreath/${data.id}/chain/get`, (err, conn) => {
@@ -51,8 +51,13 @@ exports.get_new_chain = async (node) => {
             }
             const stream = toStream(conn);
             stream.on('data', (msg) => {
-                if (msg != null && msg.length > 0)
-                    return chain_routes.post(msg);
+                try {
+                    if (msg != null && msg.length > 0)
+                        return chain_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
+                }
+                catch (e) {
+                    log.info(e);
+                }
             });
             stream.on('error', (e) => {
                 log.info(e);
@@ -63,40 +68,40 @@ exports.get_new_chain = async (node) => {
         log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.get_new_chain.apply(null, [node]));
+    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db]));
     return 0;
 };
-exports.staking = async (private_key, node) => {
+exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db) => {
     try {
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
-        const root = await data.root_db.get(last_height);
+        const root = await root_db.get(last_height);
         if (root == null)
             throw new Error("root doesn't exist");
-        const trie = vr.data.trie_ins(data.trie_db, root);
-        const made = await works.make_block(private_key, data.block_db, info.last_height, trie, data.state_db, data.lock_db, "", data.tx_db, data.output_db);
+        const trie = vr.data.trie_ins(trie_db, root);
+        const made = await works.make_block(private_key, "", block_db, chain_info_db, root_db, trie, trie_db, state_db, lock_db, output_db, tx_db);
         const block = made[0];
         const output_state = made[1];
         if (block.meta.kind === 0)
-            await vr.block.accept_key_block(block, data.block_db, last_height, trie, data.state_db, data.lock_db);
+            await vr.block.accept_key_block(block, block_db, last_height, trie, state_db, lock_db);
         else if (block.meta.kind === 1)
-            await vr.block.accept_micro_block(block, output_state, data.block_db, trie, data.state_db, data.lock_db);
-        await data.block_db.write_obj(block.meta.height, block);
+            await vr.block.accept_micro_block(block, output_state, block_db, trie, state_db, lock_db);
+        await block_db.write_obj(block.meta.height, block);
         const new_info = await works.new_obj(info, (info) => {
             info.last_height = block.meta.height;
             info.last_hash = block.hash;
             return info;
         });
-        await data.chain_info_db.write_obj("00", new_info);
+        await chain_info_db.write_obj("00", new_info);
         const new_root = trie.now_root();
-        await data.root_db.put(block.meta.height, new_root, 'hex', 'utf8');
+        await root_db.put(block.meta.height, new_root, 'hex', 'utf8');
         const txs_hash = block.txs.map(tx => tx.hash);
         await P.forEach(txs_hash, async (key) => {
-            await data.tx_db.del(key);
+            await tx_db.del(key);
         });
-        await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
             const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
@@ -113,27 +118,27 @@ exports.staking = async (private_key, node) => {
         log.info(e);
     }
     await works.sleep(1000);
-    setImmediate(() => exports.staking.apply(null, [private_key, node]));
+    setImmediate(() => exports.staking.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db]));
     return 0;
 };
-exports.buying_unit = async (private_key, config, node) => {
+exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db) => {
     try {
         const pub_key = vr.crypto.private2public(private_key);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native, pub_key);
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit, pub_key);
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
-        const root = await data.root_db.get(info.last_height);
+        const root = await root_db.get(info.last_height);
         if (root == null)
             throw new Error("root doesn't exist");
-        const trie = vr.data.trie_ins(data.trie_db, root);
-        const validator_native_state = await vr.data.read_from_trie(trie, data.state_db, native_validator, 0, vr.state.create_state("00", vr.con.constant.native, native_validator, "00"));
+        const trie = vr.data.trie_ins(trie_db, root);
+        const validator_native_state = await vr.data.read_from_trie(trie, state_db, native_validator, 0, vr.state.create_state("00", vr.con.constant.native, native_validator, "00"));
         const validator_amount = validator_native_state.amount || "00";
         const minimum = config.validator.minimum;
         if (big_integer_1.default(validator_amount, 16).lesser(big_integer_1.default(minimum, 16)))
             throw new Error("You don't have enough amount");
-        await data.tx_db.filter('hex', 'utf8', async (key, tx) => {
+        await tx_db.filter('hex', 'utf8', async (key, tx) => {
             if (tx.meta.kind === 0 && tx.meta.request.bases[0] === unit_validator)
                 throw new Error("already bought units");
             return false;
@@ -141,15 +146,15 @@ exports.buying_unit = async (private_key, config, node) => {
         let units = [];
         let unit_addresses = [unit_validator];
         let price_sum = big_integer_1.default(0);
-        await data.unit_db.filter('hex', 'utf8', async (key, unit) => {
+        await unit_db.filter('hex', 'utf8', async (key, unit) => {
             const maxed = big_integer_1.default(validator_amount, 16).subtract(price_sum).subtract(big_integer_1.default(unit[4], 16)).lesser(big_integer_1.default(minimum, 16));
-            if (maxed && big_integer_1.default(unit[4], 16).lesser(big_integer_1.default(units[0][4], 16)))
+            if (maxed && units[0] != null && big_integer_1.default(unit[4], 16).lesser(big_integer_1.default(units[0][4], 16)))
                 return false;
-            const unit_info = await vr.unit.get_info_from_unit(unit, data.block_db);
+            const unit_info = await vr.unit.get_info_from_unit(unit, block_db);
             const unit_address = unit_info[1];
-            const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
+            const unit_state = await vr.data.read_from_trie(trie, state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
             if (unit_state.data.length != 0) {
-                await data.unit_db.del(unit_address);
+                await unit_db.del(unit_address);
                 return false;
             }
             else if (maxed) {
@@ -180,12 +185,12 @@ exports.buying_unit = async (private_key, config, node) => {
             return res.concat(unit[0]).concat(index).concat(unit[2]).concat(unit[3]).concat(unit[4]);
         }, ["00"]);
         const tx = await works.make_req_tx(0, bases, feeprice, gas, input_raw, "", private_key, trie, data.state_db, data.lock_db);
-        await tx_routes.post(Buffer.from(JSON.stringify([tx, []])));
-        await data.tx_db.write_obj(tx.hash, tx);
+        await tx_routes.post(Buffer.from(JSON.stringify([tx, []])), chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
+        await tx_db.write_obj(tx.hash, tx);
         await P.forEach(units, async (unit, i) => {
-            await data.unit_db.del(unit_addresses[i + 1]);
+            await unit_db.del(unit_addresses[i + 1]);
         });
-        await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
             const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
@@ -202,12 +207,12 @@ exports.buying_unit = async (private_key, config, node) => {
         log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node]));
+    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db]));
     return 0;
 };
-exports.refreshing = async (private_key, config, node) => {
+exports.refreshing = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db) => {
     try {
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
@@ -219,11 +224,11 @@ exports.refreshing = async (private_key, config, node) => {
         while (height.notEquals(0)) {
             if (target_tx != null)
                 break;
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            block = await block_db.read_obj(vr.crypto.bigint2hex(height));
             if (block == null)
                 continue;
             await P.forEach(block.txs, async (tx, i) => {
-                const pooled = await data.tx_db.filter('hex', 'utf8', async (key, t) => {
+                const pooled = await tx_db.filter('hex', 'utf8', async (key, t) => {
                     return t.meta.kind === 1 && tx.meta.refresh.height === t.meta.refresh.height && tx.meta.refresh.index === t.meta.refresh.index && tx.meta.refresh.output === t.meta.refresh.output;
                 });
                 if (tx.meta.kind === 0 && refreshed.indexOf(tx.hash) === -1 && pooled.length === 0) {
@@ -231,7 +236,7 @@ exports.refreshing = async (private_key, config, node) => {
                     index = i;
                 }
                 else if (tx.meta.kind === 1) {
-                    const req_tx = await vr.tx.find_req_tx(tx, data.block_db);
+                    const req_tx = await vr.tx.find_req_tx(tx, block_db);
                     refreshed.push(req_tx.hash);
                 }
             });
@@ -241,17 +246,17 @@ exports.refreshing = async (private_key, config, node) => {
         }
         if (target_tx == null || index === -1)
             throw new Error('no request tx is refreshed yet.');
-        await data.tx_db.filter('hex', 'utf8', async (key, tx) => {
+        await tx_db.filter('hex', 'utf8', async (key, tx) => {
             if (tx.meta.kind === 1 && tx.meta.refresh.height === vr.crypto.bigint2hex(height) && tx.meta.refresh.index === index)
                 throw new Error('refresh tx exists in the pool');
             return false;
         });
         const gas_share = config.miner.gas_share;
         const unit_price = config.miner.unit_price;
-        const made = await works.make_ref_tx(vr.crypto.bigint2hex(height), index, gas_share, unit_price, private_key, data.block_db, data.trie_db, data.root_db, data.state_db, data.lock_db, last_height);
-        await data.tx_db.write_obj(made[0].hash, made[0]);
-        await data.output_db.write_obj(made[0].hash, made[1]);
-        await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+        const made = await works.make_ref_tx(vr.crypto.bigint2hex(height), index, gas_share, unit_price, private_key, block_db, trie_db, root_db, state_db, lock_db, last_height);
+        await tx_db.write_obj(made[0].hash, made[0]);
+        await output_db.write_obj(made[0].hash, made[1]);
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
             const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
@@ -268,34 +273,34 @@ exports.refreshing = async (private_key, config, node) => {
         log.info(e);
     }
     await works.sleep(4000);
-    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node]));
+    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db]));
     return 0;
 };
-exports.making_unit = async (private_key, config, node) => {
+exports.making_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db) => {
     try {
         const public_key = vr.crypto.private2public(private_key);
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit, public_key);
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
-        const root = await data.root_db.get(last_height);
+        const root = await root_db.get(last_height);
         if (root == null)
             throw new Error("root doesn't exist");
-        const trie = vr.data.trie_ins(data.trie_db, root);
+        const trie = vr.data.trie_ins(trie_db, root);
         let height = big_integer_1.default(last_height, 16);
         let block;
         let unit_info = null;
         while (height.notEquals(0)) {
             if (unit_info != null)
                 break;
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            block = await block_db.read_obj(vr.crypto.bigint2hex(height));
             if (block == null)
                 continue;
             await P.forEach(block.txs, async (ref_tx, i) => {
                 if (ref_tx.meta.kind === 1) {
                     const req_height = ref_tx.meta.refresh.height || "00";
-                    const req_block = await data.block_db.read_obj(req_height);
+                    const req_block = await block_db.read_obj(req_height);
                     if (req_block == null)
                         return 0;
                     const req_tx = req_block.txs[ref_tx.meta.refresh.index];
@@ -304,10 +309,10 @@ exports.making_unit = async (private_key, config, node) => {
                     const output_hash = vr.crypto.array2hash(ref_tx.meta.refresh.output);
                     const iden = vr.crypto.array2hash([req_tx.hash, req_height, req_block.hash, my_unit_address, output_hash]);
                     const unit_address = ("0000000000000000" + vr.con.constant.unit).slice(-16) + ("0000000000000000000000000000000000000000000000000000000000000000" + iden).slice(-64);
-                    const made_unit = await data.unit_db.read_obj(unit_address);
+                    const made_unit = await unit_db.read_obj(unit_address);
                     if (made_unit != null)
                         return 0;
-                    const unit_state = await vr.data.read_from_trie(trie, data.state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address));
+                    const unit_state = await vr.data.read_from_trie(trie, state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address));
                     if (unit_state.data.length === 0 && block != null) {
                         unit_info = [req_tx.hash, req_height, req_block.hash, output_hash, vr.crypto.bigint2hex(big_integer_1.default(block.meta.height, 16)), i, unit_address];
                     }
@@ -325,8 +330,8 @@ exports.making_unit = async (private_key, config, node) => {
         if (big_integer_1.default(nonce, 16).eq(0))
             throw new Error('fail to get valid nonce');
         const unit = [unit_info[4], unit_info[5], nonce, my_unit_address, unit_price];
-        await data.unit_db.write_obj(unit_info[6], unit);
-        await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+        await unit_db.write_obj(unit_info[6], unit);
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
             const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
@@ -343,12 +348,12 @@ exports.making_unit = async (private_key, config, node) => {
         log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node]));
+    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db]));
     return 0;
 };
-exports.maintenance = async (node) => {
+exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db) => {
     try {
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = big_integer_1.default(info.last_height, 16);
@@ -356,7 +361,7 @@ exports.maintenance = async (node) => {
         let i = last_height;
         let found = false;
         while (!i.lesserOrEquals(0)) {
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(i));
+            block = await block_db.read_obj(vr.crypto.bigint2hex(i));
             if (block == null) {
                 console.log(i.toString() + " block doesn't exist");
                 found = true;
@@ -366,7 +371,7 @@ exports.maintenance = async (node) => {
         }
         if (!found)
             throw new Error('all block exist');
-        const peers = await data.peer_list_db.filter();
+        const peers = await peer_list_db.filter();
         const peer = peers[0];
         if (peer == null)
             throw new Error('no peer');
@@ -382,8 +387,13 @@ exports.maintenance = async (node) => {
             stream.write(height);
             //stream.emit('end');
             stream.on('data', (msg) => {
-                if (msg != null && msg.length > 0)
-                    return block_routes.post(msg);
+                try {
+                    if (msg != null && msg.length > 0)
+                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db);
+                }
+                catch (e) {
+                    log.info(e);
+                }
             });
             stream.on('error', (e) => {
                 log.info(e);
@@ -394,6 +404,6 @@ exports.maintenance = async (node) => {
         log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.maintenance.apply(null, [node]));
+    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db]));
     return 0;
 };

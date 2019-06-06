@@ -11,12 +11,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const data = __importStar(require("../../logic/data"));
 const big_integer_1 = __importDefault(require("big-integer"));
-exports.default = async (input) => {
+exports.default = async (input, block_db) => {
     try {
         const height = vr.crypto.bigint2hex(big_integer_1.default(input));
-        const block = await data.block_db.read_obj(height);
+        const block = await block_db.read_obj(height);
         if (block == null)
             throw new Error("block doesn't exist at the height");
         return block;

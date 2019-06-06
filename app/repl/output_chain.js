@@ -11,13 +11,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const data = __importStar(require("../../logic/data"));
 const fs = __importStar(require("fs"));
 const big_integer_1 = __importDefault(require("big-integer"));
 const archiver_1 = __importDefault(require("archiver"));
-exports.default = async () => {
+exports.default = async (chain_info_db, block_db) => {
     try {
-        const info = await data.chain_info_db.read_obj("00");
+        const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
@@ -28,7 +27,7 @@ exports.default = async () => {
         const archive = archiver_1.default('zip');
         archive.pipe(output);
         while (1) {
-            block = await data.block_db.read_obj(vr.crypto.bigint2hex(height));
+            block = await block_db.read_obj(vr.crypto.bigint2hex(height));
             if (block == null)
                 continue;
             archive.append(JSON.stringify(block, null, 4), { name: `${dri_pass}/block_${vr.crypto.bigint2hex(height)}` });

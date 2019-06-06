@@ -159,51 +159,81 @@ yargs_1.default
             });
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
-                    tx_routes.post(msg);
+                    try {
+                        tx_routes.post(msg, data.chain_info_db, data.root_db, data.trie_db, data.tx_db, data.block_db, data.state_db, data.lock_db, data.output_db);
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
                 }));
             });
             node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
-                    block_routes.get(msg, node);
+                    try {
+                        block_routes.get(msg, node, data.block_db);
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
                 }));
             });
             node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
-                    block_routes.post(msg);
+                    try {
+                        block_routes.post(msg, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.tx_db);
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
-                chain_routes.get(stream);
+                try {
+                    chain_routes.get(stream, data.chain_info_db, data.block_db, data.output_db);
+                }
+                catch (e) {
+                    log.info(e);
+                }
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
-                    chain_routes.post(msg);
+                    try {
+                        chain_routes.post(msg, data.block_db, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
                 }));
             });
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
-                    unit_routes.post(msg);
+                    try {
+                        unit_routes.post(msg, data.block_db, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.unit_db);
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
                 }));
             });
             node.on('error', (err) => {
                 log.info(err);
             });
-            intervals.get_new_chain(node);
+            intervals.get_new_chain(node, data.peer_list_db, data.chain_info_db, data.block_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
             if (config.validator.flag) {
-                intervals.staking(private_key, node);
-                intervals.buying_unit(private_key, config, node);
+                intervals.staking(private_key, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.peer_list_db);
+                intervals.buying_unit(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.unit_db, data.peer_list_db);
             }
             if (config.miner.flag) {
-                intervals.refreshing(private_key, config, node);
-                intervals.making_unit(private_key, config, node);
+                intervals.refreshing(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.peer_list_db);
+                intervals.making_unit(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.unit_db, data.peer_list_db);
             }
-            intervals.maintenance(node);
+            intervals.maintenance(node, data.chain_info_db, data.block_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db, data.peer_list_db);
             const replServer = repl.start({ prompt: '>', terminal: true });
             replServer.defineCommand('request-tx', {
                 help: 'Create request tx',
                 async action(input) {
-                    const tx = await request_tx_1.default(input, private_key);
+                    const tx = await request_tx_1.default(input, private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
                     await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
                         const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
                         const peer_info = new PeerInfo(peer_id);
@@ -227,28 +257,28 @@ yargs_1.default
             replServer.defineCommand('balance', {
                 help: 'Show your VRT balance',
                 async action() {
-                    const balance = await balance_1.default(private_key);
+                    const balance = await balance_1.default(private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db);
                     console.log(balance);
                 }
             });
             replServer.defineCommand('get-block', {
                 help: 'Show the block specified by height',
                 async action(input) {
-                    const block = await get_block_1.default(input);
+                    const block = await get_block_1.default(input, data.block_db);
                     console.log(JSON.stringify(block, null, 4));
                 }
             });
             replServer.defineCommand('get-chain-info', {
                 help: 'Show the chain info',
                 async action() {
-                    const info = await get_chain_info_1.default();
+                    const info = await get_chain_info_1.default(data.chain_info_db);
                     console.log(JSON.stringify(info, null, 4));
                 }
             });
             replServer.defineCommand('output-chain', {
                 help: 'output chain as zip of json files',
                 async action() {
-                    await output_chain_1.default();
+                    await output_chain_1.default(data.chain_info_db, data.block_db);
                 }
             });
         });
@@ -278,7 +308,7 @@ yargs_1.default
         const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
         const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
         const private_key = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
-        console.log(await balance_1.default(private_key));
+        console.log(await balance_1.default(private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db));
         process.exit(1);
     }
     catch (e) {

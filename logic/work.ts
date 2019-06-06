@@ -84,9 +84,12 @@ const choose_txs = async (unit_mode:boolean,trie:vr.trie,pool_db:vr.db,lock_db:v
 }
 
 
-export const make_block = async (private_key:string,block_db:vr.db,last_height:string,trie:vr.trie,state_db:vr.db,lock_db:vr.db,extra:string,pool_db:vr.db,output_db:vr.db):Promise<[vr.Block,vr.State[]]>=>{
+export const make_block = async (private_key:string,extra:string,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie:vr.trie,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db):Promise<[vr.Block,vr.State[]]>=>{
     const my_pub:string = vr.crypto.private2public(private_key);
     const native_address = vr.crypto.generate_address(vr.con.constant.native,my_pub);
+    const info:data.chain_info|null = await chain_info_db.read_obj("00");
+    if(info==null) throw new Error("chain_info doesn't exist");
+    const last_height = info.last_height;
     const pre_key_block = await vr.block.search_key_block(block_db,last_height);
     const pre_micro_blocks = await vr.block.search_micro_block(block_db,pre_key_block,last_height);
     const key_validator = vr.block.get_info_from_block(pre_key_block)[4];
@@ -94,7 +97,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
     if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());*/
     if(bigInt(last_height,16).eq(0)&&native_address===key_validator){
-        await req_tx_com("-- --0 --0 --0,0 --",private_key);
+        await req_tx_com("-- --0 --0 --0,0 --",private_key,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
     }
     if(native_address!=key_validator||pre_micro_blocks.length>=vr.con.constant.max_blocks){
         const key_block = await vr.block.create_key_block(private_key,block_db,last_height,trie,state_db,extra);
@@ -104,7 +107,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
     else{
         const unit_mode = bigInt(last_height,16).add(1).mod(3).eq(0);
         const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
-        const txs = await choose_txs(unit_mode,trie,pool_db,lock_db,block_db,unit_address);
+        const txs = await choose_txs(unit_mode,trie,tx_db,lock_db,block_db,unit_address);
         let micro_block = await vr.block.create_micro_block(private_key,block_db,last_height,trie,txs,extra);
         const txs_hash = txs.map(tx=>tx.hash);
         micro_block.txs.forEach(tx=>{
@@ -123,7 +126,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
         },[]);
         if(!await vr.block.verify_micro_block(micro_block,output_states,block_db,trie,state_db,lock_db,last_height)){
             const invalid_tx_hashes = await P.reduce(micro_block.txs, async (result:string[],tx)=>{
-                if(tx.meta.kind===0&&!vr.tx.verify_req_tx(tx,trie,state_db,lock_db,[0,1,2,3,4,5])){
+                if(tx.meta.kind===0&&!await vr.tx.verify_req_tx(tx,trie,state_db,lock_db,[0,1,2,3,4,5])){
                     result.push(tx.hash);
                 }
                 if(tx.meta.kind===1){
@@ -140,7 +143,7 @@ export const make_block = async (private_key:string,block_db:vr.db,last_height:s
                 else return result;
             },[]);
             await P.forEach(invalid_tx_hashes, async (key)=>{
-                await pool_db.del(key);
+                await tx_db.del(key);
                 await output_db.del(key);
             });
             if(invalid_tx_hashes.length>0) throw new Error('remove invalid txs');

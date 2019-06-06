@@ -1,18 +1,67 @@
 import * as vr from 'vreath';
+import levelup, { LevelUp } from 'levelup';
+import leveldown, { LevelDown, Bytes } from 'leveldown';
 import * as path from 'path'
-
+import { Readable } from 'stream';
 export const id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
 
-export const trie_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/trie`));
-export const state_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/state`));
-export const lock_db =  new vr.db(path.join(__dirname,`../db/net_id_${id}/lock`));
-export const block_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/block`));
-export const chain_info_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/chain_info`));
-export const tx_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/tx_pool`));
-export const output_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/output`));
-export const root_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/root`));
-export const unit_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/unit_store`));
-export const peer_list_db = new vr.db(path.join(__dirname,`../db/net_id_${id}/peer_list`));
+/*class leveldb {
+    this.db:LevelUp<LevelDOWN>
+    constructor(private _db:LevelUp<LevelDown>){
+        this.db = _db;
+    }
+    public async get(key:Buffer):Promise<Buffer>{
+        return super.get(key);
+    }
+}
+*/
+
+class leveldb {
+    private db:LevelUp<LevelDown>;
+    constructor(_db:LevelUp<LevelDown>){
+        this.db = _db;
+    }
+
+    public async get(key:Buffer):Promise<Buffer>{
+        const got = await this.db.get(key);
+        if(typeof got ==='string') return Buffer.from(key);
+        else return got;
+    }
+
+    public async put(key:Buffer,val:Buffer):Promise<void>{
+        await this.db.put(key,val);
+    }
+
+    public async del(key:Buffer):Promise<void>{
+        await this.db.del(key);
+    }
+
+    public createReadStream():NodeJS.ReadableStream{
+        return this.db.createReadStream();
+    }
+
+    get raw_db(){
+        return this.db;
+    }
+
+}
+
+const make_db_obj = (root:string)=>{
+    const levelup_obj = new levelup(leveldown(path.join(root)));
+    const leveldb_obj = new leveldb(levelup_obj);
+    return new vr.db(leveldb_obj)
+}
+
+export const trie_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/trie`));
+export const state_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/state`));
+export const lock_db =  make_db_obj(path.join(__dirname,`../db/net_id_${id}/lock`));
+export const block_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/block`));
+export const chain_info_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/chain_info`));
+export const tx_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/tx_pool`));
+export const output_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/output`));
+export const root_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/root`));
+export const unit_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/unit_store`));
+export const peer_list_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/peer_list`));
 
 
 export type chain_info = {
