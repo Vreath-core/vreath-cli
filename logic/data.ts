@@ -46,22 +46,11 @@ class leveldb {
 
 }
 
-const make_db_obj = (root:string)=>{
+export const make_db_obj = (root:string)=>{
     const levelup_obj = new levelup(leveldown(path.join(root)));
     const leveldb_obj = new leveldb(levelup_obj);
     return new vr.db(leveldb_obj)
 }
-
-export const trie_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/trie`));
-export const state_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/state`));
-export const lock_db =  make_db_obj(path.join(__dirname,`../db/net_id_${id}/lock`));
-export const block_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/block`));
-export const chain_info_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/chain_info`));
-export const tx_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/tx_pool`));
-export const output_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/output`));
-export const root_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/root`));
-export const unit_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/unit_store`));
-export const peer_list_db = make_db_obj(path.join(__dirname,`../db/net_id_${id}/peer_list`));
 
 
 export type chain_info = {

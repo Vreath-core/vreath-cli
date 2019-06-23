@@ -1,7 +1,27 @@
 import * as fs from 'fs'
 import {promisify} from 'util'
 
-export default async (config:any,argv:any)=>{
+export type config = {
+    miner:{
+        flag:boolean,
+        interval:number,
+        gas_share:number,
+        unit_price:string
+    },
+    validator:{
+        flag:boolean,
+        minimum:string,
+        fee_price:string,
+        gas:string
+    },
+    peer:{
+        id:string,
+        privKey:string|null,
+        pubKey:string|null
+    }
+}
+
+export const set_config = async (config:config,argv:any)=>{
     const miner_mode = argv.miner_mode!=null ? argv.miner_mode : config.miner.flag;
     const miner_interval = argv.miner_interval!=null ? argv.miner_interval : config.miner.interval;
     const miner_gas_share = argv.miner_gas_share!=null ? argv.miner_gas_share : config.miner.gas_share;

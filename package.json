@@ -5,10 +5,12 @@
   "author": "Sora Suegami",
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
   "scripts": {
-    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../node-cryptonight-lite && npm run rebuild && cd ../../ && npm link ./"
+    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../node-cryptonight-lite && npm run rebuild && cd ../../ && npm link ./",
+    "test": "./node_modules/.bin/mocha --require espower-typescript/guess 'test/main.ts' --max-old-space-size=4096"
   },
   "dependencies": {
     "@nodeutils/defaults-deep": "^1.1.0",
+    "@rainblock/merkle-patricia-tree": "^5.0.0",
     "@types/archiver": "^2.1.2",
     "@types/bunyan": "^1.8.5",
     "@types/crypto-js": "^3.1.43",
@@ -36,7 +38,11 @@
     "libp2p-switch": "^0.42.11",
     "libp2p-tcp": "^0.13.0",
     "libp2p-websockets": "^0.12.2",
-    "localtunnel": "^1.9.1",
+    "localtunnel": "^1.9.2",
+    "memdown": "^4.0.0",
+    "merkle-patricia-tree": "^3.0.0",
+    "mocha.parallel": "^0.15.6",
+    "multiaddr": "^6.0.6",
     "peer-id": "^0.12.2",
     "peer-info": "^0.15.1",
     "promise-streams": "^2.1.1",
@@ -45,10 +51,18 @@
     "pull-stream-to-stream": "^1.3.4",
     "readline-sync": "^1.4.9",
     "vreath": "git+https://github.com/Vreath-core/ts-vreath-core.git",
+    "wrappy": "^1.0.2",
     "yargs": "^12.0.5"
   },
   "devDependencies": {
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.7",
     "@types/node": "^10.12.18",
+    "chai": "^4.2.0",
+    "espower-typescript": "^9.0.2",
+    "mocha": "^6.1.4",
+    "power-assert": "^1.6.1",
+    "typemoq": "^2.1.0",
     "typescript": "^3.2.2"
   },
   "engines": {

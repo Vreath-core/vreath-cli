@@ -33,7 +33,7 @@ const log = bunyan_1.default.createLogger({
         }
     ]
 });
-exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db) => {
+exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, err_fn) => {
     try {
         const peers = await peer_list_db.filter();
         const peer = peers[0];
@@ -65,13 +65,13 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db]));
+    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, err_fn]));
     return 0;
 };
-exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db) => {
+exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -97,6 +97,7 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
         await chain_info_db.write_obj("00", new_info);
         const new_root = trie.now_root();
         await root_db.put(block.meta.height, new_root, 'hex', 'utf8');
+        //console.log(JSON.stringify(await tx_db.filter(),null,4));
         const txs_hash = block.txs.map(tx => tx.hash);
         await P.forEach(txs_hash, async (key) => {
             await tx_db.del(key);
@@ -115,13 +116,13 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(1000);
-    setImmediate(() => exports.staking.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db]));
+    setImmediate(() => exports.staking.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn]));
     return 0;
 };
-exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db) => {
+exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, err_fn) => {
     try {
         const pub_key = vr.crypto.private2public(private_key);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native, pub_key);
@@ -184,7 +185,7 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
                 index = "0" + index;
             return res.concat(unit[0]).concat(index).concat(unit[2]).concat(unit[3]).concat(unit[4]);
         }, ["00"]);
-        const tx = await works.make_req_tx(0, bases, feeprice, gas, input_raw, "", private_key, trie, data.state_db, data.lock_db);
+        const tx = await works.make_req_tx(0, bases, feeprice, gas, input_raw, "", private_key, trie, state_db, lock_db);
         await tx_routes.post(Buffer.from(JSON.stringify([tx, []])), chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
         await tx_db.write_obj(tx.hash, tx);
         await P.forEach(units, async (unit, i) => {
@@ -204,13 +205,13 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db]));
+    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, err_fn]));
     return 0;
 };
-exports.refreshing = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db) => {
+exports.refreshing = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -270,13 +271,13 @@ exports.refreshing = async (private_key, config, node, chain_info_db, root_db, t
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(4000);
-    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db]));
+    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn]));
     return 0;
 };
-exports.making_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db) => {
+exports.making_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, err_fn) => {
     try {
         const public_key = vr.crypto.private2public(private_key);
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit, public_key);
@@ -345,13 +346,13 @@ exports.making_unit = async (private_key, config, node, chain_info_db, root_db, 
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db]));
+    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, err_fn]));
     return 0;
 };
-exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db) => {
+exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, err_fn) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -401,9 +402,9 @@ exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, st
         });
     }
     catch (e) {
-        log.info(e);
+        err_fn(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db]));
+    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, err_fn]));
     return 0;
 };

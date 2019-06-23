@@ -1,13 +1,7 @@
 "use strict";
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const vr = __importStar(require("vreath"));
+const node_1_1 = require("./node_1");
+const node_2_1 = require("./node_2");
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
@@ -24,4 +18,8 @@ const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-console.log(vr.crypto.genereate_key());
+const parallel = require('mocha.parallel');
+parallel("node test", async () => {
+    const node1 = node_1_1.run_node1();
+    const node2 = node_2_1.run_node2();
+});

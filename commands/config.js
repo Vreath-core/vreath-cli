@@ -9,7 +9,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
 const util_1 = require("util");
-exports.default = async (config, argv) => {
+exports.set_config = async (config, argv) => {
     const miner_mode = argv.miner_mode != null ? argv.miner_mode : config.miner.flag;
     const miner_interval = argv.miner_interval != null ? argv.miner_interval : config.miner.interval;
     const miner_gas_share = argv.miner_gas_share != null ? argv.miner_gas_share : config.miner.gas_share;

@@ -13,6 +13,10 @@ import * as path from 'path'
 import readlineSync from 'readline-sync'
 import CryptoJS from 'crypto-js'
 import * as P from 'p-iteration'
+import {run_node, DBSet} from './common'
+import {test_setup,add_setup_data} from './setup'
+import {run_node1} from './node_1'
+import { run_node2 } from './node_2';
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
@@ -29,6 +33,10 @@ const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
+const parallel = require('mocha.parallel')
 
 
-console.log(vr.crypto.genereate_key());
+parallel("node test", async ()=>{
+    const node1 = run_node1();
+    const node2 = run_node2();
+});

@@ -14,7 +14,6 @@ const vr = __importStar(require("vreath"));
 const P = __importStar(require("p-iteration"));
 const big_integer_1 = __importDefault(require("big-integer"));
 const lodash_1 = require("lodash");
-const data = __importStar(require("./data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
 exports.sleep = (msec) => {
     return new Promise(function (resolve) {
@@ -116,7 +115,7 @@ exports.make_block = async (private_key, extra, block_db, chain_info_db, root_db
     }
     if (native_address != key_validator || pre_micro_blocks.length >= vr.con.constant.max_blocks) {
         const key_block = await vr.block.create_key_block(private_key, block_db, last_height, trie, state_db, extra);
-        if (!await vr.block.verify_key_block(key_block, block_db, trie, state_db, data.lock_db, last_height))
+        if (!await vr.block.verify_key_block(key_block, block_db, trie, state_db, lock_db, last_height))
             throw new Error('fail to create valid key block');
         return [key_block, []];
     }
@@ -134,9 +133,9 @@ exports.make_block = async (private_key, extra, block_db, chain_info_db, root_db
         const output_states = await P.reduce(txs_hash, async (res, key, i) => {
             if (txs[i] === null || txs[i].meta.kind === 0)
                 return res;
-            const get = await data.output_db.read_obj(key);
+            const get = await output_db.read_obj(key);
             if (get == null) {
-                await data.tx_db.del(key);
+                await tx_db.del(key);
                 throw new Error('output state is not found');
             }
             return res.concat(get);
@@ -147,7 +146,7 @@ exports.make_block = async (private_key, extra, block_db, chain_info_db, root_db
                     result.push(tx.hash);
                 }
                 if (tx.meta.kind === 1) {
-                    const output_for_tx = await data.output_db.read_obj(tx.hash);
+                    const output_for_tx = await output_db.read_obj(tx.hash);
                     if (output_for_tx == null) {
                         result.push(tx.hash);
                     }

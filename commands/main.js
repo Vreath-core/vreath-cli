@@ -15,7 +15,7 @@ const vr = __importStar(require("vreath"));
 const setup_1 = __importDefault(require("./setup"));
 const generate_keys_1 = __importDefault(require("./generate-keys"));
 const set_peer_id_1 = __importDefault(require("./set-peer-id"));
-const config_1 = __importDefault(require("./config"));
+const config_1 = require("./config");
 const tx_routes = __importStar(require("../app/routes/tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
@@ -27,6 +27,8 @@ const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
 const data = __importStar(require("../logic/data"));
 const intervals = __importStar(require("../logic/interval"));
+const node_1_1 = require("../test/node_1");
+const node_2_1 = require("../test/node_2");
 const util_1 = require("util");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -119,8 +121,18 @@ yargs_1.default
     .usage('Usage: $0 <command> [options]')
     .command('setup', 'setup data', {}, async () => {
     try {
+        const trie_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/trie`));
+        const state_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/state`));
+        const lock_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/lock`));
+        const block_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/block`));
+        const chain_info_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/chain_info`));
+        const tx_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/tx_pool`));
+        const output_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/output`));
+        const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
+        const unit_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/unit_store`));
+        const peer_list_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/peer_list`));
         const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
-        await setup_1.default((Buffer.from(my_password, 'utf-8').toString('hex')));
+        await setup_1.default((Buffer.from(my_password, 'utf-8').toString('hex')), state_db, lock_db, trie_db, chain_info_db, block_db, root_db, tx_db, output_db, unit_db, peer_list_db);
         process.exit(1);
     }
     catch (e) {
@@ -130,6 +142,16 @@ yargs_1.default
 })
     .command('run', 'run node', {}, async () => {
     try {
+        const trie_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/trie`));
+        const state_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/state`));
+        const lock_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/lock`));
+        const block_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/block`));
+        const chain_info_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/chain_info`));
+        const tx_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/tx_pool`));
+        const output_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/output`));
+        const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
+        const unit_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/unit_store`));
+        const peer_list_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/peer_list`));
         const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
         const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
         const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
@@ -140,7 +162,7 @@ yargs_1.default
         peer_info.multiaddrs.add(`/ip4/${ip}/tcp/5577`);
         const bootstrapList = JSON.parse(Buffer.from(await util_1.promisify(fs.readFile)(path.join(__dirname, '../genesis_peers.json'), 'utf-8')).toString());
         const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
-        await data.peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
+        await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
         const node = new Node({ peerInfo: peer_info }, peer_address_list);
         node.start((err) => {
             node.on('peer:connect', (peerInfo) => {
@@ -155,12 +177,12 @@ yargs_1.default
                     identity: id_obj,
                     multiaddrs: multiaddrs
                 };
-                data.peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
+                peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
             });
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        tx_routes.post(msg, data.chain_info_db, data.root_db, data.trie_db, data.tx_db, data.block_db, data.state_db, data.lock_db, data.output_db);
+                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
                     }
                     catch (e) {
                         log.info(e);
@@ -170,7 +192,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.get(msg, node, data.block_db);
+                        block_routes.get(msg, node, block_db);
                     }
                     catch (e) {
                         log.info(e);
@@ -180,7 +202,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.post(msg, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.tx_db);
+                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db);
                     }
                     catch (e) {
                         log.info(e);
@@ -190,7 +212,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
                 try {
-                    chain_routes.get(stream, data.chain_info_db, data.block_db, data.output_db);
+                    chain_routes.get(stream, chain_info_db, block_db, output_db);
                 }
                 catch (e) {
                     log.info(e);
@@ -199,7 +221,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        chain_routes.post(msg, data.block_db, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
+                        chain_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
                     }
                     catch (e) {
                         log.info(e);
@@ -209,7 +231,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        unit_routes.post(msg, data.block_db, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.unit_db);
+                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db);
                     }
                     catch (e) {
                         log.info(e);
@@ -219,22 +241,22 @@ yargs_1.default
             node.on('error', (err) => {
                 log.info(err);
             });
-            intervals.get_new_chain(node, data.peer_list_db, data.chain_info_db, data.block_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
+            intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log.info);
             if (config.validator.flag) {
-                intervals.staking(private_key, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.peer_list_db);
-                intervals.buying_unit(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.unit_db, data.peer_list_db);
+                intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log.info);
+                intervals.buying_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log.info);
             }
             if (config.miner.flag) {
-                intervals.refreshing(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.lock_db, data.output_db, data.tx_db, data.peer_list_db);
-                intervals.making_unit(private_key, config, node, data.chain_info_db, data.root_db, data.trie_db, data.block_db, data.state_db, data.unit_db, data.peer_list_db);
+                intervals.refreshing(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log.info);
+                intervals.making_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log.info);
             }
-            intervals.maintenance(node, data.chain_info_db, data.block_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db, data.peer_list_db);
+            intervals.maintenance(node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log.info);
             const replServer = repl.start({ prompt: '>', terminal: true });
             replServer.defineCommand('request-tx', {
                 help: 'Create request tx',
                 async action(input) {
-                    const tx = await request_tx_1.default(input, private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db, data.lock_db, data.tx_db);
-                    await data.peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+                    const tx = await request_tx_1.default(input, private_key, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
+                    await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
                         const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
                         const peer_info = new PeerInfo(peer_id);
                         peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
@@ -257,34 +279,51 @@ yargs_1.default
             replServer.defineCommand('balance', {
                 help: 'Show your VRT balance',
                 async action() {
-                    const balance = await balance_1.default(private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db);
+                    const balance = await balance_1.default(private_key, chain_info_db, root_db, trie_db, state_db);
                     console.log(balance);
                 }
             });
             replServer.defineCommand('get-block', {
                 help: 'Show the block specified by height',
                 async action(input) {
-                    const block = await get_block_1.default(input, data.block_db);
+                    const block = await get_block_1.default(input, block_db);
                     console.log(JSON.stringify(block, null, 4));
                 }
             });
             replServer.defineCommand('get-chain-info', {
                 help: 'Show the chain info',
                 async action() {
-                    const info = await get_chain_info_1.default(data.chain_info_db);
+                    const info = await get_chain_info_1.default(chain_info_db);
                     console.log(JSON.stringify(info, null, 4));
                 }
             });
             replServer.defineCommand('output-chain', {
                 help: 'output chain as zip of json files',
                 async action() {
-                    await output_chain_1.default(data.chain_info_db, data.block_db);
+                    await output_chain_1.default(chain_info_db, block_db);
                 }
             });
         });
     }
     catch (e) {
         log.info(e);
+    }
+})
+    .command('demo <id>', 'demonstration', {
+    'id': {
+        describe: 'node id(1:validator,2:miner)',
+        type: 'number'
+    }
+}, async (argv) => {
+    try {
+        const id = argv.id;
+        if (id == null)
+            throw new Error('enter node id');
+        const nodes = [node_1_1.run_node1, node_2_1.run_node2];
+        await nodes[id - 1]();
+    }
+    catch (e) {
+        console.log(e);
     }
 })
     .command('generate-keys', 'generate new key', {}, async () => {
@@ -297,18 +336,17 @@ yargs_1.default
         process.exit(1);
     }
 })
-    .command('get-native-balance <address>', 'get native balance', {
-    'id': {
-        describe: 'address of native to check the balance',
-        type: 'string'
-    }
-}, async (argv) => {
+    .command('get-native-balance', 'get native balance', {}, async () => {
     try {
+        const trie_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/trie`));
+        const state_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/state`));
+        const chain_info_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/chain_info`));
+        const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
         const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
         const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
         const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
         const private_key = crypto_js_1.default.AES.decrypt(get_private, my_key).toString(crypto_js_1.default.enc.Utf8);
-        console.log(await balance_1.default(private_key, data.chain_info_db, data.root_db, data.trie_db, data.state_db));
+        console.log(await balance_1.default(private_key, chain_info_db, root_db, trie_db, state_db));
         process.exit(1);
     }
     catch (e) {
@@ -374,7 +412,7 @@ yargs_1.default
     }
 }, async (argv) => {
     try {
-        await config_1.default(config, argv);
+        await config_1.set_config(config, argv);
         process.exit(1);
     }
     catch (e) {
