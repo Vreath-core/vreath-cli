@@ -1,11 +1,14 @@
 import * as vr from 'vreath'
 import {promisify} from 'util'
 import bigInt from 'big-integer'
+import * as fs from 'fs'
+import * as path from 'path'
 import {peer_info, chain_info} from '../logic/data'
 import {DBSet, make_db_obj} from './common'
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const Multiaddr = require('multiaddr');
+const search_ip = require('ip');
 
 export type setup_data = {
     privKey:string,
@@ -62,7 +65,7 @@ export const test_setup = async ():Promise<setup_data>=>{
         last_height:"00",
         last_hash:gen_hash
     }
-    const gen_peer:peer_info = await set_peer_id('1');
+    const gen_peer:peer_info = await set_peer_id('8000');
     const data:setup_data = {
         privKey:privKey,
         pubKey:pubKey,
@@ -81,7 +84,8 @@ export const set_peer_id = async (port:string)=>{
     const peer_id = await promisify(PeerId.create)();
     const id_obj = peer_id.toJSON();
     const peer_info = new PeerInfo(peer_id);
-    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}`);
+    //const ip:string = search_ip.address();
+    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}/p2p/${id_obj.id}`);
     const multiaddrs = peer_info.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
     const peer_obj:peer_info = {
         identity:id_obj,
@@ -118,6 +122,8 @@ export const add_setup_data = async (db_set:DBSet,setup:setup_data)=>{
         root_db.put("00",root);
         block_db.write_obj("00",setup.block);
         peer_list_db.write_obj(Buffer.from(setup.peer.identity.id).toString('hex'),setup.peer);
+        await promisify(fs.writeFile)(path.join(__dirname,'../log/test1.log'),'','utf-8');
+        await promisify(fs.writeFile)(path.join(__dirname,'../log/test2.log'),'','utf-8');
         return db_set;
     }
     catch(e){

@@ -10,8 +10,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const common_1 = require("./common");
 const setup = __importStar(require("./setup"));
 const PeerId = require('peer-id');
-exports.run_node1 = async () => {
-    const setup_data = await setup.test_setup();
+const search_ip = require('ip');
+exports.run_node1 = async (setup_data) => {
     const db_set = new common_1.DBSet();
     const genesis_db_set = await setup.add_setup_data(db_set, setup_data);
     const config = {
@@ -29,5 +29,6 @@ exports.run_node1 = async () => {
         },
         peer: setup_data.peer.identity
     };
-    return await common_1.run_node(setup_data.privKey, config, "1", [setup_data.peer], genesis_db_set, 1);
+    //const ip:string = search_ip.address();
+    return await common_1.run_node(setup_data.privKey, config, "127.0.0.1", "8000", [setup_data.peer], genesis_db_set, 1);
 };

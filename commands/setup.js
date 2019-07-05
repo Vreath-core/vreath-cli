@@ -58,5 +58,5 @@ exports.default = async (my_password, state_db, lock_db, trie_db, chain_info_db,
     await P.forEach(genesis_peers, async (peer) => {
         await peer_list_db.write_obj(Buffer.from(peer.identity.id, 'utf-8').toString('hex'), peer);
     });
-    await util_1.promisify(fs.writeFile)('./log/log.log', '', 'utf-8');
+    await util_1.promisify(fs.writeFile)('./log/main.log', '', 'utf-8');
 };

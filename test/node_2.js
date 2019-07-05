@@ -11,11 +11,11 @@ const vr = __importStar(require("vreath"));
 const common_1 = require("./common");
 const setup = __importStar(require("./setup"));
 const PeerId = require('peer-id');
-exports.run_node2 = async () => {
-    const setup_data = await setup.test_setup();
+const search_ip = require('ip');
+exports.run_node2 = async (setup_data) => {
     const db_set = new common_1.DBSet();
     const genesis_db_set = await setup.add_setup_data(db_set, setup_data);
-    const peer = await setup.set_peer_id('2');
+    const peer = await setup.set_peer_id('8001');
     const config = {
         miner: {
             flag: true,
@@ -32,5 +32,6 @@ exports.run_node2 = async () => {
         peer: peer.identity
     };
     const privKey = vr.crypto.genereate_key();
-    return await common_1.run_node(privKey, config, "2", [setup_data.peer], genesis_db_set, 2);
+    //const ip:string = search_ip.address();
+    return await common_1.run_node(privKey, config, "0.0.0.0", "8001", [setup_data.peer], genesis_db_set, 2);
 };

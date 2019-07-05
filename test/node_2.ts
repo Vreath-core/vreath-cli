@@ -6,12 +6,13 @@ import {config} from '../commands/config'
 import {run_node,DBSet} from './common'
 import * as setup from './setup'
 const PeerId = require('peer-id');
+const search_ip = require('ip');
 
-export const run_node2 = async ()=>{
-    const setup_data = await setup.test_setup();
+
+export const run_node2 = async (setup_data:setup.setup_data)=>{
     const db_set = new DBSet();
     const genesis_db_set = await setup.add_setup_data(db_set,setup_data);
-    const peer = await setup.set_peer_id('2');
+    const peer = await setup.set_peer_id('8001');
     const config:config = {
         miner:{
             flag:true,
@@ -28,5 +29,6 @@ export const run_node2 = async ()=>{
         peer:peer.identity
     }
     const privKey = vr.crypto.genereate_key();
-    return await run_node(privKey,config,"2",[setup_data.peer],genesis_db_set,2);
+    //const ip:string = search_ip.address();
+    return await run_node(privKey,config,"0.0.0.0","8001",[setup_data.peer],genesis_db_set,2);
 }

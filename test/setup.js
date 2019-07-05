@@ -13,10 +13,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const util_1 = require("util");
 const big_integer_1 = __importDefault(require("big-integer"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const common_1 = require("./common");
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const Multiaddr = require('multiaddr');
+const search_ip = require('ip');
 exports.test_setup = async () => {
     const privKey = vr.crypto.genereate_key();
     const pubKey = vr.crypto.private2public(privKey);
@@ -61,7 +64,7 @@ exports.test_setup = async () => {
         last_height: "00",
         last_hash: gen_hash
     };
-    const gen_peer = await exports.set_peer_id('1');
+    const gen_peer = await exports.set_peer_id('8000');
     const data = {
         privKey: privKey,
         pubKey: pubKey,
@@ -78,7 +81,8 @@ exports.set_peer_id = async (port) => {
     const peer_id = await util_1.promisify(PeerId.create)();
     const id_obj = peer_id.toJSON();
     const peer_info = new PeerInfo(peer_id);
-    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}`);
+    //const ip:string = search_ip.address();
+    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}/p2p/${id_obj.id}`);
     const multiaddrs = peer_info.multiaddrs.toArray().map((add) => Multiaddr(add.buffer).toString());
     const peer_obj = {
         identity: id_obj,
@@ -113,6 +117,8 @@ exports.add_setup_data = async (db_set, setup) => {
         root_db.put("00", root);
         block_db.write_obj("00", setup.block);
         peer_list_db.write_obj(Buffer.from(setup.peer.identity.id).toString('hex'), setup.peer);
+        await util_1.promisify(fs.writeFile)(path.join(__dirname, '../log/test1.log'), '', 'utf-8');
+        await util_1.promisify(fs.writeFile)(path.join(__dirname, '../log/test2.log'), '', 'utf-8');
         return db_set;
     }
     catch (e) {

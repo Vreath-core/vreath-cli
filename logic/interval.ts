@@ -15,17 +15,17 @@ const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 
-const log = bunyan.createLogger({
+/*const log = bunyan.createLogger({
     name:'vreath-cli',
     streams:[
         {
             path:path.join(__dirname,'../log/log.log')
         }
     ]
-});
+});*/
 
 
-export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,err_fn:(e:string)=>void)=>{
+export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const peers:data.peer_info[] = await peer_list_db.filter();
         const peer = peers[0];
@@ -53,14 +53,15 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(()=>get_new_chain.apply(null,[node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,err_fn]));
+    setImmediate(()=>get_new_chain.apply(null,[node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log]));
     return 0;
 }
 
-export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,err_fn:(e:string)=>void)=>{
+export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -99,14 +100,15 @@ export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,r
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(1000);
-    setImmediate(()=>staking.apply(null,[private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,err_fn]));
+    setImmediate(()=>staking.apply(null,[private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log]));
     return 0;
 }
 
-export const buying_unit = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,err_fn:(e:string)=>void)=>{
+export const buying_unit = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const pub_key:string = vr.crypto.private2public(private_key);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native,pub_key)
@@ -183,15 +185,16 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(()=>buying_unit.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,err_fn]));
+    setImmediate(()=>buying_unit.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,log]));
     return 0;
 }
 
 
-export const refreshing = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,err_fn:(e:string)=>void)=>{
+export const refreshing = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -243,14 +246,15 @@ export const refreshing = async (private_key:string,config:any,node:Node,chain_i
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(4000);
-    setImmediate(()=>refreshing.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,err_fn]));
+    setImmediate(()=>refreshing.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log]));
     return 0;
 }
 
-export const making_unit = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,err_fn:(e:string)=>void)=>{
+export const making_unit = async (private_key:string,config:any,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const public_key = vr.crypto.private2public(private_key);
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit,public_key);
@@ -307,14 +311,15 @@ export const making_unit = async (private_key:string,config:any,node:Node,chain_
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(()=>making_unit.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,err_fn]));
+    setImmediate(()=>making_unit.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log]));
     return 0;
 }
 
-export const maintenance = async (node:Node,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,err_fn:(e:string)=>void)=>{
+export const maintenance = async (node:Node,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -359,9 +364,10 @@ export const maintenance = async (node:Node,chain_info_db:vr.db,block_db:vr.db,r
         });
     }
     catch(e){
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(()=>maintenance.apply(null,[node,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,err_fn]));
+    setImmediate(()=>maintenance.apply(null,[node,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,log]));
     return 0;
 }

@@ -1,4 +1,4 @@
-import assert = require('assert');
+//import assert = require('assert');
 import * as vr from 'vreath'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
@@ -33,10 +33,16 @@ const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-const parallel = require('mocha.parallel')
+//const parallel = require('mocha.parallel')
 
 
-parallel("node test", async ()=>{
+/*parallel("node test", async ()=>{
     const node1 = run_node1();
     const node2 = run_node2();
-});
+});*/
+
+(async ()=>{
+    const setup_data = await test_setup();
+    const node1 = run_node1(setup_data);
+    const node2 = run_node2(setup_data);
+})();

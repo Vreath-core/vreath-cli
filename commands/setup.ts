@@ -52,5 +52,5 @@ export default async (my_password:string,state_db:vr.db,lock_db:vr.db,trie_db:vr
     await P.forEach(genesis_peers, async (peer:data.peer_info)=>{
         await peer_list_db.write_obj(Buffer.from(peer.identity.id,'utf-8').toString('hex'),peer);
     });
-    await promisify(fs.writeFile)('./log/log.log','','utf-8');
+    await promisify(fs.writeFile)('./log/main.log','','utf-8');
 }

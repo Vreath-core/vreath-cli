@@ -22,7 +22,10 @@ const main_1 = require("../commands/main");
 const util_1 = require("util");
 const levelup_1 = __importDefault(require("levelup"));
 const memdown_1 = __importDefault(require("memdown"));
+const path = __importStar(require("path"));
 const big_integer_1 = __importDefault(require("big-integer"));
+const bignumber_js_1 = __importDefault(require("bignumber.js"));
+const bunyan_1 = __importDefault(require("bunyan"));
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
@@ -149,11 +152,18 @@ const dialog = async (db_set, native_address, unit_address, id) => {
     const state_db = db_set.call('state');
     const native_state = await vr.data.read_from_trie(trie, state_db, native_address, 0, vr.state.create_state("00", vr.con.constant.native, native_address, "00"));
     const unit_state = await vr.data.read_from_trie(trie, state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
+    const amount2str = (amount) => {
+        const big_int = big_integer_1.default(amount, 16);
+        const big_num = new bignumber_js_1.default(big_int.toString(16), 16);
+        return big_num.dividedBy(10 ** 12).toString();
+    };
+    const native_amount = amount2str(native_state.amount);
+    const unit_amount = amount2str(unit_state.amount);
     const obj = {
         id: id,
         address: native_address,
-        native_balance: vr.crypto.hex2number(native_state.amount),
-        unit_balance: vr.crypto.hex2number(unit_state.amount),
+        native_balance: native_amount,
+        unit_balance: unit_amount,
         chain_info: info
     };
     console.log(JSON.stringify(obj, null, 4));
@@ -168,7 +178,7 @@ const finish_check = async (db_set) => {
     else
         return await finish_check(db_set);
 };
-exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) => {
+exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, id) => {
     const chain_info_db = db_set.call('chain_info');
     const root_db = db_set.call('root');
     const trie_db = db_set.call('trie');
@@ -179,20 +189,34 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
     const output_db = db_set.call('output');
     const unit_db = db_set.call('unit');
     const peer_list_db = db_set.call('peer_list');
-    const log_db = db_set.call('log');
     const peer_id = await util_1.promisify(PeerId.createFromJSON)(config.peer);
     const peer_info = new PeerInfo(peer_id);
-    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}`);
-    const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
+    peer_info.multiaddrs.add(`/ip4/${ip}/tcp/${port}`);
+    const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}`);
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-    const node = new main_1.Node({ peerInfo: peer_info }, peer_address_list);
-    const log = async (err) => {
-        const stringed = JSON.stringify(err);
-        const hash = vr.crypto.get_sha256(Buffer.from(stringed).toString('hex'));
-        await log_db.put(hash, stringed);
-    };
+    /*const option = {
+        config: {
+          peerDiscovery: {
+            bootstrap: {
+                interval: 2000,
+                enabled: true,
+                list: peer_address_list
+            }
+          }
+        }
+    }*/
+    const node = new main_1.Node(peer_info, ['spdy', 'mplex'], peer_address_list);
+    const log = bunyan_1.default.createLogger({
+        name: 'vreath-cli',
+        streams: [
+            {
+                path: path.join(__dirname, `../log/test${id.toString()}.log`)
+            }
+        ]
+    });
     try {
         node.start((err) => {
+            //console.log(err);
             node.on('peer:connect', (peerInfo) => {
                 const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
                 const id_obj = {
@@ -205,7 +229,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                     identity: id_obj,
                     multiaddrs: multiaddrs
                 };
-                console.log(peer_obj);
+                //console.log(peer_obj)
                 peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
             });
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
@@ -214,7 +238,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                         tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
                     }
                     catch (e) {
-                        log(e);
+                        log.info(e);
                     }
                 }));
             });
@@ -224,7 +248,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                         block_routes.get(msg, node, block_db);
                     }
                     catch (e) {
-                        log(e);
+                        log.info(e);
                     }
                 }));
             });
@@ -234,7 +258,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                         block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db);
                     }
                     catch (e) {
-                        log(e);
+                        log.info(e);
                     }
                 }));
             });
@@ -244,7 +268,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                     chain_routes.get(stream, chain_info_db, block_db, output_db);
                 }
                 catch (e) {
-                    log(e);
+                    log.info(e);
                 }
             });
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
@@ -253,7 +277,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                         chain_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
                     }
                     catch (e) {
-                        log(e);
+                        log.info(e);
                     }
                 }));
             });
@@ -263,12 +287,12 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
                         unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db);
                     }
                     catch (e) {
-                        log(e);
+                        log.info(e);
                     }
                 }));
             });
             node.on('error', (e) => {
-                log(e);
+                log.info(e);
             });
             intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
             if (config.validator.flag) {
@@ -288,7 +312,7 @@ exports.run_node = async (private_key, config, port, bootstrapList, db_set, id) 
         //return await finish_check(db_set)
     }
     catch (e) {
-        log(e);
+        log.info(e);
     }
     //return db_set;
 };

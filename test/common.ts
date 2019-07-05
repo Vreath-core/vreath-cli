@@ -18,7 +18,8 @@ import readlineSync from 'readline-sync'
 import CryptoJS from 'crypto-js'
 import * as P from 'p-iteration'
 import bigInt from 'big-integer'
-import {MerklePatriciaTree} from '@rainblock/merkle-patricia-tree';
+import BigNumber from "bignumber.js"
+import bunyan from 'bunyan'
 import { config } from '../commands/config';
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
@@ -36,7 +37,6 @@ const DHT = require('libp2p-kad-dht')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-
 
 /*export class ReadableStream extends Readable implements NodeJS.ReadableStream{
     private i:number = 0;
@@ -154,11 +154,18 @@ const dialog = async (db_set:DBSet,native_address:string,unit_address:string,id:
     const state_db = db_set.call('state')
     const native_state = await vr.data.read_from_trie(trie,state_db,native_address,0,vr.state.create_state("00",vr.con.constant.native,native_address,"00"));
     const unit_state = await vr.data.read_from_trie(trie,state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address,"00"));
+    const amount2str = (amount:string)=>{
+        const big_int = bigInt(amount,16);
+        const big_num = new BigNumber(big_int.toString(16),16);
+        return big_num.dividedBy(10**12).toString();
+    }
+    const native_amount = amount2str(native_state.amount);
+    const unit_amount = amount2str(unit_state.amount);
     const obj = {
         id:id,
         address:native_address,
-        native_balance:vr.crypto.hex2number(native_state.amount),
-        unit_balance:vr.crypto.hex2number(unit_state.amount),
+        native_balance:native_amount,
+        unit_balance:unit_amount,
         chain_info:info
     }
     console.log(JSON.stringify(obj,null,4));
@@ -174,7 +181,7 @@ const finish_check = async (db_set:DBSet):Promise<DBSet>=>{
 }
 
 
-export const run_node = async (private_key:string,config:config,port:string,bootstrapList:data.peer_info[],db_set:DBSet,id:number):Promise<void>=>{
+export const run_node = async (private_key:string,config:config,ip:string,port:string,bootstrapList:data.peer_info[],db_set:DBSet,id:number):Promise<void>=>{
     const chain_info_db = db_set.call('chain_info');
     const root_db = db_set.call('root');
     const trie_db = db_set.call('trie');
@@ -185,22 +192,36 @@ export const run_node = async (private_key:string,config:config,port:string,boot
     const output_db = db_set.call('output');
     const unit_db = db_set.call('unit');
     const peer_list_db = db_set.call('peer_list');
-    const log_db = db_set.call('log');
     const peer_id = await promisify(PeerId.createFromJSON)(config.peer);
     const peer_info = new PeerInfo(peer_id);
-    peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}`);
-    const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
+    peer_info.multiaddrs.add(`/ip4/${ip}/tcp/${port}`);
+    const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}`);
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-    const node = new Node({ peerInfo: peer_info},peer_address_list);
+    /*const option = {
+        config: {
+          peerDiscovery: {
+            bootstrap: {
+                interval: 2000,
+                enabled: true,
+                list: peer_address_list
+            }
+          }
+        }
+    }*/
+    const node = new Node(peer_info,['spdy','mplex'],peer_address_list);
 
-    const log = async (err:string)=>{
-        const stringed = JSON.stringify(err);
-        const hash = vr.crypto.get_sha256(Buffer.from(stringed).toString('hex'));
-        await log_db.put(hash,stringed);
-    }
+    const log = bunyan.createLogger({
+        name:'vreath-cli',
+        streams:[
+            {
+                path:path.join(__dirname,`../log/test${id.toString()}.log`)
+            }
+        ]
+    });
 
     try{
         node.start((err:string)=>{
+            //console.log(err);
             node.on('peer:connect', (peerInfo:any) => {
                 const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
                 const id_obj = {
@@ -213,7 +234,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                     identity:id_obj,
                     multiaddrs:multiaddrs
                 }
-                console.log(peer_obj)
+                //console.log(peer_obj)
                 peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
             });
 
@@ -225,7 +246,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                             tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db);
                         }
                         catch(e){
-                            log(e);
+                            log.info(e);
                         }
                     })
                 )
@@ -239,7 +260,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                             block_routes.get(msg,node,block_db);
                         }
                         catch(e){
-                            log(e);
+                            log.info(e);
                         }
                     })
                 )
@@ -253,7 +274,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                             block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db);
                         }
                         catch(e){
-                            log(e);
+                            log.info(e);
                         }
                     })
                 )
@@ -265,7 +286,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                     chain_routes.get(stream,chain_info_db,block_db,output_db);
                 }
                 catch(e){
-                    log(e);
+                    log.info(e);
                 }
             });
 
@@ -277,7 +298,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                             chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
                         }
                         catch(e){
-                            log(e);
+                            log.info(e);
                         }
                     })
                 )
@@ -291,14 +312,14 @@ export const run_node = async (private_key:string,config:config,port:string,boot
                             unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db);
                         }
                         catch(e){
-                            log(e);
+                            log.info(e);
                         }
                     })
                 )
             });
 
             node.on('error',(e:string)=>{
-                log(e);
+                log.info(e);
             })
 
             intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
@@ -320,7 +341,7 @@ export const run_node = async (private_key:string,config:config,port:string,boot
         //return await finish_check(db_set)
     }
     catch(e){
-        log(e);
+        log.info(e);
     }
     //return db_set;
 }

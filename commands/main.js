@@ -27,6 +27,7 @@ const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
 const data = __importStar(require("../logic/data"));
 const intervals = __importStar(require("../logic/interval"));
+const setup_2 = require("../test/setup");
 const node_1_1 = require("../test/node_1");
 const node_2_1 = require("../test/node_2");
 const util_1 = require("util");
@@ -54,57 +55,124 @@ const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 const search_ip = require('ip');
+/*
+export class Node extends libp2p {
+    constructor (_options:any,_bootstrapList:string[]) {
+      const defaults = {
+        // The libp2p modules for this libp2p bundle
+        modules: {
+          transport: [
+            TCP           // It can take instances too!
+          ],
+          streamMuxer: [
+            MPLEX,
+            SPDY
+          ],
+          connEncryption: [
+            SECIO
+          ],
+          /** Encryption for private networks. Needs additional private key to work **/
+// connProtector: new Protector(/*protector specific opts*/),
+/** Enable custom content routers, such as delegated routing **/
+// contentRouting: [
+//   new DelegatedContentRouter(peerInfo.id)
+// ],
+/** Enable custom peer routers, such as delegated routing **/
+// peerRouting: [
+//   new DelegatedPeerRouter()
+// ],
+/*peerDiscovery: [
+  Bootstrap
+]           // DHT enables PeerRouting, ContentRouting and DHT itself components
+},*/
+// libp2p config options (typically found on a config.json)
+/*config: {                       // The config object is the part of the config that can go into a file, config.json.
+  peerDiscovery: {
+    autoDial: true,
+    /* */ /*autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
+mdns: {                     // mdns options
+  interval: 1000,           // ms
+  enabled: true
+},
+webrtcStar: {               // webrtc-star options
+  interval: 1000,           // ms
+  enabled: false
+},*/
+/*bootstrap: {
+    interval: 2000,
+    enabled: true,
+    list: _bootstrapList
+}
+// .. other discovery module options.
+},
+/*dht: {
+kBucketSize: 20,
+}*/
+/* }
+}
+// overload any defaults of your bundle using https://github.com/nodeutils/defaults-deep
+super(defaultsDeep(_options, defaults))
+}
+}*/
+const mapMuxers = (list) => {
+    return list.map((pref) => {
+        if (typeof pref !== 'string') {
+            return pref;
+        }
+        switch (pref.trim().toLowerCase()) {
+            case 'spdy': return SPDY;
+            case 'mplex': return MPLEX;
+            default:
+                throw new Error(pref + ' muxer not available');
+        }
+    });
+};
+const getMuxers = (muxers) => {
+    const muxerPrefs = process.env.LIBP2P_MUXER;
+    if (muxerPrefs && !muxers) {
+        return mapMuxers(muxerPrefs.split(','));
+    }
+    else if (muxers) {
+        return mapMuxers(muxers);
+    }
+    else {
+        return [MPLEX, SPDY];
+    }
+};
 class Node extends libp2p {
-    constructor(_options, _bootstrapList) {
-        const defaults = {
-            // The libp2p modules for this libp2p bundle
+    constructor(_peerinfo, _muxer, _bootstrapList) {
+        const option = {
             modules: {
                 transport: [
-                    TCP // It can take instances too!
+                    TCP,
+                    WS
                 ],
-                streamMuxer: [
-                    MPLEX
-                ],
-                connEncryption: [
-                    SECIO
-                ],
-                /** Encryption for private networks. Needs additional private key to work **/
-                // connProtector: new Protector(/*protector specific opts*/),
-                /** Enable custom content routers, such as delegated routing **/
-                // contentRouting: [
-                //   new DelegatedContentRouter(peerInfo.id)
-                // ],
-                /** Enable custom peer routers, such as delegated routing **/
-                // peerRouting: [
-                //   new DelegatedPeerRouter()
-                // ],
+                streamMuxer: getMuxers(_muxer),
+                connEncryption: [SECIO],
                 peerDiscovery: [
+                    MulticastDNS,
                     Bootstrap
-                ] // DHT enables PeerRouting, ContentRouting and DHT itself components
+                ]
             },
-            // libp2p config options (typically found on a config.json)
             config: {
                 peerDiscovery: {
-                    /* */ /*autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
-                    mdns: {                     // mdns options
-                      interval: 1000,           // ms
-                      enabled: true
+                    mdns: {
+                        interval: 10000,
+                        enabled: false
                     },
-                    webrtcStar: {               // webrtc-star options
-                      interval: 1000,           // ms
-                      enabled: false
-                    },*/
                     bootstrap: {
-                        interval: 2000,
-                        enabled: true,
+                        interval: 10000,
+                        enabled: false,
                         list: _bootstrapList
                     }
-                    // .. other discovery module options.
                 },
-            }
+                dht: {
+                    kBucketSize: 20
+                }
+            },
+            peerInfo: _peerinfo
         };
-        // overload any defaults of your bundle using https://github.com/nodeutils/defaults-deep
-        super(defaultsDeep(_options, defaults));
+        super(option);
     }
 }
 exports.Node = Node;
@@ -112,7 +180,7 @@ const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [
         {
-            path: path.join(__dirname, '../log/log.log')
+            path: path.join(__dirname, '../log/main.log')
         }
     ]
 });
@@ -163,7 +231,7 @@ yargs_1.default
         const bootstrapList = JSON.parse(Buffer.from(await util_1.promisify(fs.readFile)(path.join(__dirname, '../genesis_peers.json'), 'utf-8')).toString());
         const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
         await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-        const node = new Node({ peerInfo: peer_info }, peer_address_list);
+        const node = new Node(peer_info, ['spdy', 'mplex'], peer_address_list);
         node.start((err) => {
             node.on('peer:connect', (peerInfo) => {
                 const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
@@ -241,16 +309,16 @@ yargs_1.default
             node.on('error', (err) => {
                 log.info(err);
             });
-            intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log.info);
+            intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
             if (config.validator.flag) {
-                intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log.info);
-                intervals.buying_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log.info);
+                intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
+                intervals.buying_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log);
             }
             if (config.miner.flag) {
-                intervals.refreshing(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log.info);
-                intervals.making_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log.info);
+                intervals.refreshing(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
+                intervals.making_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log);
             }
-            intervals.maintenance(node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log.info);
+            intervals.maintenance(node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log);
             const replServer = repl.start({ prompt: '>', terminal: true });
             replServer.defineCommand('request-tx', {
                 help: 'Create request tx',
@@ -319,8 +387,9 @@ yargs_1.default
         const id = argv.id;
         if (id == null)
             throw new Error('enter node id');
+        const setup_data = await setup_2.test_setup();
         const nodes = [node_1_1.run_node1, node_2_1.run_node2];
-        await nodes[id - 1]();
+        await nodes[id - 1](setup_data);
     }
     catch (e) {
         console.log(e);

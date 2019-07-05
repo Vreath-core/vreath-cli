@@ -17,23 +17,21 @@ const tx_routes = __importStar(require("../app/routes/tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const P = __importStar(require("p-iteration"));
-const bunyan_1 = __importDefault(require("bunyan"));
-const path = __importStar(require("path"));
 const util_1 = require("util");
 const big_integer_1 = __importDefault(require("big-integer"));
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-const log = bunyan_1.default.createLogger({
-    name: 'vreath-cli',
-    streams: [
+/*const log = bunyan.createLogger({
+    name:'vreath-cli',
+    streams:[
         {
-            path: path.join(__dirname, '../log/log.log')
+            path:path.join(__dirname,'../log/log.log')
         }
     ]
-});
-exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, err_fn) => {
+});*/
+exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {
         const peers = await peer_list_db.filter();
         const peer = peers[0];
@@ -65,13 +63,14 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, err_fn]));
+    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log]));
     return 0;
 };
-exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn) => {
+exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -116,13 +115,14 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(1000);
-    setImmediate(() => exports.staking.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn]));
+    setImmediate(() => exports.staking.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log]));
     return 0;
 };
-exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, err_fn) => {
+exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log) => {
     try {
         const pub_key = vr.crypto.private2public(private_key);
         const native_validator = vr.crypto.generate_address(vr.con.constant.native, pub_key);
@@ -205,13 +205,14 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, err_fn]));
+    setImmediate(() => exports.buying_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log]));
     return 0;
 };
-exports.refreshing = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn) => {
+exports.refreshing = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -271,13 +272,14 @@ exports.refreshing = async (private_key, config, node, chain_info_db, root_db, t
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(4000);
-    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, err_fn]));
+    setImmediate(() => exports.refreshing.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log]));
     return 0;
 };
-exports.making_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, err_fn) => {
+exports.making_unit = async (private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log) => {
     try {
         const public_key = vr.crypto.private2public(private_key);
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit, public_key);
@@ -346,13 +348,14 @@ exports.making_unit = async (private_key, config, node, chain_info_db, root_db, 
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(5000);
-    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, err_fn]));
+    setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log]));
     return 0;
 };
-exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, err_fn) => {
+exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log) => {
     try {
         const info = await chain_info_db.read_obj("00");
         if (info == null)
@@ -402,9 +405,10 @@ exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, st
         });
     }
     catch (e) {
-        err_fn(e);
+        //err_fn.apply(null,e);
+        log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, err_fn]));
+    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log]));
     return 0;
 };
