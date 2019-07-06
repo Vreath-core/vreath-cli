@@ -1,6 +1,7 @@
 import * as vr from 'vreath'
 import * as data from '../../logic/data'
 import bigInt from 'big-integer'
+import * as bunyan from 'bunyan'
 /*unit
   height:8 byte,
   index:1 byte,
@@ -9,7 +10,7 @@ import bigInt from 'big-integer'
   unit_price:10 byte
 */
 
-export const post = async (msg:Buffer,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,unit_db:vr.db)=>{
+export const post = async (msg:Buffer,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,unit_db:vr.db,log:bunyan)=>{
   try{
       const unit:vr.Unit = JSON.parse(msg.toString('utf-8'));
       if(!vr.unit.isUnit(unit)) throw new Error('invalid data');
@@ -28,6 +29,6 @@ export const post = async (msg:Buffer,block_db:vr.db,chain_info_db:vr.db,root_db
       return 1;
   }
   catch(e){
-    throw new Error(e);
+      log.info(e);
   }
 }

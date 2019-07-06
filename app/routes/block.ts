@@ -2,8 +2,9 @@ import * as vr from 'vreath'
 import * as data from '../../logic/data'
 import * as works from '../../logic/work'
 import * as P from 'p-iteration'
+import * as bunyan from 'bunyan'
 
-export const get = async (msg:Buffer,stream:any,block_db:vr.db):Promise<void>=>{
+export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promise<void>=>{
     try{
         const height = msg.toString('hex');
         if(vr.checker.hex_check(height,8,true)){
@@ -12,14 +13,14 @@ export const get = async (msg:Buffer,stream:any,block_db:vr.db):Promise<void>=>{
         const block:vr.Block|null = await block_db.read_obj(height);
         if(block==null) throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
-        stream.end();
+        //stream.end();
     }
     catch(e){
-        throw new Error(e);
+        log.info(e);
     }
 }
 
-export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db)=>{
+export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const msg_data:[vr.Block,vr.State[]] = JSON.parse(message.toString('utf-8'));
         const block = msg_data[0];
@@ -57,6 +58,6 @@ export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie
         return 1;
     }
     catch(e){
-        throw new Error(e);
+        log.info(e);
     }
 }

@@ -38,15 +38,30 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { log.info(err); }
             const stream = toStream(conn)
+            let data:string[] = [];
+
+            /*promise.then(()=>{
+                console.log(data.length);
+                const msg = data.reduce((json:string,str)=>json+str,'');
+                chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+            })*/
             stream.on('data',(msg:Buffer)=>{
                 try{
-                    if(msg!=null&&msg.length>0) return chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
+                    if(msg!=null&&msg.length>0){
+                        const str = msg.toString('utf-8');
+                        if(str!='end') data.push(str);
+                        else {
+                            const res = data.reduce((json:string,str)=>json+str,'');
+                            chain_routes.post(res,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                            data = [];
+                            stream.end();
+                        }
+                    }
                 }
                 catch(e){
                     log.info(e);
                 }
             });
-
             stream.on('error',(e:string)=>{
                 log.info(e);
             });
@@ -168,7 +183,7 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
             return res.concat(unit[0]).concat(index).concat(unit[2]).concat(unit[3]).concat(unit[4]);
         },["00"]);
         const tx = await works.make_req_tx(0,bases,feeprice,gas,input_raw,"",private_key,trie,state_db,lock_db);
-        await tx_routes.post(Buffer.from(JSON.stringify([tx,[]])),chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db)
+        await tx_routes.post(Buffer.from(JSON.stringify([tx,[]])),chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log)
         await tx_db.write_obj(tx.hash,tx);
         await P.forEach(units, async (unit,i)=>{
             await unit_db.del(unit_addresses[i+1]);
@@ -351,7 +366,7 @@ export const maintenance = async (node:Node,chain_info_db:vr.db,block_db:vr.db,r
             //stream.emit('end');
             stream.on('data',(msg:Buffer)=>{
                 try{
-                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db);
+                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
                 }
                 catch(e){
                     log.info(e);

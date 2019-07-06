@@ -4,8 +4,11 @@ import * as works from '../../logic/work'
 import {post as block_post} from './block'
 import bigInt from 'big-integer'
 import * as P from 'p-iteration'
+import * as bunyan from 'bunyan'
+import * as fs from 'fs'
+const pull = require('pull-stream');
 
-export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_db:vr.db):Promise<void>=>{
+export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_db:vr.db,log:bunyan):Promise<void>=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -21,7 +24,7 @@ export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_d
         }
         const states = await P.reduce(chain, async (result:{[key:string]:vr.State[]},block)=>{
             if(block.meta.height==="00") return result;
-            return  await P.reduce(block.txs,async (res,tx)=>{
+            return await P.reduce(block.txs,async (res,tx)=>{
                 if(tx.meta.kind!=0){
                     res[tx.hash] = [];
                     return res;
@@ -35,16 +38,18 @@ export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_d
             },result);
         },{});
         stream.write(JSON.stringify([chain,states]));
-        stream.end();
+        stream.write('end');
     }
     catch(e){
-        throw new Error(e);
+        log.info(e);
     }
 }
 
-export const post = async (msg:Buffer,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db)=>{
+export const post = async (msg:string,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
-        const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg.toString('utf-8'));
+        //console.log("yeh!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        //console.log(JSON.parse(msg.toString('utf-8')));
+        const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg);
         const new_chain = parsed[0];
         const output_states = parsed[1];
         if(new_chain.some(block=>!vr.block.isBlock(block))||Object.values(output_states).some(states=>states.some(s=>!vr.state.isState(s)))) throw new Error('invalid data');
@@ -84,88 +89,11 @@ export const post = async (msg:Buffer,block_db:vr.db,chain_info_db:vr.db,root_db
                     return res.concat(output);
                 }
             },[]);
-            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db);
+            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
         }
-        return 1;
-    }
-    catch(e){
-        throw new Error(e);
-    }
-}
-/*
-export default router.get('/',async (req,res)=>{
-    try{
-        const req_diff_sum:number = req.body.diff_sum || 0;
-        if(typeof req_diff_sum != 'number'){
-            res.status(500).send('invalid data');
-            return 0;
-        }
-        const info:chain_info = await read_chain_info();
-        const my_diffs = info.pos_diffs;
-        let height:number = 0;
-        let sum:number = 0;
-        let i:string;
-        let index:number = 0;
-        for(i in my_diffs){
-            index = Number(i);
-            sum = math.chain(sum).add(my_diffs[index]).done();
-            if(math.larger(sum,req_diff_sum) as boolean){
-                height = index;
-                break;
-            }
-        }
-        const chain:vr.Block[] = await read_chain(2*(10**9));
-        let block:vr.Block;
-        let key_height:number = 0;
-        for(block of chain.slice(0,height+1).reverse()){
-            if(block.meta.kind==='key'){
-                key_height = block.meta.height;
-                break;
-            }
-        }
-        const sliced = chain.slice(key_height);
-        res.json(sliced);
-        return 1;
-    }
-    catch(e){
-        res.status(500).send('error');
-    }
-}).post('/', async (req,res)=>{
-    try{
-        const new_chain:vr.Block[] = req.body;
-        const my_chain:vr.Block[] = await read_chain(2*(10**9));
-        const same_height = (()=>{
-            let same_height:number = 0;
-            let index:string;
-            let i:number;
-            for(index in new_chain.slice().reverse()){
-                i = Number(index);
-                if(my_chain[new_chain.length-1-i]!=null&&my_chain[new_chain.length-1-i].hash===new_chain[new_chain.length-1-i].hash){
-                    same_height = new_chain.length-1-i;
-                }
-            }
-            return same_height;
-        })();
-        const add_chain = new_chain.slice(same_height+1);
-        const info:chain_info = await read_chain_info();
-        const my_diff_sum = info.pos_diffs.slice(same_height+1).reduce((sum,diff)=>math.chain(sum).add(diff).done(),0);
-        const new_diff_sum:number = add_chain.reduce((sum,block)=>math.chain(sum).add(block.meta.pos_diff).done(),0);
-        if(math.largerEq(my_diff_sum,new_diff_sum)as boolean){
-            res.status(500).send('light chain');
-            return 0;
-        }
-        await P.forEach(add_chain, async block=>{
-            await rp.post({
-                url:'http://localhost:57750/block',
-                body:block,
-                json:true
-            });
-        });
-        res.status(200).send('success');
         return 1;
     }
     catch(e){
         log.info(e);
-        res.status(500).send('error');
     }
-});*/
+}

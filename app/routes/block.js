@@ -10,7 +10,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const works = __importStar(require("../../logic/work"));
 const P = __importStar(require("p-iteration"));
-exports.get = async (msg, stream, block_db) => {
+exports.get = async (msg, stream, block_db, log) => {
     try {
         const height = msg.toString('hex');
         if (vr.checker.hex_check(height, 8, true)) {
@@ -20,13 +20,13 @@ exports.get = async (msg, stream, block_db) => {
         if (block == null)
             throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
-        stream.end();
+        //stream.end();
     }
     catch (e) {
-        throw new Error(e);
+        log.info(e);
     }
 };
-exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db) => {
+exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log) => {
     try {
         const msg_data = JSON.parse(message.toString('utf-8'));
         const block = msg_data[0];
@@ -72,6 +72,6 @@ exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_
         return 1;
     }
     catch (e) {
-        throw new Error(e);
+        log.info(e);
     }
 };

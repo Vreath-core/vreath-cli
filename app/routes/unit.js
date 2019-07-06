@@ -19,7 +19,7 @@ const big_integer_1 = __importDefault(require("big-integer"));
   address:40 byte,
   unit_price:10 byte
 */
-exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db) => {
+exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db, log) => {
     try {
         const unit = JSON.parse(msg.toString('utf-8'));
         if (!vr.unit.isUnit(unit))
@@ -42,6 +42,6 @@ exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, 
         return 1;
     }
     catch (e) {
-        throw new Error(e);
+        log.info(e);
     }
 };

@@ -152,19 +152,22 @@ const dialog = async (db_set, native_address, unit_address, id) => {
     const state_db = db_set.call('state');
     const native_state = await vr.data.read_from_trie(trie, state_db, native_address, 0, vr.state.create_state("00", vr.con.constant.native, native_address, "00"));
     const unit_state = await vr.data.read_from_trie(trie, state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
-    const amount2str = (amount) => {
+    const hex2tenstr = (amount, compute) => {
         const big_int = big_integer_1.default(amount, 16);
         const big_num = new bignumber_js_1.default(big_int.toString(16), 16);
-        return big_num.dividedBy(10 ** 12).toString();
+        return compute(big_num).toString();
     };
-    const native_amount = amount2str(native_state.amount);
-    const unit_amount = amount2str(unit_state.amount);
+    const amount_divide = (big) => big.dividedBy(10 ** 12);
+    const native_amount = hex2tenstr(native_state.amount, amount_divide);
+    const unit_amount = hex2tenstr(unit_state.amount, amount_divide);
+    const height = hex2tenstr(info.last_height, (big) => big);
     const obj = {
         id: id,
         address: native_address,
         native_balance: native_amount,
         unit_balance: unit_amount,
-        chain_info: info
+        last_height: height,
+        last_hash: info.last_hash
     };
     console.log(JSON.stringify(obj, null, 4));
     await works.sleep(10000);
@@ -235,7 +238,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
+                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -245,7 +248,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.get(msg, node, block_db);
+                        block_routes.get(msg, node, block_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -255,7 +258,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db);
+                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -265,7 +268,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
                 try {
-                    chain_routes.get(stream, chain_info_db, block_db, output_db);
+                    chain_routes.get(stream, chain_info_db, block_db, output_db, log);
                 }
                 catch (e) {
                     log.info(e);
@@ -274,7 +277,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        chain_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
+                        chain_routes.post(msg.toString('utf-8'), block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -284,7 +287,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db);
+                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db, log);
                     }
                     catch (e) {
                         log.info(e);

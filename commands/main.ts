@@ -16,9 +16,8 @@ import output_chain from '../app/repl/output_chain'
 import get_balance from '../app/repl/balance'
 import * as data from '../logic/data'
 import * as intervals from '../logic/interval'
-import {test_setup} from '../test/setup'
-import {run_node1} from '../test/node_1'
-import {run_node2} from '../test/node_2'
+import {setup_data} from '../test/setup'
+import {run_node1,run_node2,run_node3,run_node4} from '../test/nodes'
 import {promisify} from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -253,7 +252,7 @@ yargs
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db);
+                            tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -267,7 +266,7 @@ yargs
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            block_routes.get(msg,node,block_db);
+                            block_routes.get(msg,node,block_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -281,7 +280,7 @@ yargs
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db);
+                            block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -293,7 +292,7 @@ yargs
             node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
                 const stream = toStream(conn);
                 try{
-                    chain_routes.get(stream,chain_info_db,block_db,output_db);
+                    chain_routes.get(stream,chain_info_db,block_db,output_db,log);
                 }
                 catch(e){
                     log.info(e);
@@ -305,7 +304,7 @@ yargs
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
+                            chain_routes.post(msg.toString('utf-8'),block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -319,7 +318,7 @@ yargs
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db);
+                            unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -415,8 +414,8 @@ yargs
     try{
         const id = argv.id;
         if(id==null) throw new Error('enter node id');
-        const setup_data = await test_setup();
-        const nodes = [run_node1,run_node2];
+        const setup_data:setup_data = JSON.parse(await promisify(fs.readFile)(path.join(__dirname,'../test/test_genesis_data.json'),'utf8'));
+        const nodes = [run_node1,run_node2,run_node3,run_node4];
         await nodes[id-1](setup_data);
     }
     catch(e){

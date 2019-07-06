@@ -27,9 +27,7 @@ const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
 const data = __importStar(require("../logic/data"));
 const intervals = __importStar(require("../logic/interval"));
-const setup_2 = require("../test/setup");
-const node_1_1 = require("../test/node_1");
-const node_2_1 = require("../test/node_2");
+const nodes_1 = require("../test/nodes");
 const util_1 = require("util");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -250,7 +248,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db);
+                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -260,7 +258,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.get(msg, node, block_db);
+                        block_routes.get(msg, node, block_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -270,7 +268,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db);
+                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -280,7 +278,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
                 const stream = toStream(conn);
                 try {
-                    chain_routes.get(stream, chain_info_db, block_db, output_db);
+                    chain_routes.get(stream, chain_info_db, block_db, output_db, log);
                 }
                 catch (e) {
                     log.info(e);
@@ -289,7 +287,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        chain_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
+                        chain_routes.post(msg.toString('utf-8'), block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -299,7 +297,7 @@ yargs_1.default
             node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
                     try {
-                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db);
+                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db, log);
                     }
                     catch (e) {
                         log.info(e);
@@ -387,8 +385,8 @@ yargs_1.default
         const id = argv.id;
         if (id == null)
             throw new Error('enter node id');
-        const setup_data = await setup_2.test_setup();
-        const nodes = [node_1_1.run_node1, node_2_1.run_node2];
+        const setup_data = JSON.parse(await util_1.promisify(fs.readFile)(path.join(__dirname, '../test/test_genesis_data.json'), 'utf8'));
+        const nodes = [nodes_1.run_node1, nodes_1.run_node2, nodes_1.run_node3, nodes_1.run_node4];
         await nodes[id - 1](setup_data);
     }
     catch (e) {

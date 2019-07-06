@@ -14,9 +14,8 @@ import readlineSync from 'readline-sync'
 import CryptoJS from 'crypto-js'
 import * as P from 'p-iteration'
 import {run_node, DBSet} from './common'
-import {test_setup,add_setup_data} from './setup'
-import {run_node1} from './node_1'
-import { run_node2 } from './node_2';
+import {test_setup,add_setup_data, setup_data} from './setup'
+import {run_node1,run_node2,run_node3,run_node4} from './nodes'
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
@@ -42,7 +41,9 @@ const toStream = require('pull-stream-to-stream');
 });*/
 
 (async ()=>{
-    const setup_data = await test_setup();
-    const node1 = run_node1(setup_data);
-    const node2 = run_node2(setup_data);
+    const setup_data:setup_data = JSON.parse(await promisify(fs.readFile)(path.join(__dirname,'./test_genesis_data.json'),'utf8'));
+    run_node1(setup_data);
+    run_node2(setup_data);
+    run_node3(setup_data);
+    run_node4(setup_data);
 })();
