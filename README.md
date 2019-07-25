@@ -6,7 +6,11 @@
 ## Attention
 This is under development.  
 Our main net is not launched yet.  
-As we could reset the blockchain, at present, our token has no value.
+As we could reset the blockchain, at present, our token has no value.  
+
+## Requirement
+- npm v11.13.0+
+- cargo v1.35.0+ (nightly)
 
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
