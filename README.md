@@ -80,22 +80,22 @@ You can try a Vreath demonstration!
 ### Terminal1
 `vreath demo 1`  
 Node 1 begins to run.  
-It plays a validator, miner and the genesis-peer.  
+It is a validator, miner and the genesis-peer.  
 
 ### Terminal2
 `vreath demo 2`  
 Node 2 begins to run.  
-It plays a miner.  
+It is a miner.  
 
 ### Terminal3
 `vreath demo 3`  
 Node 3 begins to run.  
-It plays a miner.  
+It is a miner.  
 
 ### Terminal4
 `vreath demo 4`  
 Node 4 begins to run.  
-It plays a validator and miner.  
+It is a validator and miner.  
 
 
 ## License
