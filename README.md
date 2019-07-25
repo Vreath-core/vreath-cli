@@ -6,7 +6,7 @@
 ## Attention
 This is under development.  
 Our main net is not launched yet.  
-Our token has no value now since we could reset the blockchain.
+As we could reset the blockchain, at present, our token has no value.
 
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
@@ -73,6 +73,30 @@ Your balance of VRT is displayed.
 
 - .request-tx --(addresses to request) --(feeprice) --(gas) --(input data) --(log data)  
 A request transaction is published.  
+
+## Demonstration
+You can try a Vreath demonstration!  
+
+### Terminal1
+`vreath demo 1`  
+Node 1 begins to run.  
+It plays a validator, miner and the genesis-peer.  
+
+### Terminal2
+`vreath demo 2`  
+Node 2 begins to run.  
+It plays a miner.  
+
+### Terminal3
+`vreath demo 3`  
+Node 3 begins to run.  
+It plays a miner.  
+
+### Terminal4
+`vreath demo 4`  
+Node 4 begins to run.  
+It plays a validator and miner.  
+
 
 ## License
 [MIT](https://github.com/Vreath-core/vreath-cli/blob/master/LICENSE)
