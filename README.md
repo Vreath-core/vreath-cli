@@ -9,7 +9,8 @@ Our main net is not launched yet.
 As we could reset the blockchain, at present, our token has no value.  
 
 ## Requirement
-- npm v11.13.0+
+- node v11.13.0+
+- npm v6.7.0+
 - cargo v1.35.0+ (nightly)
 
 ## Installation
