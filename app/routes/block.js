@@ -20,7 +20,6 @@ exports.get = async (msg, stream, block_db, log) => {
         if (block == null)
             throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
-        //stream.end();
     }
     catch (e) {
         log.info(e);

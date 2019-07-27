@@ -11,7 +11,7 @@ const search_ip = require('ip');
 
 export const run_node1 = async (setup_data:setup.setup_data)=>{
     const db_set = new DBSet();
-    const genesis_db_set = await setup.add_setup_data(db_set,setup_data);
+    const genesis_db_set = await setup.add_setup_data(db_set,setup_data,1);
     const config:config = {
         miner:{
             flag:true,
@@ -27,14 +27,13 @@ export const run_node1 = async (setup_data:setup.setup_data)=>{
         },
         peer:setup_data.peer.identity
     }
-    //const ip:string = search_ip.address();
     return await run_node(setup_data.privKey,config,"127.0.0.1","8000",[setup_data.peer],genesis_db_set,1);
 }
 
 
 export const run_node2 = async (setup_data:setup.setup_data)=>{
     const db_set = new DBSet();
-    const genesis_db_set = await setup.add_setup_data(db_set,setup_data);
+    const genesis_db_set = await setup.add_setup_data(db_set,setup_data,2);
     const peer = await setup.set_peer_id('8001');
     const config:config = {
         miner:{
@@ -52,13 +51,12 @@ export const run_node2 = async (setup_data:setup.setup_data)=>{
         peer:peer.identity
     }
     const privKey = vr.crypto.genereate_key();
-    //const ip:string = search_ip.address();
     return await run_node(privKey,config,"0.0.0.0","8001",[setup_data.peer],genesis_db_set,2);
 }
 
 export const run_node3 = async (setup_data:setup.setup_data)=>{
     const db_set = new DBSet();
-    const genesis_db_set = await setup.add_setup_data(db_set,setup_data);
+    const genesis_db_set = await setup.add_setup_data(db_set,setup_data,3);
     const peer = await setup.set_peer_id('8002');
     const config:config = {
         miner:{
@@ -76,13 +74,12 @@ export const run_node3 = async (setup_data:setup.setup_data)=>{
         peer:peer.identity
     }
     const privKey = vr.crypto.genereate_key();
-    //const ip:string = search_ip.address();
     return await run_node(privKey,config,"0.0.0.0","8002",[setup_data.peer],genesis_db_set,3);
 }
 
 export const run_node4 = async (setup_data:setup.setup_data)=>{
     const db_set = new DBSet();
-    const genesis_db_set = await setup.add_setup_data(db_set,setup_data);
+    const genesis_db_set = await setup.add_setup_data(db_set,setup_data,4);
     const peer = await setup.set_peer_id('8003');
     const config:config = {
         miner:{
@@ -100,7 +97,6 @@ export const run_node4 = async (setup_data:setup.setup_data)=>{
         peer:peer.identity
     }
     const privKey = vr.crypto.genereate_key();
-    //const ip:string = search_ip.address();
     return await run_node(privKey,config,"0.0.0.0","8003",[setup_data.peer],genesis_db_set,4);
 }
 

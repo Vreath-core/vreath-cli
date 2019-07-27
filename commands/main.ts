@@ -5,6 +5,7 @@ import setup from './setup'
 import generate_keys from './generate-keys'
 import set_peer_id from './set-peer-id'
 import {set_config} from './config'
+import handshake from '../app/routes/handshake'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
@@ -44,66 +45,6 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 const search_ip = require('ip');
-/*
-export class Node extends libp2p {
-    constructor (_options:any,_bootstrapList:string[]) {
-      const defaults = {
-        // The libp2p modules for this libp2p bundle
-        modules: {
-          transport: [
-            TCP           // It can take instances too!
-          ],
-          streamMuxer: [
-            MPLEX,
-            SPDY
-          ],
-          connEncryption: [
-            SECIO
-          ],
-          /** Encryption for private networks. Needs additional private key to work **/
-          // connProtector: new Protector(/*protector specific opts*/),
-          /** Enable custom content routers, such as delegated routing **/
-          // contentRouting: [
-          //   new DelegatedContentRouter(peerInfo.id)
-          // ],
-          /** Enable custom peer routers, such as delegated routing **/
-          // peerRouting: [
-          //   new DelegatedPeerRouter()
-          // ],
-          /*peerDiscovery: [
-            Bootstrap
-          ]           // DHT enables PeerRouting, ContentRouting and DHT itself components
-        },*/
-
-        // libp2p config options (typically found on a config.json)
-        /*config: {                       // The config object is the part of the config that can go into a file, config.json.
-          peerDiscovery: {
-            autoDial: true,
-            /* *//*autoDial: true,             // Auto connect to discovered peers (limited by ConnectionManager minPeers)
-            mdns: {                     // mdns options
-              interval: 1000,           // ms
-              enabled: true
-            },
-            webrtcStar: {               // webrtc-star options
-              interval: 1000,           // ms
-              enabled: false
-            },*/
-            /*bootstrap: {
-                interval: 2000,
-                enabled: true,
-                list: _bootstrapList
-            }
-            // .. other discovery module options.
-          },
-          /*dht: {
-            kBucketSize: 20,
-          }*/
-       /* }
-      }
-      // overload any defaults of your bundle using https://github.com/nodeutils/defaults-deep
-      super(defaultsDeep(_options, defaults))
-    }
-}*/
 
 
 const mapMuxers = (list:string[])=>{
@@ -247,6 +188,31 @@ yargs
                 peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
             });
 
+            node.handle(`/vreath/${data.id}/handshake`, (protocol:string, conn:any)=>{
+                const stream = toStream(conn);
+                let data:string[] = [];
+                stream.on('data',(msg:Buffer)=>{
+                    try{
+                        if(msg!=null&&msg.length>0){
+                            const str = msg.toString('utf-8');
+                            if(str!='end') data.push(str);
+                            else {
+                                const res = data.reduce((json:string,str)=>json+str,'');
+                                handshake(res,peer_list_db,log);
+                                data = [];
+                                stream.end();
+                            }
+                        }
+                    }
+                    catch(e){
+                        log.info(e);
+                    }
+                });
+                stream.on('error',(e:string)=>{
+                    log.info(e);
+                });
+            })
+
             node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
                 pull(
                     conn,
@@ -290,9 +256,29 @@ yargs
             });
 
             node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
-                const stream = toStream(conn);
                 try{
-                    chain_routes.get(stream,chain_info_db,block_db,output_db,log);
+                    const stream = toStream(conn);
+                    let data:string[] = [];
+                    stream.on('data',(msg:Buffer)=>{
+                        try{
+                            if(msg!=null&&msg.length>0){
+                                const str = msg.toString('utf-8');
+                                if(str!='end1') data.push(str);
+                                else {
+                                    const res = data.reduce((json:string,str)=>json+str,'');
+                                    const hashes:{[key:string]:string} = JSON.parse(res);
+                                    chain_routes.get(hashes,stream,chain_info_db,block_db,output_db,log);
+                                    data = [];
+                                }
+                            }
+                        }
+                        catch(e){
+                            log.info(e);
+                        }
+                    });
+                    stream.on('error',(e:string)=>{
+                        log.info(e);
+                    });
                 }
                 catch(e){
                     log.info(e);
@@ -331,6 +317,7 @@ yargs
                 log.info(err);
             })
 
+            intervals.shake_hands(node,peer_list_db,log);
             intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
             if(config.validator.flag){
                 intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
@@ -341,7 +328,6 @@ yargs
                 intervals.refreshing(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
                 intervals.making_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log);
             }
-            intervals.maintenance(node,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,log);
 
             const replServer = repl.start({prompt:'>',terminal:true});
 
@@ -361,13 +347,6 @@ yargs
                     });
                 }
             });
-
-            /*replServer.defineCommand('remit',{
-                help: 'Create request tx',
-                async action(input){
-                    await remit(input,config,my_private);
-                }
-            });*/
 
             replServer.defineCommand('balance',{
                 help: 'Show your VRT balance',

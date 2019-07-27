@@ -11,6 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
+const handshake_1 = __importDefault(require("../app/routes/handshake"));
 const tx_routes = __importStar(require("../app/routes/tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
@@ -42,59 +43,6 @@ const DHT = require('libp2p-kad-dht');
 const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-/*export class ReadableStream extends Readable implements NodeJS.ReadableStream{
-    private i:number = 0;
-    constructor(private keys:Buffer[],private values:Buffer[]){
-        super({objectMode:true});
-    }
-    _read(){
-        if(this.i>=this.keys.length){
-            this.push(null);
-        }
-        else{
-            const obj = {key:this.keys[this.i],value:this.values[this.i]};
-            this.push(obj);
-            this.i ++;
-        }
-    }
-}
-
-export class TestDB implements vr.db_impl {
-    constructor(private keys:Buffer[],private values:Buffer[]){}
-
-    public async get(key:Buffer){
-        const i = this.keys.indexOf(key);
-        return this.values[i];
-    }
-
-    public async put(key:Buffer,val:Buffer){
-        const i = this.keys.indexOf(key);
-        if(i===-1){
-            this.keys.push(key);
-            this.values.push(val);
-        }
-        else{
-            this.values[i] = val;
-        }
-    }
-
-    public async del(key:Buffer){
-        const i = this.keys.indexOf(key);
-        this.keys.splice(i,1);
-        this.values.splice(i,1);
-    }
-
-    public createReadStream(){
-        const keys = this.keys;
-        const values = this.values;
-        const stream = new ReadableStream(keys,values);
-        return stream;
-    }
-
-    get raw_db(){
-        return this.keys.map((key,i)=>{return {key:key,value:this.values[i]}});
-    }
-}*/
 class leveldb {
     constructor(_db) {
         this.db = _db;
@@ -170,7 +118,7 @@ const dialog = async (db_set, native_address, unit_address, id) => {
         last_hash: info.last_hash
     };
     console.log(JSON.stringify(obj, null, 4));
-    await works.sleep(10000);
+    await works.sleep(7000);
     return await dialog(db_set, native_address, unit_address, id);
 };
 const finish_check = async (db_set) => {
@@ -197,17 +145,6 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
     peer_info.multiaddrs.add(`/ip4/${ip}/tcp/${port}`);
     const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}`);
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-    /*const option = {
-        config: {
-          peerDiscovery: {
-            bootstrap: {
-                interval: 2000,
-                enabled: true,
-                list: peer_address_list
-            }
-          }
-        }
-    }*/
     const node = new main_1.Node(peer_info, ['spdy', 'mplex'], peer_address_list);
     const log = bunyan_1.default.createLogger({
         name: 'vreath-cli',
@@ -234,6 +171,31 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
                 };
                 //console.log(peer_obj)
                 peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
+            });
+            node.handle(`/vreath/${data.id}/handshake`, (protocol, conn) => {
+                const stream = toStream(conn);
+                let data = [];
+                stream.on('data', (msg) => {
+                    try {
+                        if (msg != null && msg.length > 0) {
+                            const str = msg.toString('utf-8');
+                            if (str != 'end')
+                                data.push(str);
+                            else {
+                                const res = data.reduce((json, str) => json + str, '');
+                                handshake_1.default(res, peer_list_db, log);
+                                data = [];
+                                stream.end();
+                            }
+                        }
+                    }
+                    catch (e) {
+                        log.info(e);
+                    }
+                });
+                stream.on('error', (e) => {
+                    log.info(e);
+                });
             });
             node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
                 pull(conn, pull.drain((msg) => {
@@ -266,9 +228,30 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
                 }));
             });
             node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
-                const stream = toStream(conn);
                 try {
-                    chain_routes.get(stream, chain_info_db, block_db, output_db, log);
+                    const stream = toStream(conn);
+                    let data = [];
+                    stream.on('data', (msg) => {
+                        try {
+                            if (msg != null && msg.length > 0) {
+                                const str = msg.toString('utf-8');
+                                if (str != 'end1')
+                                    data.push(str);
+                                else {
+                                    const res = data.reduce((json, str) => json + str, '');
+                                    const hashes = JSON.parse(res);
+                                    chain_routes.get(hashes, stream, chain_info_db, block_db, output_db, log);
+                                    data = [];
+                                }
+                            }
+                        }
+                        catch (e) {
+                            log.info(e);
+                        }
+                    });
+                    stream.on('error', (e) => {
+                        log.info(e);
+                    });
                 }
                 catch (e) {
                     log.info(e);
@@ -297,6 +280,7 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
             node.on('error', (e) => {
                 log.info(e);
             });
+            intervals.shake_hands(node, peer_list_db, log);
             intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
             if (config.validator.flag) {
                 intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
@@ -306,16 +290,13 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
                 intervals.refreshing(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
                 intervals.making_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log);
             }
-            intervals.maintenance(node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log);
             const pubKey = vr.crypto.private2public(private_key);
             const native_address = vr.crypto.generate_address(vr.con.constant.native, pubKey);
             const unit_address = vr.crypto.generate_address(vr.con.constant.unit, pubKey);
             dialog(db_set, native_address, unit_address, id);
         });
-        //return await finish_check(db_set)
     }
     catch (e) {
         log.info(e);
     }
-    //return db_set;
 };

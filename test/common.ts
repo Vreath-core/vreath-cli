@@ -1,5 +1,6 @@
 import assert = require('assert');
 import * as vr from 'vreath'
+import handshake from '../app/routes/handshake'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
@@ -38,59 +39,6 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 
-/*export class ReadableStream extends Readable implements NodeJS.ReadableStream{
-    private i:number = 0;
-    constructor(private keys:Buffer[],private values:Buffer[]){
-        super({objectMode:true});
-    }
-    _read(){
-        if(this.i>=this.keys.length){
-            this.push(null);
-        }
-        else{
-            const obj = {key:this.keys[this.i],value:this.values[this.i]};
-            this.push(obj);
-            this.i ++;
-        }
-    }
-}
-
-export class TestDB implements vr.db_impl {
-    constructor(private keys:Buffer[],private values:Buffer[]){}
-
-    public async get(key:Buffer){
-        const i = this.keys.indexOf(key);
-        return this.values[i];
-    }
-
-    public async put(key:Buffer,val:Buffer){
-        const i = this.keys.indexOf(key);
-        if(i===-1){
-            this.keys.push(key);
-            this.values.push(val);
-        }
-        else{
-            this.values[i] = val;
-        }
-    }
-
-    public async del(key:Buffer){
-        const i = this.keys.indexOf(key);
-        this.keys.splice(i,1);
-        this.values.splice(i,1);
-    }
-
-    public createReadStream(){
-        const keys = this.keys;
-        const values = this.values;
-        const stream = new ReadableStream(keys,values);
-        return stream;
-    }
-
-    get raw_db(){
-        return this.keys.map((key,i)=>{return {key:key,value:this.values[i]}});
-    }
-}*/
 
 export class leveldb {
     private db:LevelUp<memdown<Buffer,Buffer>>;
@@ -172,7 +120,7 @@ const dialog = async (db_set:DBSet,native_address:string,unit_address:string,id:
         last_hash:info.last_hash
     }
     console.log(JSON.stringify(obj,null,4));
-    await works.sleep(10000);
+    await works.sleep(7000);
     return await dialog(db_set,native_address,unit_address,id);
 }
 
@@ -200,17 +148,7 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
     peer_info.multiaddrs.add(`/ip4/${ip}/tcp/${port}`);
     const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}`);
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
-    /*const option = {
-        config: {
-          peerDiscovery: {
-            bootstrap: {
-                interval: 2000,
-                enabled: true,
-                list: peer_address_list
-            }
-          }
-        }
-    }*/
+
     const node = new Node(peer_info,['spdy','mplex'],peer_address_list);
 
     const log = bunyan.createLogger({
@@ -240,6 +178,31 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
                 //console.log(peer_obj)
                 peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
             });
+
+            node.handle(`/vreath/${data.id}/handshake`, (protocol:string, conn:any)=>{
+                const stream = toStream(conn);
+                let data:string[] = [];
+                stream.on('data',(msg:Buffer)=>{
+                    try{
+                        if(msg!=null&&msg.length>0){
+                            const str = msg.toString('utf-8');
+                            if(str!='end') data.push(str);
+                            else {
+                                const res = data.reduce((json:string,str)=>json+str,'');
+                                handshake(res,peer_list_db,log);
+                                data = [];
+                                stream.end();
+                            }
+                        }
+                    }
+                    catch(e){
+                        log.info(e);
+                    }
+                });
+                stream.on('error',(e:string)=>{
+                    log.info(e);
+                });
+            })
 
             node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
                 pull(
@@ -284,9 +247,29 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
             });
 
             node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
-                const stream = toStream(conn);
                 try{
-                    chain_routes.get(stream,chain_info_db,block_db,output_db,log);
+                    const stream = toStream(conn);
+                    let data:string[] = [];
+                    stream.on('data',(msg:Buffer)=>{
+                        try{
+                            if(msg!=null&&msg.length>0){
+                                const str = msg.toString('utf-8');
+                                if(str!='end1') data.push(str);
+                                else {
+                                    const res = data.reduce((json:string,str)=>json+str,'');
+                                    const hashes:{[key:string]:string} = JSON.parse(res);
+                                    chain_routes.get(hashes,stream,chain_info_db,block_db,output_db,log);
+                                    data = [];
+                                }
+                            }
+                        }
+                        catch(e){
+                            log.info(e);
+                        }
+                    });
+                    stream.on('error',(e:string)=>{
+                        log.info(e);
+                    });
                 }
                 catch(e){
                     log.info(e);
@@ -325,6 +308,7 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
                 log.info(e);
             })
 
+            intervals.shake_hands(node,peer_list_db,log);
             intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
             if(config.validator.flag){
                 intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
@@ -334,17 +318,14 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
                 intervals.refreshing(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
                 intervals.making_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log);
             }
-            intervals.maintenance(node,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,log);
             const pubKey = vr.crypto.private2public(private_key);
             const native_address = vr.crypto.generate_address(vr.con.constant.native,pubKey);
             const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pubKey);
 
             dialog(db_set,native_address,unit_address,id);
         });
-        //return await finish_check(db_set)
     }
     catch(e){
         log.info(e);
     }
-    //return db_set;
 }

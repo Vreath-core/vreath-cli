@@ -16,22 +16,39 @@ const block_1 = require("./block");
 const big_integer_1 = __importDefault(require("big-integer"));
 const P = __importStar(require("p-iteration"));
 const pull = require('pull-stream');
-exports.get = async (stream, chain_info_db, block_db, output_db, log) => {
+exports.get = async (hashes, stream, chain_info_db, block_db, output_db, log) => {
     try {
         const info = await chain_info_db.read_obj('00');
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
         let i = big_integer_1.default(0);
+        let height;
         let block;
-        let chain = [];
+        let fork_height = last_height;
         while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
-            block = await block_db.read_obj(vr.crypto.bigint2hex(i));
-            if (block == null)
+            height = vr.crypto.bigint2hex(i);
+            block = await block_db.read_obj(height);
+            if (block == null || block.hash != hashes[block.meta.height]) {
+                fork_height = height;
                 break;
-            chain.push(block);
+            }
             i = i.add(1);
         }
+        let chain = [];
+        let next_blocks = [];
+        i = big_integer_1.default(fork_height, 16);
+        while (i.lesserOrEquals(big_integer_1.default(last_height, 16))) {
+            height = vr.crypto.bigint2hex(i);
+            block = await block_db.read_obj(height);
+            i = i.add(1);
+            if (block != null)
+                next_blocks.push(block);
+            else
+                break;
+        }
+        chain = chain.concat(next_blocks);
+        next_blocks = [];
         const states = await P.reduce(chain, async (result, block) => {
             if (block.meta.height === "00")
                 return result;
@@ -50,7 +67,7 @@ exports.get = async (stream, chain_info_db, block_db, output_db, log) => {
             }, result);
         }, {});
         stream.write(JSON.stringify([chain, states]));
-        stream.write('end');
+        stream.write('end2');
     }
     catch (e) {
         log.info(e);
@@ -58,8 +75,6 @@ exports.get = async (stream, chain_info_db, block_db, output_db, log) => {
 };
 exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {
-        //console.log("yeh!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        //console.log(JSON.parse(msg.toString('utf-8')));
         const parsed = JSON.parse(msg);
         const new_chain = parsed[0];
         const output_states = parsed[1];
@@ -80,15 +95,18 @@ exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, 
         let info = await chain_info_db.read_obj('00');
         if (info == null)
             throw new Error('chain_info is empty');
-        const last_key_block = await vr.block.search_key_block(block_db, info.last_height);
-        if (last_key_block.meta.height != '00') {
-            info.last_hash = last_key_block.meta.previoushash;
-            info.last_height = vr.crypto.bigint2hex(big_integer_1.default(last_key_block.meta.height, 16).subtract(1));
+        const fork_block = new_chain[0];
+        const backed_last_height = vr.crypto.bigint2hex(big_integer_1.default(fork_block.meta.height, 16).subtract(1));
+        const backed_last_block = await block_db.read_obj(backed_last_height);
+        if (backed_last_block != null) {
+            info.last_hash = backed_last_block.hash;
+            info.last_height = backed_last_height;
         }
         await chain_info_db.write_obj("00", info);
         let block;
+        const minimum_height = big_integer_1.default(backed_last_height, 16);
         for (block of new_chain) {
-            if (block.meta.height === '00' || big_integer_1.default(block.meta.height, 16).lesser(big_integer_1.default(last_key_block.meta.height, 16)))
+            if (block.meta.height === '00' || big_integer_1.default(block.meta.height, 16).lesser(minimum_height))
                 continue;
             const outputs = await P.reduce(block.txs, async (res, tx) => {
                 if (tx.meta.kind != 1)

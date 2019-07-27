@@ -35,11 +35,6 @@ const toStream = require('pull-stream-to-stream');
 //const parallel = require('mocha.parallel')
 
 
-/*parallel("node test", async ()=>{
-    const node1 = run_node1();
-    const node2 = run_node2();
-});*/
-
 (async ()=>{
     const setup_data:setup_data = JSON.parse(await promisify(fs.readFile)(path.join(__dirname,'./test_genesis_data.json'),'utf8'));
     run_node1(setup_data);

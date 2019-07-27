@@ -28,10 +28,6 @@ const defaultsDeep = require('@nodeutils/defaults-deep');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 //const parallel = require('mocha.parallel')
-/*parallel("node test", async ()=>{
-    const node1 = run_node1();
-    const node2 = run_node2();
-});*/
 (async () => {
     const setup_data = JSON.parse(await util_1.promisify(fs.readFile)(path.join(__dirname, './test_genesis_data.json'), 'utf8'));
     nodes_1.run_node1(setup_data);

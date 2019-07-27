@@ -14,7 +14,6 @@ const vr = __importStar(require("vreath"));
 const data = __importStar(require("./data"));
 const works = __importStar(require("./work"));
 const tx_routes = __importStar(require("../app/routes/tx"));
-const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const P = __importStar(require("p-iteration"));
 const util_1 = require("util");
@@ -23,18 +22,35 @@ const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
-/*const log = bunyan.createLogger({
-    name:'vreath-cli',
-    streams:[
-        {
-            path:path.join(__dirname,'../log/log.log')
-        }
-    ]
-});*/
+exports.shake_hands = async (node, peer_list_db, log) => {
+    try {
+        const peer_info_list = await peer_list_db.filter();
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info, `/vreath/${data.id}/handshake`, (err, conn) => {
+                if (err) {
+                    log.info(err);
+                }
+                const stream = toStream(conn);
+                stream.write(JSON.stringify(peer_info_list));
+                stream.write('end');
+            });
+            return false;
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
+    await works.sleep(30000);
+    setImmediate(() => exports.shake_hands.apply(null, [node, peer_list_db, log]));
+    return 0;
+};
 exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {
         const peers = await peer_list_db.filter();
-        const peer = peers[0];
+        const peer = peers[Math.floor(Math.random() * peers.length)];
         if (peer == null)
             throw new Error('no peer');
         const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
@@ -43,22 +59,33 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root
         const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
+        let got_block;
+        let chain_hashes = {};
+        let i = big_integer_1.default(0);
+        const last_height = big_integer_1.default(info.last_height, 16);
+        let height;
+        for (i; i.lesserOrEquals(last_height); i = i.add(1)) {
+            height = vr.crypto.bigint2hex(i);
+            got_block = await block_db.read_obj(height);
+            if (got_block == null) {
+                await works.maintenance(node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
+                break;
+            }
+            chain_hashes[got_block.meta.height] = got_block.hash;
+        }
         node.dialProtocol(peer_info, `/vreath/${data.id}/chain/get`, (err, conn) => {
             if (err) {
                 log.info(err);
             }
             const stream = toStream(conn);
+            stream.write(JSON.stringify(chain_hashes));
+            stream.write('end1');
             let data = [];
-            /*promise.then(()=>{
-                console.log(data.length);
-                const msg = data.reduce((json:string,str)=>json+str,'');
-                chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
-            })*/
             stream.on('data', (msg) => {
                 try {
                     if (msg != null && msg.length > 0) {
                         const str = msg.toString('utf-8');
-                        if (str != 'end')
+                        if (str != 'end2')
                             data.push(str);
                         else {
                             const res = data.reduce((json, str) => json + str, '');
@@ -368,62 +395,5 @@ exports.making_unit = async (private_key, config, node, chain_info_db, root_db, 
     }
     await works.sleep(5000);
     setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log]));
-    return 0;
-};
-exports.maintenance = async (node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log) => {
-    try {
-        const info = await chain_info_db.read_obj("00");
-        if (info == null)
-            throw new Error("chain_info doesn't exist");
-        const last_height = big_integer_1.default(info.last_height, 16);
-        let block;
-        let i = last_height;
-        let found = false;
-        while (!i.lesserOrEquals(0)) {
-            block = await block_db.read_obj(vr.crypto.bigint2hex(i));
-            if (block == null) {
-                console.log(i.toString() + " block doesn't exist");
-                found = true;
-                break;
-            }
-            i = i.subtract(1);
-        }
-        if (!found)
-            throw new Error('all block exist');
-        const peers = await peer_list_db.filter();
-        const peer = peers[0];
-        if (peer == null)
-            throw new Error('no peer');
-        const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
-        const peer_info = new PeerInfo(peer_id);
-        peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
-        node.dialProtocol(peer_info, `/vreath/${data.id}/block/get`, (err, conn) => {
-            if (err) {
-                log.info(err);
-            }
-            const stream = toStream(conn);
-            const height = vr.crypto.bigint2hex(i);
-            stream.write(height);
-            //stream.emit('end');
-            stream.on('data', (msg) => {
-                try {
-                    if (msg != null && msg.length > 0)
-                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
-                }
-                catch (e) {
-                    log.info(e);
-                }
-            });
-            stream.on('error', (e) => {
-                log.info(e);
-            });
-        });
-    }
-    catch (e) {
-        //err_fn.apply(null,e);
-        log.info(e);
-    }
-    await works.sleep(30000);
-    setImmediate(() => exports.maintenance.apply(null, [node, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, log]));
     return 0;
 };

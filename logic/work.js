@@ -14,7 +14,10 @@ const vr = __importStar(require("vreath"));
 const P = __importStar(require("p-iteration"));
 const big_integer_1 = __importDefault(require("big-integer"));
 const lodash_1 = require("lodash");
+const data = __importStar(require("./data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
+const block_routes = __importStar(require("../app/routes/block"));
+const toStream = require('pull-stream-to-stream');
 exports.sleep = (msec) => {
     return new Promise(function (resolve) {
         setTimeout(function () { resolve(); }, msec);
@@ -243,4 +246,30 @@ exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, 
     if (!vr.tx.verify_ref_tx(ref_tx, output, block_db, trie, state_db, lock_db, last_height))
         throw new Error('fail to create valid refresh tx');
     return [ref_tx, output];
+};
+exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
+    try {
+        node.dialProtocol(peer_info, `/vreath/${data.id}/block/get`, (err, conn) => {
+            if (err) {
+                log.info(err);
+            }
+            const stream = toStream(conn);
+            stream.write(height);
+            stream.on('data', (msg) => {
+                try {
+                    if (msg != null && msg.length > 0)
+                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
+                }
+                catch (e) {
+                    log.info(e);
+                }
+            });
+            stream.on('error', (e) => {
+                log.info(e);
+            });
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
 };

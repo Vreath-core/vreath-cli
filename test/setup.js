@@ -81,7 +81,6 @@ exports.set_peer_id = async (port) => {
     const peer_id = await util_1.promisify(PeerId.create)();
     const id_obj = peer_id.toJSON();
     const peer_info = new PeerInfo(peer_id);
-    //const ip:string = search_ip.address();
     peer_info.multiaddrs.add(`/ip4/127.0.0.1/tcp/${port}/p2p/${id_obj.id}`);
     const multiaddrs = peer_info.multiaddrs.toArray().map((add) => Multiaddr(add.buffer).toString());
     const peer_obj = {
@@ -90,7 +89,7 @@ exports.set_peer_id = async (port) => {
     };
     return peer_obj;
 };
-exports.add_setup_data = async (db_set, setup) => {
+exports.add_setup_data = async (db_set, setup, id) => {
     try {
         db_set.add_db('chain_info', common_1.make_db_obj());
         db_set.add_db('root', common_1.make_db_obj());
@@ -117,8 +116,7 @@ exports.add_setup_data = async (db_set, setup) => {
         root_db.put("00", root);
         block_db.write_obj("00", setup.block);
         peer_list_db.write_obj(Buffer.from(setup.peer.identity.id).toString('hex'), setup.peer);
-        await util_1.promisify(fs.writeFile)(path.join(__dirname, '../log/test1.log'), '', 'utf-8');
-        await util_1.promisify(fs.writeFile)(path.join(__dirname, '../log/test2.log'), '', 'utf-8');
+        await util_1.promisify(fs.writeFile)(path.join(__dirname, '../log/test' + id.toString() + '.log'), '', 'utf-8');
         return db_set;
     }
     catch (e) {

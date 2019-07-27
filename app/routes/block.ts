@@ -13,7 +13,6 @@ export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promi
         const block:vr.Block|null = await block_db.read_obj(height);
         if(block==null) throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
-        //stream.end();
     }
     catch(e){
         log.info(e);

@@ -4,6 +4,11 @@ import bigInt, {BigInteger} from 'big-integer';
 import {cloneDeep} from 'lodash'
 import * as data from './data'
 import req_tx_com from '../app/repl/request-tx'
+import * as block_routes from '../app/routes/block'
+import * as chain_routes from '../app/routes/chain'
+import bunyan from 'bunyan'
+import {Node} from '../commands/main'
+const toStream = require('pull-stream-to-stream');
 
 export const sleep = (msec:number)=>{
     return new Promise(function(resolve) {
@@ -218,4 +223,29 @@ export const make_ref_tx = async (height:string,index:number,gas_share:number,un
     const ref_tx = vr.tx.create_ref_tx(height,index,success,output_hashes,[],nonce,gas_share,unit_price,private_key);
     if(!vr.tx.verify_ref_tx(ref_tx,output,block_db,trie,state_db,lock_db,last_height)) throw new Error('fail to create valid refresh tx');
     return [ref_tx,output];
+}
+
+export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+    try{
+        node.dialProtocol(peer_info,`/vreath/${data.id}/block/get`,(err:string,conn:any) => {
+            if (err) { log.info(err); }
+            const stream = toStream(conn)
+            stream.write(height);
+            stream.on('data',(msg:Buffer)=>{
+                try{
+                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            });
+
+            stream.on('error',(e:string)=>{
+                log.info(e);
+            });
+        });
+    }
+    catch(e){
+        log.info(e);
+    }
 }

@@ -15,41 +15,69 @@ const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 
-/*const log = bunyan.createLogger({
-    name:'vreath-cli',
-    streams:[
-        {
-            path:path.join(__dirname,'../log/log.log')
-        }
-    ]
-});*/
+
+export const shake_hands = async (node:Node,peer_list_db:vr.db,log:bunyan)=>{
+    try{
+        const peer_info_list:data.peer_info[] = await peer_list_db.filter();
+        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info,`/vreath/${data.id}/handshake`,(err:string,conn:any) => {
+                if (err) { log.info(err); }
+                const stream = toStream(conn);
+                stream.write(JSON.stringify(peer_info_list));
+                stream.write('end');
+            });
+            return false;
+        });
+    }
+    catch(e){
+        log.info(e);
+    }
+    await works.sleep(30000);
+    setImmediate(()=>shake_hands.apply(null,[node,peer_list_db,log]));
+    return 0;
+}
 
 
 export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const peers:data.peer_info[] = await peer_list_db.filter();
-        const peer = peers[0];
+        const peer = peers[Math.floor(Math.random()*peers.length)];
         if(peer==null) throw new Error('no peer');
         const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
         const peer_info = new PeerInfo(peer_id);
         peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
+        let got_block:vr.Block|null;
+        let chain_hashes:{[key:string]:string} = {};
+        let i:BigInteger = bigInt(0);
+        const last_height = bigInt(info.last_height,16);
+        let height:string;
+        for(i;i.lesserOrEquals(last_height);i=i.add(1)){
+            height = vr.crypto.bigint2hex(i);
+            got_block = await block_db.read_obj(height);
+            if(got_block==null){
+                await works.maintenance(node,peer_info,height,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                break;
+            }
+            chain_hashes[got_block.meta.height] = got_block.hash;
+        }
+
         node.dialProtocol(peer_info,`/vreath/${data.id}/chain/get`,(err:string,conn:any) => {
             if (err) { log.info(err); }
-            const stream = toStream(conn)
+            const stream = toStream(conn);
+            stream.write(JSON.stringify(chain_hashes));
+            stream.write('end1');
             let data:string[] = [];
 
-            /*promise.then(()=>{
-                console.log(data.length);
-                const msg = data.reduce((json:string,str)=>json+str,'');
-                chain_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
-            })*/
             stream.on('data',(msg:Buffer)=>{
                 try{
                     if(msg!=null&&msg.length>0){
                         const str = msg.toString('utf-8');
-                        if(str!='end') data.push(str);
+                        if(str!='end2') data.push(str);
                         else {
                             const res = data.reduce((json:string,str)=>json+str,'');
                             chain_routes.post(res,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
@@ -331,58 +359,5 @@ export const making_unit = async (private_key:string,config:any,node:Node,chain_
     }
     await works.sleep(5000);
     setImmediate(()=>making_unit.apply(null,[private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log]));
-    return 0;
-}
-
-export const maintenance = async (node:Node,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
-    try{
-        const info:data.chain_info|null = await chain_info_db.read_obj("00");
-        if(info==null) throw new Error("chain_info doesn't exist");
-        const last_height = bigInt(info.last_height,16);
-        let block:vr.Block|null;
-        let i = last_height;
-        let found:boolean = false;
-        while(!i.lesserOrEquals(0)){
-            block = await block_db.read_obj(vr.crypto.bigint2hex(i));
-            if(block==null){
-                console.log(i.toString()+" block doesn't exist");
-                found = true;
-                break;
-            }
-            i = i.subtract(1);
-        }
-        if(!found) throw new Error('all block exist');
-        const peers:data.peer_info[] = await peer_list_db.filter();
-        const peer = peers[0];
-        if(peer==null) throw new Error('no peer');
-        const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
-        const peer_info = new PeerInfo(peer_id);
-        peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
-        node.dialProtocol(peer_info,`/vreath/${data.id}/block/get`,(err:string,conn:any) => {
-            if (err) { log.info(err); }
-            const stream = toStream(conn)
-            const height = vr.crypto.bigint2hex(i);
-            stream.write(height);
-            //stream.emit('end');
-            stream.on('data',(msg:Buffer)=>{
-                try{
-                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
-                }
-                catch(e){
-                    log.info(e);
-                }
-            });
-
-            stream.on('error',(e:string)=>{
-                log.info(e);
-            });
-        });
-    }
-    catch(e){
-        //err_fn.apply(null,e);
-        log.info(e);
-    }
-    await works.sleep(30000);
-    setImmediate(()=>maintenance.apply(null,[node,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,log]));
     return 0;
 }

@@ -8,20 +8,36 @@ import * as bunyan from 'bunyan'
 import * as fs from 'fs'
 const pull = require('pull-stream');
 
-export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_db:vr.db,log:bunyan):Promise<void>=>{
+export const get = async (hashes:{[key:string]:string},stream:any,chain_info_db:vr.db,block_db:vr.db,output_db:vr.db,log:bunyan):Promise<void>=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
         let i = bigInt(0);
+        let height:string;
         let block:vr.Block|null;
-        let chain:vr.Block[] = [];
+        let fork_height:string = last_height;
         while(i.lesserOrEquals(bigInt(last_height,16))){
-            block = await block_db.read_obj(vr.crypto.bigint2hex(i));
-            if(block==null) break;
-            chain.push(block);
+            height = vr.crypto.bigint2hex(i);
+            block = await block_db.read_obj(height);
+            if(block==null||block.hash!=hashes[block.meta.height]){
+                fork_height = height;
+                break;
+            }
             i = i.add(1);
         }
+        let chain:vr.Block[] = [];
+        let next_blocks:vr.Block[] = [];
+        i = bigInt(fork_height,16);
+        while(i.lesserOrEquals(bigInt(last_height,16))){
+            height = vr.crypto.bigint2hex(i);
+            block = await block_db.read_obj(height);
+            i = i.add(1);
+            if(block!=null) next_blocks.push(block);
+            else break;
+        }
+        chain = chain.concat(next_blocks);
+        next_blocks = [];
         const states = await P.reduce(chain, async (result:{[key:string]:vr.State[]},block)=>{
             if(block.meta.height==="00") return result;
             return await P.reduce(block.txs,async (res,tx)=>{
@@ -38,7 +54,7 @@ export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_d
             },result);
         },{});
         stream.write(JSON.stringify([chain,states]));
-        stream.write('end');
+        stream.write('end2');
     }
     catch(e){
         log.info(e);
@@ -47,8 +63,6 @@ export const get = async (stream:any,chain_info_db:vr.db,block_db:vr.db,output_d
 
 export const post = async (msg:string,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
-        //console.log("yeh!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        //console.log(JSON.parse(msg.toString('utf-8')));
         const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg);
         const new_chain = parsed[0];
         const output_states = parsed[1];
@@ -65,15 +79,18 @@ export const post = async (msg:string,block_db:vr.db,chain_info_db:vr.db,root_db
         if(new_diff_sum.lesserOrEquals(my_diff_sum)) throw new Error("lighter chain");
         let info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error('chain_info is empty');
-        const last_key_block = await vr.block.search_key_block(block_db,info.last_height);
-        if(last_key_block.meta.height!='00'){
-            info.last_hash = last_key_block.meta.previoushash;
-            info.last_height = vr.crypto.bigint2hex(bigInt(last_key_block.meta.height,16).subtract(1));
+        const fork_block = new_chain[0];
+        const backed_last_height = vr.crypto.bigint2hex(bigInt(fork_block.meta.height,16).subtract(1));
+        const backed_last_block:vr.Block|null = await block_db.read_obj(backed_last_height);
+        if(backed_last_block!=null){
+            info.last_hash = backed_last_block.hash;
+            info.last_height = backed_last_height;
         }
         await chain_info_db.write_obj("00",info);
         let block:vr.Block;
+        const minimum_height = bigInt(backed_last_height,16);
         for(block of new_chain){
-            if(block.meta.height==='00'||bigInt(block.meta.height,16).lesser(bigInt(last_key_block.meta.height,16))) continue;
+            if(block.meta.height==='00'||bigInt(block.meta.height,16).lesser(minimum_height)) continue;
             const outputs = await P.reduce(block.txs,async (res:vr.State[],tx)=>{
                 if(tx.meta.kind!=1) return res;
                 const given = output_states[tx.hash];
