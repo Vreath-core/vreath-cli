@@ -5,7 +5,7 @@
   "author": "Sora Suegami",
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
   "scripts": {
-    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../node-cryptonight-lite && npm run rebuild && cd ../../ && npm link ./",
+    "build": "npm install ./ && cd ./node_modules/vreath/ffi-vreath && npm install && cd ../../node-cryptonight-lite && npm run rebuild && cd ../../ && npm link ./ && mkdir ./log && touch ./log/main.log ./log/test1.log ./log/test2.log ./log/test3.log ./log/test4.log",
     "test": "./node_modules/.bin/mocha --require espower-typescript/guess 'test/main.ts' --max-old-space-size=4096"
   },
   "dependencies": {

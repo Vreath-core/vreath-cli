@@ -13,6 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const P = __importStar(require("p-iteration"));
 const big_integer_1 = __importDefault(require("big-integer"));
+const bignumber_js_1 = __importDefault(require("bignumber.js"));
 const lodash_1 = require("lodash");
 const data = __importStar(require("./data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
@@ -246,6 +247,36 @@ exports.make_ref_tx = async (height, index, gas_share, unit_price, private_key, 
     if (!vr.tx.verify_ref_tx(ref_tx, output, block_db, trie, state_db, lock_db, last_height))
         throw new Error('fail to create valid refresh tx');
     return [ref_tx, output];
+};
+exports.dialog_data = async (chain_info_db, root_db, trie_db, state_db, native_address, unit_address, id) => {
+    const info = await chain_info_db.read_obj('00');
+    if (info == null)
+        throw new Error("chain_info doesn't exist");
+    const last_height = info.last_height;
+    const root = await root_db.get(last_height);
+    if (root == null)
+        throw new Error("root doesn't exist");
+    const trie = vr.data.trie_ins(trie_db, root);
+    const native_state = await vr.data.read_from_trie(trie, state_db, native_address, 0, vr.state.create_state("00", vr.con.constant.native, native_address, "00"));
+    const unit_state = await vr.data.read_from_trie(trie, state_db, unit_address, 0, vr.state.create_state("00", vr.con.constant.unit, unit_address, "00"));
+    const hex2tenstr = (amount, compute) => {
+        const big_int = big_integer_1.default(amount, 16);
+        const big_num = new bignumber_js_1.default(big_int.toString(16), 16);
+        return compute(big_num).toString();
+    };
+    const amount_divide = (big) => big.dividedBy(10 ** 12);
+    const native_amount = hex2tenstr(native_state.amount, amount_divide);
+    const unit_amount = hex2tenstr(unit_state.amount, amount_divide);
+    const height = hex2tenstr(info.last_height, (big) => big);
+    const obj = {
+        id: id,
+        address: native_address,
+        native_balance: native_amount,
+        unit_balance: unit_amount,
+        last_height: height,
+        last_hash: info.last_hash
+    };
+    return obj;
 };
 exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {

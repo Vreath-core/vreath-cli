@@ -1,7 +1,7 @@
 import * as vr from 'vreath'
 import * as data from './data'
 import * as works from './work'
-import {Node} from '../commands/main'
+import {Node} from '../commands/run'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'

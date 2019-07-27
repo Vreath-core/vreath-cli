@@ -1,13 +1,14 @@
 import * as vr from 'vreath'
 import * as P from 'p-iteration'
 import bigInt, {BigInteger} from 'big-integer';
+import BigNumber from "bignumber.js"
 import {cloneDeep} from 'lodash'
 import * as data from './data'
 import req_tx_com from '../app/repl/request-tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
 import bunyan from 'bunyan'
-import {Node} from '../commands/main'
+import {Node} from '../commands/run'
 const toStream = require('pull-stream-to-stream');
 
 export const sleep = (msec:number)=>{
@@ -223,6 +224,35 @@ export const make_ref_tx = async (height:string,index:number,gas_share:number,un
     const ref_tx = vr.tx.create_ref_tx(height,index,success,output_hashes,[],nonce,gas_share,unit_price,private_key);
     if(!vr.tx.verify_ref_tx(ref_tx,output,block_db,trie,state_db,lock_db,last_height)) throw new Error('fail to create valid refresh tx');
     return [ref_tx,output];
+}
+
+export const dialog_data = async (chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,native_address:string,unit_address:string,id:number):Promise<{id:number,address:string,unit_balance:string,last_height:string,last_hash:string}>=>{
+    const info:data.chain_info|null = await chain_info_db.read_obj('00');
+    if(info==null) throw new Error("chain_info doesn't exist");
+    const last_height = info.last_height;
+    const root = await root_db.get(last_height);
+    if(root==null) throw new Error("root doesn't exist");
+    const trie = vr.data.trie_ins(trie_db,root);
+    const native_state = await vr.data.read_from_trie(trie,state_db,native_address,0,vr.state.create_state("00",vr.con.constant.native,native_address,"00"));
+    const unit_state = await vr.data.read_from_trie(trie,state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address,"00"));
+    const hex2tenstr = (amount:string,compute:(big:BigNumber)=>BigNumber)=>{
+        const big_int = bigInt(amount,16);
+        const big_num = new BigNumber(big_int.toString(16),16);
+        return compute(big_num).toString();
+    }
+    const amount_divide = (big:BigNumber)=>big.dividedBy(10**12);
+    const native_amount = hex2tenstr(native_state.amount,amount_divide);
+    const unit_amount = hex2tenstr(unit_state.amount,amount_divide);
+    const height = hex2tenstr(info.last_height,(big:BigNumber)=>big);
+    const obj = {
+        id:id,
+        address:native_address,
+        native_balance:native_amount,
+        unit_balance:unit_amount,
+        last_height:height,
+        last_hash:info.last_hash
+    }
+    return obj;
 }
 
 export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{

@@ -1,20 +1,8 @@
 import * as vr from 'vreath';
 import levelup, { LevelUp } from 'levelup';
-import leveldown, { LevelDown, Bytes } from 'leveldown';
+import leveldown, { LevelDown} from 'leveldown';
 import * as path from 'path'
-import { Readable } from 'stream';
 export const id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
-
-/*class leveldb {
-    this.db:LevelUp<LevelDOWN>
-    constructor(private _db:LevelUp<LevelDown>){
-        this.db = _db;
-    }
-    public async get(key:Buffer):Promise<Buffer>{
-        return super.get(key);
-    }
-}
-*/
 
 class leveldb {
     private db:LevelUp<LevelDown>;

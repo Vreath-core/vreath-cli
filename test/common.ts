@@ -1,4 +1,3 @@
-import assert = require('assert');
 import * as vr from 'vreath'
 import handshake from '../app/routes/handshake'
 import * as tx_routes from '../app/routes/tx'
@@ -8,16 +7,11 @@ import * as unit_routes from '../app/routes/unit'
 import * as data from '../logic/data'
 import * as works from '../logic/work'
 import * as intervals from '../logic/interval'
-import {Node} from '../commands/main'
+import {Node} from '../commands/run'
 import {promisify} from 'util'
-import {Readable} from 'stream'
 import levelup, { LevelUp } from 'levelup';
 import memdown from 'memdown'
-import * as fs from 'fs'
 import * as path from 'path'
-import readlineSync from 'readline-sync'
-import CryptoJS from 'crypto-js'
-import * as P from 'p-iteration'
 import bigInt from 'big-integer'
 import BigNumber from "bignumber.js"
 import bunyan from 'bunyan'
@@ -25,17 +19,6 @@ import { config } from '../commands/config';
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
-const PeerBook = require('peer-book')
-const libp2p = require('libp2p');
-const TCP = require('libp2p-tcp')
-const WS = require('libp2p-websockets')
-const SPDY = require('libp2p-spdy')
-const MPLEX = require('libp2p-mplex')
-const SECIO = require('libp2p-secio')
-const MulticastDNS = require('libp2p-mdns')
-const Bootstrap = require('libp2p-bootstrap')
-const DHT = require('libp2p-kad-dht')
-const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 
@@ -91,34 +74,10 @@ export class DBSet {
 
 const dialog = async (db_set:DBSet,native_address:string,unit_address:string,id:number):Promise<void>=>{
     const chain_info_db = db_set.call('chain_info');
-    const info:data.chain_info|null = await chain_info_db.read_obj('00');
-    if(info==null) throw new Error("chain_info doesn't exist");
-    const last_height = info.last_height;
     const root_db = db_set.call('root');
-    const root = await root_db.get(last_height);
-    if(root==null) throw new Error("root doesn't exist");
     const trie_db = db_set.call('trie');
-    const trie = vr.data.trie_ins(trie_db,root);
     const state_db = db_set.call('state')
-    const native_state = await vr.data.read_from_trie(trie,state_db,native_address,0,vr.state.create_state("00",vr.con.constant.native,native_address,"00"));
-    const unit_state = await vr.data.read_from_trie(trie,state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address,"00"));
-    const hex2tenstr = (amount:string,compute:(big:BigNumber)=>BigNumber)=>{
-        const big_int = bigInt(amount,16);
-        const big_num = new BigNumber(big_int.toString(16),16);
-        return compute(big_num).toString();
-    }
-    const amount_divide = (big:BigNumber)=>big.dividedBy(10**12);
-    const native_amount = hex2tenstr(native_state.amount,amount_divide);
-    const unit_amount = hex2tenstr(unit_state.amount,amount_divide);
-    const height = hex2tenstr(info.last_height,(big:BigNumber)=>big);
-    const obj = {
-        id:id,
-        address:native_address,
-        native_balance:native_amount,
-        unit_balance:unit_amount,
-        last_height:height,
-        last_hash:info.last_hash
-    }
+    const obj = await works.dialog_data(chain_info_db,root_db,trie_db,state_db,native_address,unit_address,id);
     console.log(JSON.stringify(obj,null,4));
     await works.sleep(7000);
     return await dialog(db_set,native_address,unit_address,id);

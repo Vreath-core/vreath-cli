@@ -15,16 +15,6 @@ const levelup_1 = __importDefault(require("levelup"));
 const leveldown_1 = __importDefault(require("leveldown"));
 const path = __importStar(require("path"));
 exports.id = vr.con.constant.my_chain_id + vr.con.constant.my_net_id;
-/*class leveldb {
-    this.db:LevelUp<LevelDOWN>
-    constructor(private _db:LevelUp<LevelDown>){
-        this.db = _db;
-    }
-    public async get(key:Buffer):Promise<Buffer>{
-        return super.get(key);
-    }
-}
-*/
 class leveldb {
     constructor(_db) {
         this.db = _db;
