@@ -82,6 +82,8 @@ A request transaction is published.
 ## Demonstration
 You can try a Vreath demonstration!  
 
+![demo](https://github.com/Vreath-core/Documents/blob/master/vreath_demo_node4.gif?raw=true)  
+
 ### Terminal1
 `vreath demo 1`  
 Node 1 begins to run.  
