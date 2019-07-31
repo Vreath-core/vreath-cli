@@ -63,10 +63,9 @@ For example, `.get-block 9` shows you the tenth block.
 - .get-chain-info  
 The meta data about your blockchain is displayed.  
 
-    - net_id: the network id.  
-    - chain_id: the chain id.  
-    - version: the version of your protocol.  
-    - compatible_version: the compatible version of your protocol.  
+    - id: the node id. (default: 1)  
+    - native_balance: the amount of native token(VRT).  
+    - unit_balance: the amount of unit token.  
     - last_height: the height of the last block.  
     - last_hash: the hash of the last block.  
 
