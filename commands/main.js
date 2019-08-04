@@ -65,18 +65,7 @@ yargs_1.default
     .usage('Usage: $0 <command> [options]')
     .command('setup', 'setup data', {}, async () => {
     try {
-        const trie_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/trie`));
-        const state_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/state`));
-        const lock_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/lock`));
-        const block_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/block`));
-        const chain_info_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/chain_info`));
-        const tx_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/tx_pool`));
-        const output_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/output`));
-        const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
-        const unit_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/unit_store`));
-        const peer_list_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/peer_list`));
-        const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
-        await setup_1.default((Buffer.from(my_password, 'utf-8').toString('hex')), state_db, lock_db, trie_db, chain_info_db, block_db, root_db, tx_db, output_db, unit_db, peer_list_db);
+        await setup_1.default();
         process.exit(1);
     }
     catch (e) {

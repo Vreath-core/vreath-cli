@@ -77,7 +77,7 @@
     "vreath"
   ],
   "license": "MIT",
-  "main": "./commands/main.js",
+  "main": "./index.js",
   "bin": {
     "vreath": "./commands/main.js"
   },

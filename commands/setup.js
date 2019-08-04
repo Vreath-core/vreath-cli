@@ -6,16 +6,32 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
+const data = __importStar(require("../logic/data"));
 const genesis = __importStar(require("../genesis/index"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const util_1 = require("util");
 const P = __importStar(require("p-iteration"));
-exports.default = async (my_password, state_db, lock_db, trie_db, chain_info_db, block_db, root_db, tx_db, output_db, unit_db, peer_list_db) => {
+const readline_sync_1 = __importDefault(require("readline-sync"));
+exports.default = async () => {
+    const trie_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/trie`));
+    const state_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/state`));
+    const lock_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/lock`));
+    const block_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/block`));
+    const chain_info_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/chain_info`));
+    const tx_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/tx_pool`));
+    const output_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/output`));
+    const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
+    const unit_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/unit_store`));
+    const peer_list_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/peer_list`));
+    const my_password = Buffer.from(readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' }), 'utf-8').toString('hex');
     const my_key = vr.crypto.get_sha256(my_password).slice(0, 122);
-    await util_1.promisify(fs.stat)('./keys/private/' + my_key + '.txt');
+    await util_1.promisify(fs.stat)(path.join(__dirname, '../keys/private/' + my_key + '.txt'));
     await state_db.filter('hex', 'utf8', async (key, val) => {
         await state_db.del(key);
         return false;

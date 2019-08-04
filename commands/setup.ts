@@ -6,10 +6,22 @@ import * as path from 'path'
 import {promisify} from 'util'
 import * as P from 'p-iteration'
 import bigInt from 'big-integer'
+import readlineSync from 'readline-sync'
 
-export default async (my_password:string,state_db:vr.db,lock_db:vr.db,trie_db:vr.db,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,tx_db:vr.db,output_db:vr.db,unit_db:vr.db,peer_list_db:vr.db)=>{
+export default async ()=>{
+    const trie_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/trie`));
+    const state_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/state`));
+    const lock_db =  data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/lock`));
+    const block_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/block`));
+    const chain_info_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/chain_info`));
+    const tx_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/tx_pool`));
+    const output_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/output`));
+    const root_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/root`));
+    const unit_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/unit_store`));
+    const peer_list_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/peer_list`));
+    const my_password = Buffer.from(readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'}),'utf-8').toString('hex')
     const my_key = vr.crypto.get_sha256(my_password).slice(0,122);
-    await promisify(fs.stat)('./keys/private/'+my_key+'.txt');
+    await promisify(fs.stat)(path.join(__dirname,'../keys/private/'+my_key+'.txt'));
     await state_db.filter('hex','utf8',async (key:string,val:vr.Tx)=>{
         await state_db.del(key);
         return false;
