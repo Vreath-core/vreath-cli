@@ -11,12 +11,13 @@ As we could reset the blockchain, at present, our token has no value.
 ## Requirement
 - node v11.13.0+
 - npm v6.7.0+
+- yarn 1.17.3+
 - cargo v1.35.0+ (nightly)
 
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
 `cd ./vreath-cli`  
-`npm run build`  
+`yarn build`  
 
 ## Quick Start
 Generate private key to use:  

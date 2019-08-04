@@ -60,6 +60,15 @@ const log = bunyan.createLogger({
 
 const config:config = JSON.parse(fs.readFileSync(path.join(__dirname,'../config/config.json'),'utf-8'));
 
+if(!fs.existsSync(path.join(__dirname,'../log'))){
+    fs.mkdirSync(path.join(__dirname,'../log'));
+    fs.writeFileSync(path.join(__dirname,'../log/main.log'),'');
+    fs.writeFileSync(path.join(__dirname,'../log/test1.log'),'');
+    fs.writeFileSync(path.join(__dirname,'../log/test2.log'),'');
+    fs.writeFileSync(path.join(__dirname,'../log/test3.log'),'');
+    fs.writeFileSync(path.join(__dirname,'../log/test4.log'),'');
+}
+
 yargs
 .usage('Usage: $0 <command> [options]')
 .command('setup','setup data', {}, async ()=>{
