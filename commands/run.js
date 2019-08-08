@@ -197,7 +197,7 @@ exports.run = async (config, log) => {
         node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
             pull(conn, pull.drain((msg) => {
                 try {
-                    block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
+                    block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log);
                 }
                 catch (e) {
                     log.info(e);

@@ -278,7 +278,7 @@ exports.dialog_data = async (chain_info_db, root_db, trie_db, state_db, native_a
     };
     return obj;
 };
-exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
+exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, uniter_db, log) => {
     try {
         node.dialProtocol(peer_info, `/vreath/${data.id}/block/get`, (err, conn) => {
             if (err) {
@@ -289,7 +289,7 @@ exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, r
             stream.on('data', (msg) => {
                 try {
                     if (msg != null && msg.length > 0)
-                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
+                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log);
                 }
                 catch (e) {
                     log.info(e);

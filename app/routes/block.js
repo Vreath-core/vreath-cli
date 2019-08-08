@@ -25,7 +25,7 @@ exports.get = async (msg, stream, block_db, log) => {
         log.info(e);
     }
 };
-exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log) => {
+exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log) => {
     try {
         const msg_data = JSON.parse(message.toString('utf-8'));
         const block = msg_data[0];
@@ -68,6 +68,9 @@ exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_
         await P.forEach(txs_hash, async (key) => {
             await tx_db.del(key);
         });
+        const pre_uniters = await uniter_db.read_obj(last_height) || [];
+        const new_uniters = vr.finalize.rocate(pre_uniters);
+        await uniter_db.write_obj(block.meta.height, new_uniters);
         return 1;
     }
     catch (e) {

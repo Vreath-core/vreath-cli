@@ -255,7 +255,7 @@ export const dialog_data = async (chain_info_db:vr.db,root_db:vr.db,trie_db:vr.d
     return obj;
 }
 
-export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
     try{
         node.dialProtocol(peer_info,`/vreath/${data.id}/block/get`,(err:string,conn:any) => {
             if (err) { log.info(err); }
@@ -263,7 +263,7 @@ export const maintenance = async (node:Node,peer_info:any,height:string,chain_in
             stream.write(height);
             stream.on('data',(msg:Buffer)=>{
                 try{
-                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
+                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
                 }
                 catch(e){
                     log.info(e);

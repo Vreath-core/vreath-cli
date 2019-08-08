@@ -68,7 +68,7 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, fina
             height = vr.crypto.bigint2hex(i);
             got_block = await block_db.read_obj(height);
             if (got_block == null) {
-                await works.maintenance(node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
+                await works.maintenance(node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, uniter_db, log);
                 break;
             }
             chain_hashes[got_block.meta.height] = got_block.hash;
@@ -395,5 +395,49 @@ exports.making_unit = async (private_key, config, node, chain_info_db, root_db, 
     }
     await works.sleep(5000);
     setImmediate(() => exports.making_unit.apply(null, [private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log]));
+    return 0;
+};
+exports.finalizing = async (private_key, node, chain_info_db, root_db, trie_db, block_db, finalize_db, uniter_db, state_db, peer_list_db, log) => {
+    try {
+        const info = await chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        const last_height = info.last_height;
+        const last_block = await block_db.read_obj(last_height);
+        if (last_block == null || last_block.meta.kind != 0)
+            throw new Error("last block is not key block");
+        const uniters = await uniter_db.read_obj(last_height);
+        if (uniters == null)
+            throw new Error("no uniters");
+        const root = await root_db.get(last_height);
+        if (root == null)
+            throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(trie_db, root);
+        const finalize_validators = await vr.finalize.choose(uniters, last_height, trie, state_db);
+        const pub_key = vr.crypto.private2public(private_key);
+        const unit_address = vr.crypto.generate_address(vr.con.constant.unit, pub_key);
+        if (finalize_validators.indexOf(unit_address) === -1)
+            throw new Error('not finalize_validator at the height');
+        const finalize = vr.finalize.sign(last_block.meta.height, last_block.hash, private_key);
+        const now_finalize = await finalize_db.read_obj(last_height) || [];
+        await finalize_db.write_obj(last_height, now_finalize.concat(finalize));
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info, `/vreath/${data.id}/finalize/post`, (err, conn) => {
+                if (err) {
+                    log.info(err);
+                }
+                pull(pull.values([JSON.stringify(finalize)]), conn);
+            });
+            return false;
+        });
+    }
+    catch (e) {
+        log.info(e);
+    }
+    await works.sleep(4000);
+    setImmediate(() => exports.finalizing.apply(null, [private_key, node, chain_info_db, root_db, trie_db, block_db, finalize_db, uniter_db, state_db, peer_list_db, log]));
     return 0;
 };

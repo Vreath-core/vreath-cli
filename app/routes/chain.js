@@ -143,7 +143,7 @@ exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root
                     return res.concat(output);
                 }
             }, []);
-            await block_1.post(Buffer.from(JSON.stringify([block, outputs])), chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, log);
+            await block_1.post(Buffer.from(JSON.stringify([block, outputs])), chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log);
         }
         return 1;
     }

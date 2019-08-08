@@ -119,7 +119,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
                     return res.concat(output);
                 }
             },[]);
-            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
+            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
         }
         return 1;
     }

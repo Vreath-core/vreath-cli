@@ -19,7 +19,7 @@ export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promi
     }
 }
 
-export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
     try{
         const msg_data:[vr.Block,vr.State[]] = JSON.parse(message.toString('utf-8'));
         const block = msg_data[0];
@@ -54,6 +54,9 @@ export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie
         await P.forEach(txs_hash, async (key:string)=>{
             await tx_db.del(key);
         });
+        const pre_uniters:string[] = await uniter_db.read_obj(last_height) || [];
+        const new_uniters = vr.finalize.rocate(pre_uniters);
+        await uniter_db.write_obj(block.meta.height,new_uniters);
         return 1;
     }
     catch(e){

@@ -198,7 +198,7 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,log);
+                            block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
                         }
                         catch(e){
                             log.info(e);
