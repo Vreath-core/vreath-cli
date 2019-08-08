@@ -47,7 +47,7 @@ exports.shake_hands = async (node, peer_list_db, log) => {
     setImmediate(() => exports.shake_hands.apply(null, [node, peer_list_db, log]));
     return 0;
 };
-exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
+exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, finalize_db, uniter_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {
         const peers = await peer_list_db.filter();
         const peer = peers[Math.floor(Math.random() * peers.length)];
@@ -89,7 +89,7 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root
                             data.push(str);
                         else {
                             const res = data.reduce((json, str) => json + str, '');
-                            chain_routes.post(res, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
+                            chain_routes.post(res, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
                             data = [];
                             stream.end();
                         }
@@ -109,7 +109,7 @@ exports.get_new_chain = async (node, peer_list_db, chain_info_db, block_db, root
         log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log]));
+    setImmediate(() => exports.get_new_chain.apply(null, [node, peer_list_db, chain_info_db, block_db, finalize_db, uniter_db, root_db, trie_db, state_db, lock_db, tx_db, log]));
     return 0;
 };
 exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log) => {

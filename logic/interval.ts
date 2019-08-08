@@ -41,7 +41,7 @@ export const shake_hands = async (node:Node,peer_list_db:vr.db,log:bunyan)=>{
 }
 
 
-export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const peers:data.peer_info[] = await peer_list_db.filter();
         const peer = peers[Math.floor(Math.random()*peers.length)];
@@ -80,7 +80,7 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
                         if(str!='end2') data.push(str);
                         else {
                             const res = data.reduce((json:string,str)=>json+str,'');
-                            chain_routes.post(res,block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                            chain_routes.post(res,block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
                             data = [];
                             stream.end();
                         }
@@ -100,7 +100,7 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
         log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(()=>get_new_chain.apply(null,[node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log]));
+    setImmediate(()=>get_new_chain.apply(null,[node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log]));
     return 0;
 }
 

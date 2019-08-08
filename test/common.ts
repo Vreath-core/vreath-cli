@@ -102,6 +102,8 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
     const output_db = db_set.call('output');
     const unit_db = db_set.call('unit');
     const peer_list_db = db_set.call('peer_list');
+    const finalize_db = db_set.call('finalize');
+    const uniter_db = db_set.call('uniter');
     const peer_id = await promisify(PeerId.createFromJSON)(config.peer);
     const peer_info = new PeerInfo(peer_id);
     peer_info.multiaddrs.add(`/ip4/${ip}/tcp/${port}`);
@@ -240,7 +242,7 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
                     conn,
                     pull.drain((msg:Buffer)=>{
                         try{
-                            chain_routes.post(msg.toString('utf-8'),block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                            chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
                         }
                         catch(e){
                             log.info(e);
@@ -268,7 +270,7 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
             })
 
             intervals.shake_hands(node,peer_list_db,log);
-            intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+            intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log);
             if(config.validator.flag){
                 intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
                 intervals.buying_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,log);

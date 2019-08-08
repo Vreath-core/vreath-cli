@@ -73,7 +73,7 @@ exports.get = async (hashes, stream, chain_info_db, block_db, output_db, log) =>
         log.info(e);
     }
 };
-exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
+exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log) => {
     try {
         const parsed = JSON.parse(msg);
         const new_chain = parsed[0];
@@ -95,6 +95,23 @@ exports.post = async (msg, block_db, chain_info_db, root_db, trie_db, state_db, 
         let info = await chain_info_db.read_obj('00');
         if (info == null)
             throw new Error('chain_info is empty');
+        const key_blocks = new_chain.filter(block => block.meta.kind === 0);
+        const finality_check = P.some(key_blocks, async (block) => {
+            const key_height = block.meta.height;
+            const my_key_block = await block_db.read_obj(key_height);
+            const finalizes = await finalize_db.read_obj(key_height);
+            const uniters = await uniter_db.read_obj(key_height);
+            const root = await root_db.read_obj(key_height);
+            if (my_key_block == null || finalizes == null || uniters == null || root == null || block.hash === my_key_block.hash)
+                return false;
+            const trie = vr.data.trie_ins(trie_db, root);
+            if (vr.finalize.verify(block, finalizes, uniters, trie, state_db))
+                return true;
+            else
+                return false;
+        });
+        if (finality_check)
+            throw new Error('finalized');
         const fork_block = new_chain[0];
         const backed_last_height = vr.crypto.bigint2hex(big_integer_1.default(fork_block.meta.height, 16).subtract(1));
         const backed_last_block = await block_db.read_obj(backed_last_height);

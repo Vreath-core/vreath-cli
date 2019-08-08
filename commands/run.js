@@ -16,6 +16,7 @@ const tx_routes = __importStar(require("../app/routes/tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const chain_routes = __importStar(require("../app/routes/chain"));
 const unit_routes = __importStar(require("../app/routes/unit"));
+const finalize_routes = __importStar(require("../app/routes/finalize"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
 const get_block_1 = __importDefault(require("../app/repl/get_block"));
 const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
@@ -119,6 +120,8 @@ exports.run = async (config, log) => {
     const root_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/root`));
     const unit_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/unit_store`));
     const peer_list_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/peer_list`));
+    const uniter_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/uniter`));
+    const finalize_db = data.make_db_obj(path.join(__dirname, `../db/net_id_${data.id}/finalize`));
     const my_password = readline_sync_1.default.question('Your password:', { hideEchoBack: true, defaultInput: 'password' });
     const my_key = vr.crypto.get_sha256(Buffer.from(my_password, 'utf-8').toString('hex')).slice(0, 122);
     const get_private = fs.readFileSync('./keys/private/' + my_key + '.txt', 'utf-8');
@@ -234,7 +237,7 @@ exports.run = async (config, log) => {
         node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
             pull(conn, pull.drain((msg) => {
                 try {
-                    chain_routes.post(msg.toString('utf-8'), block_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
+                    chain_routes.post(msg.toString('utf-8'), block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
                 }
                 catch (e) {
                     log.info(e);
@@ -251,11 +254,21 @@ exports.run = async (config, log) => {
                 }
             }));
         });
+        node.handle(`/vreath/${data.id}/finalize/post`, (protocol, conn) => {
+            pull(conn, pull.drain((msg) => {
+                try {
+                    finalize_routes.post(msg, block_db, uniter_db, root_db, trie_db, state_db, finalize_db, log);
+                }
+                catch (e) {
+                    log.info(e);
+                }
+            }));
+        });
         node.on('error', (err) => {
             log.info(err);
         });
         intervals.shake_hands(node, peer_list_db, log);
-        intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, log);
+        intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, finalize_db, uniter_db, root_db, trie_db, state_db, lock_db, tx_db, log);
         if (config.validator.flag) {
             intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
             intervals.buying_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log);

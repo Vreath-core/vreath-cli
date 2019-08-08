@@ -18,7 +18,9 @@ export type setup_data = {
     lock:vr.Lock[],
     block:vr.Block,
     chain_info:chain_info
-    peer:peer_info
+    peer:peer_info,
+    finalize:vr.Finalize[]
+    uniter:string[],
 }
 
 export const test_setup = async ():Promise<setup_data>=>{
@@ -66,6 +68,8 @@ export const test_setup = async ():Promise<setup_data>=>{
         last_hash:gen_hash
     }
     const gen_peer:peer_info = await set_peer_id('8000');
+    const gen_finalize = vr.finalize.sign("00",gen_hash,privKey);
+    const gen_uniter = [unit_address];
     const data:setup_data = {
         privKey:privKey,
         pubKey:pubKey,
@@ -74,7 +78,9 @@ export const test_setup = async ():Promise<setup_data>=>{
         lock:genesis_lock,
         block:genesis_block,
         chain_info:genesis_chain_info,
-        peer:gen_peer
+        peer:gen_peer,
+        finalize:[gen_finalize],
+        uniter:gen_uniter,
     }
     return data;
 }
@@ -105,6 +111,8 @@ export const add_setup_data = async (db_set:DBSet,setup:setup_data,id:number)=>{
         db_set.add_db('output',make_db_obj());
         db_set.add_db('unit',make_db_obj());
         db_set.add_db('peer_list',make_db_obj());
+        db_set.add_db('finalize',make_db_obj());
+        db_set.add_db('uniter',make_db_obj());
         db_set.add_db('log',make_db_obj());
         const chain_info_db = db_set.call('chain_info');
         const root_db = db_set.call('root');
@@ -113,14 +121,18 @@ export const add_setup_data = async (db_set:DBSet,setup:setup_data,id:number)=>{
         const state_db = db_set.call('state');
         const lock_db = db_set.call('lock');
         const peer_list_db = db_set.call('peer_list');
+        const finalize_db = db_set.call('finalize');
+        const uniter_db = db_set.call('uniter');
 
         chain_info_db.write_obj("00",setup.chain_info);
         const trie = vr.data.trie_ins(trie_db);
         await vr.data.write_trie(trie,state_db,lock_db,setup.state[0],setup.lock[0]);
         const root = trie.now_root();
-        root_db.put("00",root);
-        block_db.write_obj("00",setup.block);
-        peer_list_db.write_obj(Buffer.from(setup.peer.identity.id).toString('hex'),setup.peer);
+        await root_db.put("00",root);
+        await block_db.write_obj("00",setup.block);
+        await peer_list_db.write_obj(Buffer.from(setup.peer.identity.id).toString('hex'),setup.peer);
+        await finalize_db.write_obj("00",setup.finalize);
+        await uniter_db.write_obj("00",setup.uniter);
         await promisify(fs.writeFile)(path.join(__dirname,'../log/test'+id.toString()+'.log'),'','utf-8');
         return db_set;
     }

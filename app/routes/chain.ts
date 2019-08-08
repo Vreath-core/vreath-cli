@@ -61,7 +61,7 @@ export const get = async (hashes:{[key:string]:string},stream:any,chain_info_db:
     }
 }
 
-export const post = async (msg:string,block_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg);
         const new_chain = parsed[0];
@@ -79,6 +79,19 @@ export const post = async (msg:string,block_db:vr.db,chain_info_db:vr.db,root_db
         if(new_diff_sum.lesserOrEquals(my_diff_sum)) throw new Error("lighter chain");
         let info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error('chain_info is empty');
+        const key_blocks = new_chain.filter(block=>block.meta.kind===0);
+        const finality_check = P.some(key_blocks,async block=>{
+            const key_height = block.meta.height;
+            const my_key_block:vr.Block|null = await block_db.read_obj(key_height);
+            const finalizes:vr.Finalize[]|null = await finalize_db.read_obj(key_height);
+            const uniters:string[] | null = await uniter_db.read_obj(key_height);
+            const root:string|null = await root_db.read_obj(key_height);
+            if(my_key_block==null||finalizes==null||uniters==null||root==null||block.hash===my_key_block.hash) return false;
+            const trie = vr.data.trie_ins(trie_db,root);
+            if(vr.finalize.verify(block,finalizes,uniters,trie,state_db)) return true;
+            else return  false;
+        });
+        if(finality_check) throw new Error('finalized');
         const fork_block = new_chain[0];
         const backed_last_height = vr.crypto.bigint2hex(bigInt(fork_block.meta.height,16).subtract(1));
         const backed_last_block:vr.Block|null = await block_db.read_obj(backed_last_height);

@@ -8,6 +8,7 @@ import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
 import * as unit_routes from '../app/routes/unit'
+import * as finalize_routes from '../app/routes/finalize'
 import req_tx_com from '../app/repl/request-tx'
 import repl_get_block from '../app/repl/get_block'
 import repl_get_chain_info from '../app/repl/get_chain_info'
@@ -119,6 +120,8 @@ export const run = async (config:config,log:bunyan)=> {
     const root_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/root`));
     const unit_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/unit_store`));
     const peer_list_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/peer_list`));
+    const uniter_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/uniter`));
+    const finalize_db = data.make_db_obj(path.join(__dirname,`../db/net_id_${data.id}/finalize`));
     const my_password = readlineSync.question('Your password:',{hideEchoBack: true, defaultInput: 'password'});
     const my_key = vr.crypto.get_sha256(Buffer.from(my_password,'utf-8').toString('hex')).slice(0,122);
     const get_private = fs.readFileSync('./keys/private/'+my_key+'.txt','utf-8');
@@ -251,7 +254,7 @@ export const run = async (config:config,log:bunyan)=> {
                 conn,
                 pull.drain((msg:Buffer)=>{
                     try{
-                        chain_routes.post(msg.toString('utf-8'),block_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                        chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
                     }
                     catch(e){
                         log.info(e);
@@ -274,12 +277,26 @@ export const run = async (config:config,log:bunyan)=> {
             )
         });
 
+        node.handle(`/vreath/${data.id}/finalize/post`, (protocol:string, conn:string) => {
+            pull(
+                conn,
+                pull.drain((msg:Buffer)=>{
+                    try{
+                        finalize_routes.post(msg,block_db,uniter_db,root_db,trie_db,state_db,finalize_db,log);
+                    }
+                    catch(e){
+                        log.info(e);
+                    }
+                })
+            )
+        });
+
         node.on('error',(err:string)=>{
             log.info(err);
         })
 
         intervals.shake_hands(node,peer_list_db,log);
-        intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+        intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log);
         if(config.validator.flag){
             intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
             intervals.buying_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,log);
