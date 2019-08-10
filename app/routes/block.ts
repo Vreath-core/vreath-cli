@@ -3,6 +3,12 @@ import * as data from '../../logic/data'
 import * as works from '../../logic/work'
 import * as P from 'p-iteration'
 import * as bunyan from 'bunyan'
+import { Node } from '../../commands/run';
+import {post as finalize_post} from './finalize'
+import {promisify} from 'util'
+const PeerId = require('peer-id');
+const PeerInfo = require('peer-info');
+const pull = require('pull-stream');
 
 export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promise<void>=>{
     try{
@@ -19,12 +25,13 @@ export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promi
     }
 }
 
-export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
+export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,private_key:string,node:Node,log:bunyan)=>{
     try{
-        const msg_data:[vr.Block,vr.State[]] = JSON.parse(message.toString('utf-8'));
+        const msg_data:[vr.Block,vr.State[],vr.Finalize|null] = JSON.parse(message.toString('utf-8'));
         const block = msg_data[0];
         const output_state = msg_data[1];
-        if(block==null||!vr.block.isBlock(block)||output_state==null||output_state.some(s=>!vr.state.isState(s))) throw new Error('invalid data');
+        const finalize = msg_data[2];
+        if(block==null||!vr.block.isBlock(block)||output_state==null||output_state.some(s=>!vr.state.isState(s))||(finalize!=null&&!vr.finalize.isFinalize(finalize))) throw new Error('invalid data');
         const info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error('chain_info is empty');
         const last_height = info.last_height;
@@ -57,6 +64,24 @@ export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie
         const pre_uniters:string[] = await uniter_db.read_obj(last_height) || [];
         const new_uniters = vr.finalize.rocate(pre_uniters);
         await uniter_db.write_obj(block.meta.height,new_uniters);
+        if(finalize!=null) await finalize_post(Buffer.from(JSON.stringify(finalize),'utf8'),block_db,uniter_db,root_db,trie_db,state_db,finalize_db,log);
+        if(block.meta.kind===0){
+            const finalize = await works.make_finalize(private_key,block,chain_info_db,root_db,trie_db,uniter_db,state_db,log);
+            if(finalize==null) throw new Error('fail to make valid finalize');
+            const now_finalize:vr.Finalize[] = await finalize_db.read_obj(block.meta.height) || [];
+            await finalize_db.write_obj(block.meta.height,now_finalize.concat(finalize));
+            const peers:data.peer_info[] = await peer_list_db.filter('hex','utf8');
+            await P.forEach(peers, async (peer:data.peer_info)=>{
+                const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+                const peer_info = new PeerInfo(peer_id);
+                peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+                node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
+                    if (err) { log.info(err); }
+                    pull(pull.values([JSON.stringify(finalize)]), conn);
+                });
+                return false;
+            });
+        }
         return 1;
     }
     catch(e){

@@ -1,8 +1,5 @@
 import * as vr from 'vreath'
-import setup from './setup'
-import generate_keys from './generate-keys'
-import set_peer_id from './set-peer-id'
-import {set_config, config} from './config'
+import {config} from './config'
 import handshake from '../app/routes/handshake'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
@@ -16,21 +13,16 @@ import output_chain from '../app/repl/output_chain'
 import get_balance from '../app/repl/balance'
 import * as data from '../logic/data'
 import * as intervals from '../logic/interval'
-import {setup_data} from '../test/setup'
-import {run_node1,run_node2,run_node3,run_node4} from '../test/nodes'
 import {promisify} from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
 import bunyan from 'bunyan'
-import yargs from 'yargs'
 import * as repl from 'repl'
 import readlineSync from 'readline-sync'
 import CryptoJS from 'crypto-js'
-import * as P from 'p-iteration'
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
-const PeerBook = require('peer-book')
 const libp2p = require('libp2p');
 const TCP = require('libp2p-tcp')
 const WS = require('libp2p-websockets')
@@ -39,8 +31,6 @@ const MPLEX = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
 const MulticastDNS = require('libp2p-mdns')
 const Bootstrap = require('libp2p-bootstrap')
-const DHT = require('libp2p-kad-dht')
-const defaultsDeep = require('@nodeutils/defaults-deep')
 const pull = require('pull-stream');
 const toStream = require('pull-stream-to-stream');
 const search_ip = require('ip');
@@ -137,227 +127,247 @@ export const run = async (config:config,log:bunyan)=> {
 
     node.start((err:string)=>{
 
-        node.on('peer:connect', (peerInfo:any) => {
-            const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-            const id_obj = {
-                id:ids.id._idB58String,
-                privKey:ids.id._privKey,
-                pubKey:ids.id._pubKey
-            };
-            const multiaddrs = peerInfo.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
-            const peer_obj:data.peer_info = {
-                identity:id_obj,
-                multiaddrs:multiaddrs
-            }
-            peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
-        });
+        node_handles(node,private_key,config,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,finalize_db,uniter_db,log);
 
-        node.handle(`/vreath/${data.id}/handshake`, (protocol:string, conn:any)=>{
+        run_intervals(node,private_key,config,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,finalize_db,uniter_db,log);
+
+        accept_repl(node,private_key,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,log);
+    });
+}
+
+export const node_handles  = (node:Node,private_key:string,config:config,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
+    node.on('peer:connect', (peerInfo:any) => {
+        const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
+        const id_obj = {
+            id:ids.id._idB58String,
+            privKey:ids.id._privKey,
+            pubKey:ids.id._pubKey
+        };
+        const multiaddrs = peerInfo.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
+        const peer_obj:data.peer_info = {
+            identity:id_obj,
+            multiaddrs:multiaddrs
+        }
+        peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
+    });
+
+    node.on('peer:disconnect', (peerInfo:any)=>{
+        const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
+        const id = ids.id._idB58String;
+        peer_list_db.del(Buffer.from(id).toString('hex'));
+    });
+
+
+    node.handle(`/vreath/${data.id}/handshake`, (protocol:string, conn:any)=>{
+        const stream = toStream(conn);
+        let data:string[] = [];
+        stream.on('data',(msg:Buffer)=>{
+            try{
+                if(msg!=null&&msg.length>0){
+                    const str = msg.toString('utf-8');
+                    if(str!='end') data.push(str);
+                    else {
+                        const res = data.reduce((json:string,str)=>json+str,'');
+                        handshake(res,peer_list_db,config.peer.id,node,log);
+                        data = [];
+                        stream.end();
+                    }
+                }
+            }
+            catch(e){
+                log.info(e);
+            }
+        });
+        stream.on('error',(e:string)=>{
+            log.info(e);
+        });
+    })
+
+    node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });
+
+    node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    block_routes.get(msg,node,block_db,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });
+
+    node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });
+
+    node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
+        try{
             const stream = toStream(conn);
             let data:string[] = [];
             stream.on('data',(msg:Buffer)=>{
                 try{
                     if(msg!=null&&msg.length>0){
                         const str = msg.toString('utf-8');
-                        if(str!='end') data.push(str);
+                        if(str!='end1') data.push(str);
                         else {
                             const res = data.reduce((json:string,str)=>json+str,'');
-                            handshake(res,peer_list_db,log);
+                            const hashes:{[key:string]:string} = JSON.parse(res);
+                            chain_routes.get(hashes,stream,chain_info_db,block_db,output_db,log);
                             data = [];
-                            stream.end();
                         }
                     }
                 }
                 catch(e){
                     log.info(e);
+                    stream.end();
                 }
             });
             stream.on('error',(e:string)=>{
                 log.info(e);
+                stream.end();
             });
-        })
+        }
+        catch(e){
+            log.info(e);
+        }
+    });
 
-        node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        block_routes.get(msg,node,block_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
-
-        node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
-            try{
-                const stream = toStream(conn);
-                let data:string[] = [];
-                stream.on('data',(msg:Buffer)=>{
-                    try{
-                        if(msg!=null&&msg.length>0){
-                            const str = msg.toString('utf-8');
-                            if(str!='end1') data.push(str);
-                            else {
-                                const res = data.reduce((json:string,str)=>json+str,'');
-                                const hashes:{[key:string]:string} = JSON.parse(res);
-                                chain_routes.get(hashes,stream,chain_info_db,block_db,output_db,log);
-                                data = [];
-                            }
-                        }
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                });
-                stream.on('error',(e:string)=>{
+    node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,private_key,node,log);
+                }
+                catch(e){
                     log.info(e);
-                });
-            }
-            catch(e){
-                log.info(e);
-            }
-        });
+                }
+            })
+        )
+    });
 
-        node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
+    node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });
 
-        node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
+    node.handle(`/vreath/${data.id}/finalize/post`, (protocol:string, conn:string) => {
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    finalize_routes.post(msg,block_db,uniter_db,root_db,trie_db,state_db,finalize_db,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });
 
-        node.handle(`/vreath/${data.id}/finalize/post`, (protocol:string, conn:string) => {
-            pull(
-                conn,
-                pull.drain((msg:Buffer)=>{
-                    try{
-                        finalize_routes.post(msg,block_db,uniter_db,root_db,trie_db,state_db,finalize_db,log);
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                })
-            )
-        });
+    node.on('error',(err:string)=>{
+        log.info(err);
+    });
+}
 
-        node.on('error',(err:string)=>{
-            log.info(err);
-        })
-
-        intervals.shake_hands(node,peer_list_db,log);
-        intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+export const run_intervals = (node:Node,private_key:string,config:config,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,unit_db:vr.db,peer_list_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
+    intervals.shake_hands(node,peer_list_db,log);
+        intervals.get_new_chain(private_key,node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log);
         if(config.validator.flag){
-            intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
+            intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,finalize_db,uniter_db,log);
             intervals.buying_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,log);
-
         }
         if(config.miner.flag){
             intervals.refreshing(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
             intervals.making_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log);
         }
+}
 
-        const replServer = repl.start({prompt:'>',terminal:true});
+export const accept_repl = (node:Node,private_key:string,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
+    const replServer = repl.start({prompt:'>',terminal:true});
 
-        replServer.defineCommand('request-tx',{
-            help: 'Create request tx',
-            async action(input){
-                const tx = await req_tx_com(input,private_key,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
-                await peer_list_db.filter('hex','utf8',async (key:string,peer:data.peer_info)=>{
-                    const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
-                    const peer_info = new PeerInfo(peer_id);
-                    peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
-                    node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
-                        if (err) { log.info(err) }
-                        pull(pull.values([JSON.stringify([tx,[]])]), conn);
-                    });
-                    return false;
+    replServer.defineCommand('request-tx',{
+        help: 'Create request tx',
+        async action(input){
+            const tx = await req_tx_com(input,private_key,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
+            await peer_list_db.filter('hex','utf8',async (key:string,peer:data.peer_info)=>{
+                const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+                const peer_info = new PeerInfo(peer_id);
+                peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+                node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
+                    if (err) { log.info(err) }
+                    pull(pull.values([JSON.stringify([tx,[]])]), conn);
                 });
-            }
-        });
+                return false;
+            });
+        }
+    });
 
-        replServer.defineCommand('balance',{
-            help: 'Show your VRT balance',
-            async action(){
-                const balance = await get_balance(private_key,chain_info_db,root_db,trie_db,state_db);
-                console.log(balance);
-            }
-        });
+    replServer.defineCommand('balance',{
+        help: 'Show your VRT balance',
+        async action(){
+            const balance = await get_balance(private_key,chain_info_db,root_db,trie_db,state_db);
+            console.log(balance);
+        }
+    });
 
-        replServer.defineCommand('get-block',{
-            help:'Show the block specified by height',
-            async action(input){
-                const block = await repl_get_block(input,block_db);
-                console.log(JSON.stringify(block,null,4));
-            }
-        });
+    replServer.defineCommand('get-block',{
+        help:'Show the block specified by height',
+        async action(input){
+            const block = await repl_get_block(input,block_db);
+            console.log(JSON.stringify(block,null,4));
+        }
+    });
 
-        replServer.defineCommand('get-chain-info',{
-            help:'Show the chain info',
-            async action(){
-                const pub_key = vr.crypto.private2public(private_key);
-                const native_address = vr.crypto.generate_address(vr.con.constant.native,pub_key);
-                const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pub_key);
-                const info = await repl_get_chain_info(chain_info_db,root_db,trie_db,state_db,native_address,unit_address);
-                console.log(JSON.stringify(info,null,4));
-            }
-        });
+    replServer.defineCommand('get-chain-info',{
+        help:'Show the chain info',
+        async action(){
+            const pub_key = vr.crypto.private2public(private_key);
+            const native_address = vr.crypto.generate_address(vr.con.constant.native,pub_key);
+            const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pub_key);
+            const info = await repl_get_chain_info(chain_info_db,root_db,trie_db,state_db,native_address,unit_address);
+            console.log(JSON.stringify(info,null,4));
+        }
+    });
 
-        replServer.defineCommand('output-chain',{
-            help:'output chain as zip of json files',
-            async action(){
-                await output_chain(chain_info_db,block_db);
-            }
-        });
+    replServer.defineCommand('output-chain',{
+        help:'output chain as zip of json files',
+        async action(){
+            await output_chain(chain_info_db,block_db);
+        }
     });
 }

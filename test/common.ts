@@ -4,10 +4,11 @@ import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
 import * as unit_routes from '../app/routes/unit'
+import * as finalize_routes from '../app/routes/finalize'
 import * as data from '../logic/data'
 import * as works from '../logic/work'
 import * as intervals from '../logic/interval'
-import {Node} from '../commands/run'
+import {Node,node_handles,run_intervals} from '../commands/run'
 import {promisify} from 'util'
 import levelup, { LevelUp } from 'levelup';
 import memdown from 'memdown'
@@ -124,161 +125,8 @@ export const run_node = async (private_key:string,config:config,ip:string,port:s
     try{
         node.start((err:string)=>{
             //console.log(err);
-            node.on('peer:connect', (peerInfo:any) => {
-                const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-                const id_obj = {
-                    id:ids.id._idB58String,
-                    privKey:ids.id._privKey,
-                    pubKey:ids.id._pubKey
-                };
-                const multiaddrs = peerInfo.multiaddrs.toArray().map((add:{buffer:Buffer})=>Multiaddr(add.buffer).toString());
-                const peer_obj:data.peer_info = {
-                    identity:id_obj,
-                    multiaddrs:multiaddrs
-                }
-                //console.log(peer_obj)
-                peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'),peer_obj);
-            });
-
-            node.handle(`/vreath/${data.id}/handshake`, (protocol:string, conn:any)=>{
-                const stream = toStream(conn);
-                let data:string[] = [];
-                stream.on('data',(msg:Buffer)=>{
-                    try{
-                        if(msg!=null&&msg.length>0){
-                            const str = msg.toString('utf-8');
-                            if(str!='end') data.push(str);
-                            else {
-                                const res = data.reduce((json:string,str)=>json+str,'');
-                                handshake(res,peer_list_db,log);
-                                data = [];
-                                stream.end();
-                            }
-                        }
-                    }
-                    catch(e){
-                        log.info(e);
-                    }
-                });
-                stream.on('error',(e:string)=>{
-                    log.info(e);
-                });
-            })
-
-            node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
-                pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        try{
-                            tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    })
-                )
-            });
-
-            node.handle(`/vreath/${data.id}/block/get`, async (protocol:string, conn:any) => {
-                pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        try{
-                            block_routes.get(msg,node,block_db,log);
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    })
-                )
-            });
-
-            node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
-                pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        try{
-                            block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    })
-                )
-            });
-
-            node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {
-                try{
-                    const stream = toStream(conn);
-                    let data:string[] = [];
-                    stream.on('data',(msg:Buffer)=>{
-                        try{
-                            if(msg!=null&&msg.length>0){
-                                const str = msg.toString('utf-8');
-                                if(str!='end1') data.push(str);
-                                else {
-                                    const res = data.reduce((json:string,str)=>json+str,'');
-                                    const hashes:{[key:string]:string} = JSON.parse(res);
-                                    chain_routes.get(hashes,stream,chain_info_db,block_db,output_db,log);
-                                    data = [];
-                                }
-                            }
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    });
-                    stream.on('error',(e:string)=>{
-                        log.info(e);
-                    });
-                }
-                catch(e){
-                    log.info(e);
-                }
-            });
-
-            node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
-                pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        try{
-                            chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    })
-                )
-            });
-
-            node.handle(`/vreath/${data.id}/unit/post`, async (protocol:string, conn:any)=>{
-                pull(
-                    conn,
-                    pull.drain((msg:Buffer)=>{
-                        try{
-                            unit_routes.post(msg,block_db,chain_info_db,root_db,trie_db,state_db,unit_db,log);
-                        }
-                        catch(e){
-                            log.info(e);
-                        }
-                    })
-                )
-            });
-
-            node.on('error',(e:string)=>{
-                log.info(e);
-            })
-
-            intervals.shake_hands(node,peer_list_db,log);
-            intervals.get_new_chain(node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log);
-            if(config.validator.flag){
-                intervals.staking(private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
-                intervals.buying_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,log);
-            }
-            if(config.miner.flag){
-                intervals.refreshing(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log);
-                intervals.making_unit(private_key,config,node,chain_info_db,root_db,trie_db,block_db,state_db,unit_db,peer_list_db,log);
-            }
+            node_handles(node,private_key,config,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,finalize_db,uniter_db,log);
+            run_intervals(node,private_key,config,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,unit_db,peer_list_db,finalize_db,uniter_db,log);
             const pubKey = vr.crypto.private2public(private_key);
             const native_address = vr.crypto.generate_address(vr.con.constant.native,pubKey);
             const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pubKey);

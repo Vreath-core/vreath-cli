@@ -6,6 +6,7 @@ import bigInt from 'big-integer'
 import * as P from 'p-iteration'
 import * as bunyan from 'bunyan'
 import * as fs from 'fs'
+import { Node } from '../../commands/run';
 const pull = require('pull-stream');
 
 export const get = async (hashes:{[key:string]:string},stream:any,chain_info_db:vr.db,block_db:vr.db,output_db:vr.db,log:bunyan):Promise<void>=>{
@@ -61,7 +62,7 @@ export const get = async (hashes:{[key:string]:string},stream:any,chain_info_db:
     }
 }
 
-export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,private_key:string,node:Node,log:bunyan)=>{
     try{
         const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg);
         const new_chain = parsed[0];
@@ -80,7 +81,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
         let info:data.chain_info|null = await chain_info_db.read_obj('00');
         if(info==null) throw new Error('chain_info is empty');
         const key_blocks = new_chain.filter(block=>block.meta.kind===0);
-        const finality_check = P.some(key_blocks,async block=>{
+        const finality_check = await P.some(key_blocks,async block=>{
             const key_height = block.meta.height;
             const my_key_block:vr.Block|null = await block_db.read_obj(key_height);
             const finalizes:vr.Finalize[]|null = await finalize_db.read_obj(key_height);
@@ -119,7 +120,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
                     return res.concat(output);
                 }
             },[]);
-            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
+            await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
         }
         return 1;
     }

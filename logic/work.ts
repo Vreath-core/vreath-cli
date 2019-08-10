@@ -6,10 +6,13 @@ import {cloneDeep} from 'lodash'
 import * as data from './data'
 import req_tx_com from '../app/repl/request-tx'
 import * as block_routes from '../app/routes/block'
-import * as chain_routes from '../app/routes/chain'
+import {promisify} from 'util'
 import bunyan from 'bunyan'
 import {Node} from '../commands/run'
 const toStream = require('pull-stream-to-stream');
+const PeerId = require('peer-id');
+const PeerInfo = require('peer-info');
+const pull = require('pull-stream');
 
 export const sleep = (msec:number)=>{
     return new Promise(function(resolve) {
@@ -255,7 +258,7 @@ export const dialog_data = async (chain_info_db:vr.db,root_db:vr.db,trie_db:vr.d
     return obj;
 }
 
-export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
+export const maintenance = async (node:Node,peer_info:any,height:string,chain_info_db:vr.db,block_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,private_key:string,log:bunyan)=>{
     try{
         node.dialProtocol(peer_info,`/vreath/${data.id}/block/get`,(err:string,conn:any) => {
             if (err) { log.info(err); }
@@ -263,7 +266,7 @@ export const maintenance = async (node:Node,peer_info:any,height:string,chain_in
             stream.write(height);
             stream.on('data',(msg:Buffer)=>{
                 try{
-                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,uniter_db,log);
+                    if(msg!=null&&msg.length>0) return block_routes.post(msg,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
                 }
                 catch(e){
                     log.info(e);
@@ -277,5 +280,41 @@ export const maintenance = async (node:Node,peer_info:any,height:string,chain_in
     }
     catch(e){
         log.info(e);
+    }
+}
+
+export const make_finalize = async (private_key:string,block:vr.Block,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,uniter_db:vr.db,state_db:vr.db,log:bunyan)=>{
+    try{
+        const info:data.chain_info|null = await chain_info_db.read_obj("00");
+        if(info==null) throw new Error("chain_info doesn't exist");
+        if(block.meta.kind!=0) throw new Error("block is not key block");
+        const height = block.meta.height;
+        const uniters:string[]|null = await uniter_db.read_obj(height);
+        if(uniters==null) throw new Error("no uniters");
+        const root = await root_db.get(height);
+        if(root==null) throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(trie_db,root);
+        const finalize_validators = await vr.finalize.choose(uniters,height,trie,state_db);
+        const pub_key = vr.crypto.private2public(private_key);
+        const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pub_key);
+        if(finalize_validators.indexOf(unit_address)===-1) throw new Error('not finalize_validator at the height');
+        const finalize = vr.finalize.sign(height,block.hash,private_key);
+        return finalize;
+        /*const now_finalize:vr.Finalize[] = await finalize_db.read_obj(height) || [];
+        await finalize_db.write_obj(height,now_finalize.concat(finalize));
+        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
+                if (err) { log.info(err); }
+                pull(pull.values([JSON.stringify(finalize)]), conn);
+            });
+            return false;
+        });*/
+    }
+    catch(e){
+        log.info(e);
+        return null;
     }
 }

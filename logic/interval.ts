@@ -19,7 +19,7 @@ const toStream = require('pull-stream-to-stream');
 export const shake_hands = async (node:Node,peer_list_db:vr.db,log:bunyan)=>{
     try{
         const peer_info_list:data.peer_info[] = await peer_list_db.filter();
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+        await P.forEach(peer_info_list ,async (peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
@@ -41,7 +41,7 @@ export const shake_hands = async (node:Node,peer_list_db:vr.db,log:bunyan)=>{
 }
 
 
-export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
+export const get_new_chain = async (private_key:string,node:Node,peer_list_db:vr.db,chain_info_db:vr.db,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,log:bunyan)=>{
     try{
         const peers:data.peer_info[] = await peer_list_db.filter();
         const peer = peers[Math.floor(Math.random()*peers.length)];
@@ -60,7 +60,7 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
             height = vr.crypto.bigint2hex(i);
             got_block = await block_db.read_obj(height);
             if(got_block==null){
-                await works.maintenance(node,peer_info,height,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,uniter_db,log);
+                await works.maintenance(node,peer_info,height,chain_info_db,block_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,log);
                 break;
             }
             chain_hashes[got_block.meta.height] = got_block.hash;
@@ -80,7 +80,7 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
                         if(str!='end2') data.push(str);
                         else {
                             const res = data.reduce((json:string,str)=>json+str,'');
-                            chain_routes.post(res,block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,log);
+                            chain_routes.post(res,block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,private_key,node,log);
                             data = [];
                             stream.end();
                         }
@@ -88,10 +88,12 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
                 }
                 catch(e){
                     log.info(e);
+                    stream.end();
                 }
             });
             stream.on('error',(e:string)=>{
                 log.info(e);
+                stream.end();
             });
         });
     }
@@ -100,11 +102,11 @@ export const get_new_chain = async (node:Node,peer_list_db:vr.db,chain_info_db:v
         log.info(e);
     }
     await works.sleep(30000);
-    setImmediate(()=>get_new_chain.apply(null,[node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log]));
+    setImmediate(()=>get_new_chain.apply(null,[private_key,node,peer_list_db,chain_info_db,block_db,finalize_db,uniter_db,root_db,trie_db,state_db,lock_db,tx_db,log]));
     return 0;
 }
 
-export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
+export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,state_db:vr.db,lock_db:vr.db,output_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,log:bunyan)=>{
     try{
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
@@ -126,28 +128,39 @@ export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,r
         await chain_info_db.write_obj("00",new_info);
         const new_root = trie.now_root();
         await root_db.put(block.meta.height,new_root,'hex','utf8');
-        //console.log(JSON.stringify(await tx_db.filter(),null,4));
         const txs_hash = block.txs.map(tx=>tx.hash);
         await P.forEach(txs_hash, async (key:string)=>{
             await tx_db.del(key);
         });
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+        const pre_uniters:string[] = await uniter_db.read_obj(last_height) || [];
+        const new_uniters = vr.finalize.rocate(pre_uniters);
+        await uniter_db.write_obj(block.meta.height,new_uniters);
+        let send_data:[vr.Block,vr.State[],vr.Finalize|null] = [block,output_state,null];
+        if(block.meta.kind===0){
+            const finalize = await works.make_finalize(private_key,block,chain_info_db,root_db,trie_db,uniter_db,state_db,log);
+            if(finalize!=null){
+                const now_finalize:vr.Finalize[] = await finalize_db.read_obj(block.meta.height) || [];
+                await finalize_db.write_obj(block.meta.height,now_finalize.concat(finalize));
+                send_data[2] = finalize;
+            }
+        }
+        const peers:data.peer_info[] = await peer_list_db.filter('hex','utf8');
+        await P.forEach(peers, async (peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
                 if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify(made)]), conn);
+                pull(pull.values([JSON.stringify(send_data)]), conn);
             });
             return false;
         });
     }
     catch(e){
-        //err_fn.apply(null,e);
         log.info(e);
     }
     await works.sleep(1000);
-    setImmediate(()=>staking.apply(null,[private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,log]));
+    setImmediate(()=>staking.apply(null,[private_key,node,chain_info_db,root_db,trie_db,block_db,state_db,lock_db,output_db,tx_db,peer_list_db,finalize_db,uniter_db,log]));
     return 0;
 }
 
@@ -216,7 +229,8 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
         await P.forEach(units, async (unit,i)=>{
             await unit_db.del(unit_addresses[i+1]);
         });
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+        const peers:data.peer_info[] = await peer_list_db.filter('hex','utf8');
+        await P.forEach(peers,async (peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
@@ -277,7 +291,8 @@ export const refreshing = async (private_key:string,config:any,node:Node,chain_i
         const made = await works.make_ref_tx(vr.crypto.bigint2hex(height),index,gas_share,unit_price,private_key,block_db,trie_db,root_db,state_db,lock_db,last_height);
         await tx_db.write_obj(made[0].hash,made[0]);
         await output_db.write_obj(made[0].hash,made[1]);
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+        const peers:data.peer_info[] = await peer_list_db.filter('hex','utf8');
+        await P.forEach(peers, async (peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
@@ -342,12 +357,15 @@ export const making_unit = async (private_key:string,config:any,node:Node,chain_
         if(bigInt(nonce,16).eq(0)) throw new Error('fail to get valid nonce');
         const unit:vr.Unit = [unit_info[4],unit_info[5],nonce,my_unit_address,unit_price];
         await unit_db.write_obj(unit_info[6],unit);
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+        const peers:data.peer_info[] = await peer_list_db.filter('hex','utf8');
+        await P.forEach(peers,async (peer:data.peer_info)=>{
             const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
             const peer_info = new PeerInfo(peer_id);
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/unit/post`,(err:string,conn:any) => {
-                if (err) { log.info(err); }
+                if (err) {
+                    log.info(err);
+                }
                 pull(pull.values([JSON.stringify(unit)]), conn);
             });
             return false;
@@ -362,40 +380,4 @@ export const making_unit = async (private_key:string,config:any,node:Node,chain_
     return 0;
 }
 
-export const finalizing = async (private_key:string,node:Node,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,state_db:vr.db,peer_list_db:vr.db,log:bunyan)=>{
-    try{
-        const info:data.chain_info|null = await chain_info_db.read_obj("00");
-        if(info==null) throw new Error("chain_info doesn't exist");
-        const last_height = info.last_height;
-        const last_block:vr.Block|null = await block_db.read_obj(last_height);
-        if(last_block==null||last_block.meta.kind!=0) throw new Error("last block is not key block");
-        const uniters:string[]|null = await uniter_db.read_obj(last_height);
-        if(uniters==null) throw new Error("no uniters");
-        const root = await root_db.get(last_height);
-        if(root==null) throw new Error("root doesn't exist");
-        const trie = vr.data.trie_ins(trie_db,root);
-        const finalize_validators = await vr.finalize.choose(uniters,last_height,trie,state_db);
-        const pub_key = vr.crypto.private2public(private_key);
-        const unit_address = vr.crypto.generate_address(vr.con.constant.unit,pub_key);
-        if(finalize_validators.indexOf(unit_address)===-1) throw new Error('not finalize_validator at the height');
-        const finalize = vr.finalize.sign(last_block.meta.height,last_block.hash,private_key);
-        const now_finalize:vr.Finalize[] = await finalize_db.read_obj(last_height) || [];
-        await finalize_db.write_obj(last_height,now_finalize.concat(finalize));
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
-            const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
-            const peer_info = new PeerInfo(peer_id);
-            peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
-            node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
-                if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify(finalize)]), conn);
-            });
-            return false;
-        });
-    }
-    catch(e){
-        log.info(e);
-    }
-    await works.sleep(4000);
-    setImmediate(()=>finalizing.apply(null,[private_key,node,chain_info_db,root_db,trie_db,block_db,finalize_db,uniter_db,state_db,peer_list_db,log]));
-    return 0;
-}
+

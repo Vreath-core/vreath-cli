@@ -19,6 +19,9 @@ const data = __importStar(require("./data"));
 const request_tx_1 = __importDefault(require("../app/repl/request-tx"));
 const block_routes = __importStar(require("../app/routes/block"));
 const toStream = require('pull-stream-to-stream');
+const PeerId = require('peer-id');
+const PeerInfo = require('peer-info');
+const pull = require('pull-stream');
 exports.sleep = (msec) => {
     return new Promise(function (resolve) {
         setTimeout(function () { resolve(); }, msec);
@@ -278,7 +281,7 @@ exports.dialog_data = async (chain_info_db, root_db, trie_db, state_db, native_a
     };
     return obj;
 };
-exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, uniter_db, log) => {
+exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, log) => {
     try {
         node.dialProtocol(peer_info, `/vreath/${data.id}/block/get`, (err, conn) => {
             if (err) {
@@ -289,7 +292,7 @@ exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, r
             stream.on('data', (msg) => {
                 try {
                     if (msg != null && msg.length > 0)
-                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log);
+                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
                 }
                 catch (e) {
                     log.info(e);
@@ -302,5 +305,45 @@ exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, r
     }
     catch (e) {
         log.info(e);
+    }
+};
+exports.make_finalize = async (private_key, block, chain_info_db, root_db, trie_db, uniter_db, state_db, log) => {
+    try {
+        const info = await chain_info_db.read_obj("00");
+        if (info == null)
+            throw new Error("chain_info doesn't exist");
+        if (block.meta.kind != 0)
+            throw new Error("block is not key block");
+        const height = block.meta.height;
+        const uniters = await uniter_db.read_obj(height);
+        if (uniters == null)
+            throw new Error("no uniters");
+        const root = await root_db.get(height);
+        if (root == null)
+            throw new Error("root doesn't exist");
+        const trie = vr.data.trie_ins(trie_db, root);
+        const finalize_validators = await vr.finalize.choose(uniters, height, trie, state_db);
+        const pub_key = vr.crypto.private2public(private_key);
+        const unit_address = vr.crypto.generate_address(vr.con.constant.unit, pub_key);
+        if (finalize_validators.indexOf(unit_address) === -1)
+            throw new Error('not finalize_validator at the height');
+        const finalize = vr.finalize.sign(height, block.hash, private_key);
+        return finalize;
+        /*const now_finalize:vr.Finalize[] = await finalize_db.read_obj(height) || [];
+        await finalize_db.write_obj(height,now_finalize.concat(finalize));
+        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
+            const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
+                if (err) { log.info(err); }
+                pull(pull.values([JSON.stringify(finalize)]), conn);
+            });
+            return false;
+        });*/
+    }
+    catch (e) {
+        log.info(e);
+        return null;
     }
 };

@@ -14,6 +14,17 @@ export const post = async (msg:Buffer,block_db:vr.db,uniter_db:vr.db,root_db:vr.
         if(!vr.finalize.isFinalize(data)) throw new Error('invalid data');
         const block:vr.Block|null = await block_db.read_obj(data.height);
         if(block==null||block.meta.kind!=0||block.hash!=data.hash) throw new Error('invalid block height');
+        const pre_height = vr.crypto.bigint2hex(bigInt(data.height,16).subtract(1));
+        const pre_key_block = await vr.block.search_key_block(block_db,pre_height);
+        const pre_key_height = pre_key_block.meta.height;
+        const pre_finalizes:vr.Finalize[]|null = await finalize_db.read_obj(pre_key_height);
+        const pre_uniters:string[] | null = await uniter_db.read_obj(pre_key_height);
+        const pre_root:string|null = await root_db.read_obj(pre_key_height);
+        const pre_trie = pre_root!=null ? vr.data.trie_ins(trie_db,pre_root) : null;
+        if(pre_finalizes==null||pre_uniters==null||pre_root==null||pre_trie==null||!vr.finalize.verify(pre_key_block,pre_finalizes,pre_uniters,pre_trie,state_db)){
+            console.log('previous key block is not finalized yet');
+            throw new Error('previous key block is not finalized yet');
+        }
         const sign:vr.Sign = data.sign;
         const finalize_hash = vr.finalize.hash(data.height,data.hash);
         const recover_id = vr.tx.get_recover_id_from_sign(sign);
@@ -26,7 +37,7 @@ export const post = async (msg:Buffer,block_db:vr.db,uniter_db:vr.db,root_db:vr.
         const trie = vr.data.trie_ins(trie_db,root);
         const finalize_validators = await vr.finalize.choose(uniters,data.height,trie,state_db);
         if(finalize_validators.indexOf(address)===-1) throw new Error('invalid address');
-        if(vr.crypto.verify(finalize_hash,sign.data,pub_key)) throw new Error('invalid sign');
+        if(!vr.crypto.verify(finalize_hash,sign.data,pub_key)) throw new Error('invalid sign');
         await finalize_db.write_obj(data.height,data);
     }
     catch(e){

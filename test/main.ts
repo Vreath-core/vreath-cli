@@ -1,7 +1,7 @@
 import {promisify} from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
-import {setup_data} from './setup'
+import {setup_data, test_setup} from './setup'
 import {run_node1,run_node2,run_node3,run_node4} from './nodes'
 
 

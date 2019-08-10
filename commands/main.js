@@ -27,23 +27,6 @@ const bunyan_1 = __importDefault(require("bunyan"));
 const yargs_1 = __importDefault(require("yargs"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const crypto_js_1 = __importDefault(require("crypto-js"));
-const PeerInfo = require('peer-info');
-const PeerId = require('peer-id');
-const Multiaddr = require('multiaddr');
-const PeerBook = require('peer-book');
-const libp2p = require('libp2p');
-const TCP = require('libp2p-tcp');
-const WS = require('libp2p-websockets');
-const SPDY = require('libp2p-spdy');
-const MPLEX = require('libp2p-mplex');
-const SECIO = require('libp2p-secio');
-const MulticastDNS = require('libp2p-mdns');
-const Bootstrap = require('libp2p-bootstrap');
-const DHT = require('libp2p-kad-dht');
-const defaultsDeep = require('@nodeutils/defaults-deep');
-const pull = require('pull-stream');
-const toStream = require('pull-stream-to-stream');
-const search_ip = require('ip');
 const log = bunyan_1.default.createLogger({
     name: 'vreath-cli',
     streams: [

@@ -11,14 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
-const handshake_1 = __importDefault(require("../app/routes/handshake"));
-const tx_routes = __importStar(require("../app/routes/tx"));
-const block_routes = __importStar(require("../app/routes/block"));
-const chain_routes = __importStar(require("../app/routes/chain"));
-const unit_routes = __importStar(require("../app/routes/unit"));
-const data = __importStar(require("../logic/data"));
 const works = __importStar(require("../logic/work"));
-const intervals = __importStar(require("../logic/interval"));
 const run_1 = require("../commands/run");
 const util_1 = require("util");
 const levelup_1 = __importDefault(require("levelup"));
@@ -121,139 +114,8 @@ exports.run_node = async (private_key, config, ip, port, bootstrapList, db_set, 
     try {
         node.start((err) => {
             //console.log(err);
-            node.on('peer:connect', (peerInfo) => {
-                const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-                const id_obj = {
-                    id: ids.id._idB58String,
-                    privKey: ids.id._privKey,
-                    pubKey: ids.id._pubKey
-                };
-                const multiaddrs = peerInfo.multiaddrs.toArray().map((add) => Multiaddr(add.buffer).toString());
-                const peer_obj = {
-                    identity: id_obj,
-                    multiaddrs: multiaddrs
-                };
-                //console.log(peer_obj)
-                peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
-            });
-            node.handle(`/vreath/${data.id}/handshake`, (protocol, conn) => {
-                const stream = toStream(conn);
-                let data = [];
-                stream.on('data', (msg) => {
-                    try {
-                        if (msg != null && msg.length > 0) {
-                            const str = msg.toString('utf-8');
-                            if (str != 'end')
-                                data.push(str);
-                            else {
-                                const res = data.reduce((json, str) => json + str, '');
-                                handshake_1.default(res, peer_list_db, log);
-                                data = [];
-                                stream.end();
-                            }
-                        }
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                });
-                stream.on('error', (e) => {
-                    log.info(e);
-                });
-            });
-            node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
-                pull(conn, pull.drain((msg) => {
-                    try {
-                        tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                }));
-            });
-            node.handle(`/vreath/${data.id}/block/get`, async (protocol, conn) => {
-                pull(conn, pull.drain((msg) => {
-                    try {
-                        block_routes.get(msg, node, block_db, log);
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                }));
-            });
-            node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
-                pull(conn, pull.drain((msg) => {
-                    try {
-                        block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, uniter_db, log);
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                }));
-            });
-            node.handle(`/vreath/${data.id}/chain/get`, (protocol, conn) => {
-                try {
-                    const stream = toStream(conn);
-                    let data = [];
-                    stream.on('data', (msg) => {
-                        try {
-                            if (msg != null && msg.length > 0) {
-                                const str = msg.toString('utf-8');
-                                if (str != 'end1')
-                                    data.push(str);
-                                else {
-                                    const res = data.reduce((json, str) => json + str, '');
-                                    const hashes = JSON.parse(res);
-                                    chain_routes.get(hashes, stream, chain_info_db, block_db, output_db, log);
-                                    data = [];
-                                }
-                            }
-                        }
-                        catch (e) {
-                            log.info(e);
-                        }
-                    });
-                    stream.on('error', (e) => {
-                        log.info(e);
-                    });
-                }
-                catch (e) {
-                    log.info(e);
-                }
-            });
-            node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
-                pull(conn, pull.drain((msg) => {
-                    try {
-                        chain_routes.post(msg.toString('utf-8'), block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, log);
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                }));
-            });
-            node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
-                pull(conn, pull.drain((msg) => {
-                    try {
-                        unit_routes.post(msg, block_db, chain_info_db, root_db, trie_db, state_db, unit_db, log);
-                    }
-                    catch (e) {
-                        log.info(e);
-                    }
-                }));
-            });
-            node.on('error', (e) => {
-                log.info(e);
-            });
-            intervals.shake_hands(node, peer_list_db, log);
-            intervals.get_new_chain(node, peer_list_db, chain_info_db, block_db, finalize_db, uniter_db, root_db, trie_db, state_db, lock_db, tx_db, log);
-            if (config.validator.flag) {
-                intervals.staking(private_key, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
-                intervals.buying_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, log);
-            }
-            if (config.miner.flag) {
-                intervals.refreshing(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, peer_list_db, log);
-                intervals.making_unit(private_key, config, node, chain_info_db, root_db, trie_db, block_db, state_db, unit_db, peer_list_db, log);
-            }
+            run_1.node_handles(node, private_key, config, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, finalize_db, uniter_db, log);
+            run_1.run_intervals(node, private_key, config, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, finalize_db, uniter_db, log);
             const pubKey = vr.crypto.private2public(private_key);
             const native_address = vr.crypto.generate_address(vr.con.constant.native, pubKey);
             const unit_address = vr.crypto.generate_address(vr.con.constant.unit, pubKey);
