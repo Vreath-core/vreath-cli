@@ -22,7 +22,6 @@ export const post = async (msg:Buffer,block_db:vr.db,uniter_db:vr.db,root_db:vr.
         const pre_root:string|null = await root_db.read_obj(pre_key_height);
         const pre_trie = pre_root!=null ? vr.data.trie_ins(trie_db,pre_root) : null;
         if(pre_finalizes==null||pre_uniters==null||pre_root==null||pre_trie==null||!vr.finalize.verify(pre_key_block,pre_finalizes,pre_uniters,pre_trie,state_db)){
-            console.log('previous key block is not finalized yet');
             throw new Error('previous key block is not finalized yet');
         }
         const sign:vr.Sign = data.sign;

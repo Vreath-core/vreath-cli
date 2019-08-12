@@ -36,6 +36,10 @@ exports.shake_hands = async (node, peer_list_db, log) => {
                 const stream = toStream(conn);
                 stream.write(JSON.stringify(peer_info_list));
                 stream.write('end');
+                stream.on('error', (e) => {
+                    log.info(e);
+                    stream.end();
+                });
             });
             return false;
         });
@@ -165,7 +169,7 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
                 if (err) {
                     log.info(err);
                 }
-                pull(pull.values([JSON.stringify(send_data)]), conn);
+                pull(pull.values([JSON.stringify(send_data), 'end']), conn);
             });
             return false;
         });

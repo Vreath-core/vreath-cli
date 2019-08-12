@@ -139,23 +139,33 @@ exports.run = async (config, log) => {
 };
 exports.node_handles = (node, private_key, config, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, finalize_db, uniter_db, log) => {
     node.on('peer:connect', (peerInfo) => {
-        const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-        const id_obj = {
-            id: ids.id._idB58String,
-            privKey: ids.id._privKey,
-            pubKey: ids.id._pubKey
-        };
-        const multiaddrs = peerInfo.multiaddrs.toArray().map((add) => Multiaddr(add.buffer).toString());
-        const peer_obj = {
-            identity: id_obj,
-            multiaddrs: multiaddrs
-        };
-        peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
+        try {
+            const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
+            const id_obj = {
+                id: ids.id._idB58String,
+                privKey: ids.id._privKey,
+                pubKey: ids.id._pubKey
+            };
+            const multiaddrs = peerInfo.multiaddrs.toArray().map((add) => Multiaddr(add.buffer).toString());
+            const peer_obj = {
+                identity: id_obj,
+                multiaddrs: multiaddrs
+            };
+            peer_list_db.write_obj(Buffer.from(peer_obj.identity.id).toString('hex'), peer_obj);
+        }
+        catch (e) {
+            log.info(e);
+        }
     });
     node.on('peer:disconnect', (peerInfo) => {
-        const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
-        const id = ids.id._idB58String;
-        peer_list_db.del(Buffer.from(id).toString('hex'));
+        try {
+            const ids = new PeerInfo(PeerId.createFromB58String(peerInfo.id._idB58String));
+            const id = ids.id._idB58String;
+            peer_list_db.del(Buffer.from(id).toString('hex'));
+        }
+        catch (e) {
+            log.info(e);
+        }
     });
     node.handle(`/vreath/${data.id}/handshake`, (protocol, conn) => {
         const stream = toStream(conn);
@@ -203,9 +213,19 @@ exports.node_handles = (node, private_key, config, chain_info_db, root_db, trie_
         }));
     });
     node.handle(`/vreath/${data.id}/block/post`, (protocol, conn) => {
+        let data = [];
         pull(conn, pull.drain((msg) => {
             try {
-                block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
+                if (msg != null && msg.length > 0) {
+                    const str = msg.toString('utf-8');
+                    if (str != 'end')
+                        data.push(str);
+                    else {
+                        const res = data.reduce((json, str) => json + str, '');
+                        block_routes.post(Buffer.from(res, 'utf-8'), chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
+                        data = [];
+                    }
+                }
             }
             catch (e) {
                 log.info(e);
@@ -244,16 +264,19 @@ exports.node_handles = (node, private_key, config, chain_info_db, root_db, trie_
             log.info(e);
         }
     });
-    node.handle(`/vreath/${data.id}/chain/post`, (protocol, conn) => {
-        pull(conn, pull.drain((msg) => {
-            try {
-                chain_routes.post(msg.toString('utf-8'), block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, private_key, node, log);
-            }
-            catch (e) {
-                log.info(e);
-            }
-        }));
-    });
+    /*node.handle(`/vreath/${data.id}/chain/post`, (protocol:string, conn:string) => {
+        pull(
+            conn,
+            pull.drain((msg:Buffer)=>{
+                try{
+                    chain_routes.post(msg.toString('utf-8'),block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,private_key,node,log);
+                }
+                catch(e){
+                    log.info(e);
+                }
+            })
+        )
+    });*/
     node.handle(`/vreath/${data.id}/unit/post`, async (protocol, conn) => {
         pull(conn, pull.drain((msg) => {
             try {
@@ -265,9 +288,19 @@ exports.node_handles = (node, private_key, config, chain_info_db, root_db, trie_
         }));
     });
     node.handle(`/vreath/${data.id}/finalize/post`, (protocol, conn) => {
+        let data = [];
         pull(conn, pull.drain((msg) => {
             try {
-                finalize_routes.post(msg, block_db, uniter_db, root_db, trie_db, state_db, finalize_db, log);
+                if (msg != null && msg.length > 0) {
+                    const str = msg.toString('utf-8');
+                    if (str != 'end')
+                        data.push(str);
+                    else {
+                        const res = data.reduce((json, str) => json + str, '');
+                        finalize_routes.post(Buffer.from(res, 'utf-8'), block_db, uniter_db, root_db, trie_db, state_db, finalize_db, log);
+                        data = [];
+                    }
+                }
             }
             catch (e) {
                 log.info(e);

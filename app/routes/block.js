@@ -26,6 +26,7 @@ exports.get = async (msg, stream, block_db, log) => {
         if (block == null)
             throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
+        stream.write('end');
     }
     catch (e) {
         log.info(e);
@@ -95,7 +96,7 @@ exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_
                     if (err) {
                         log.info(err);
                     }
-                    pull(pull.values([JSON.stringify(finalize)]), conn);
+                    pull(pull.values([JSON.stringify(finalize), 'end']), conn);
                 });
                 return false;
             });

@@ -8825,7 +8825,7 @@ vinyl@^2.0.0:
 
 "vreath@https://github.com/Vreath-core/ts-vreath-core#protocol_gpou":
   version "0.0.1"
-  resolved "https://github.com/Vreath-core/ts-vreath-core#cb0360f617875159547913089d0f1386427c8052"
+  resolved "https://github.com/Vreath-core/ts-vreath-core#1aca910130171a94228b34cfef3b4bb7baa52f94"
   dependencies:
     "@types/leveldown" "^4.0.0"
     "@types/levelup" "^3.1.0"

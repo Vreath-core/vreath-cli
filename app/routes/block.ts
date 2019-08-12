@@ -19,6 +19,7 @@ export const get = async (msg:Buffer,stream:any,block_db:vr.db,log:bunyan):Promi
         const block:vr.Block|null = await block_db.read_obj(height);
         if(block==null) throw new Error('invalid height');
         stream.write(JSON.stringify([block]));
+        stream.write('end');
     }
     catch(e){
         log.info(e);
@@ -77,7 +78,7 @@ export const post = async (message:Buffer,chain_info_db:vr.db,root_db:vr.db,trie
                 peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
                 node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
                     if (err) { log.info(err); }
-                    pull(pull.values([JSON.stringify(finalize)]), conn);
+                    pull(pull.values([JSON.stringify(finalize),'end']), conn);
                 });
                 return false;
             });

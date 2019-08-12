@@ -288,18 +288,23 @@ exports.maintenance = async (node, peer_info, height, chain_info_db, block_db, r
                 log.info(err);
             }
             const stream = toStream(conn);
+            let data = [];
             stream.write(height);
             stream.on('data', (msg) => {
-                try {
-                    if (msg != null && msg.length > 0)
-                        return block_routes.post(msg, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
-                }
-                catch (e) {
-                    log.info(e);
+                console.log('maintenance');
+                const str = msg.toString('utf-8');
+                if (str != 'end')
+                    data.push(str);
+                else {
+                    const res = data.reduce((json, str) => json + str, '');
+                    block_routes.post(Buffer.from(res, 'utf-8'), chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
+                    data = [];
+                    stream.end();
                 }
             });
             stream.on('error', (e) => {
                 log.info(e);
+                stream.end();
             });
         });
     }

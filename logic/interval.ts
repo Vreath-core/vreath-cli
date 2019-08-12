@@ -28,6 +28,10 @@ export const shake_hands = async (node:Node,peer_list_db:vr.db,log:bunyan)=>{
                 const stream = toStream(conn);
                 stream.write(JSON.stringify(peer_info_list));
                 stream.write('end');
+                stream.on('error',(e:string)=>{
+                    log.info(e);
+                    stream.end();
+                });
             });
             return false;
         });
@@ -151,7 +155,7 @@ export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,r
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/block/post`,(err:string,conn:any) => {
                 if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify(send_data)]), conn);
+                pull(pull.values([JSON.stringify(send_data),'end']), conn);
             });
             return false;
         });
