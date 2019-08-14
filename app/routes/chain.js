@@ -101,7 +101,7 @@ exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root
             const my_key_block = await block_db.read_obj(key_height);
             const finalizes = await finalize_db.read_obj(key_height);
             const uniters = await uniter_db.read_obj(key_height);
-            const root = await root_db.read_obj(key_height);
+            const root = await root_db.get(key_height);
             if (my_key_block == null || finalizes == null || uniters == null || root == null || block.hash === my_key_block.hash)
                 return false;
             const trie = vr.data.trie_ins(trie_db, root);

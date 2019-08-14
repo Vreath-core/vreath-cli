@@ -193,9 +193,19 @@ exports.node_handles = (node, private_key, config, chain_info_db, root_db, trie_
         });
     });
     node.handle(`/vreath/${data.id}/tx/post`, (protocol, conn) => {
+        let data = [];
         pull(conn, pull.drain((msg) => {
             try {
-                tx_routes.post(msg, chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
+                if (msg != null && msg.length > 0) {
+                    const str = msg.toString('utf-8');
+                    if (str != 'end')
+                        data.push(str);
+                    else {
+                        const res = data.reduce((json, str) => json + str, '');
+                        tx_routes.post(Buffer.from(res, 'utf-8'), chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
+                        data = [];
+                    }
+                }
             }
             catch (e) {
                 log.info(e);
@@ -337,7 +347,7 @@ exports.accept_repl = (node, private_key, chain_info_db, root_db, trie_db, block
                     if (err) {
                         log.info(err);
                     }
-                    pull(pull.values([JSON.stringify([tx, []])]), conn);
+                    pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
                 });
                 return false;
             });

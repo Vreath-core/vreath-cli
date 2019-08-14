@@ -86,7 +86,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
             const my_key_block:vr.Block|null = await block_db.read_obj(key_height);
             const finalizes:vr.Finalize[]|null = await finalize_db.read_obj(key_height);
             const uniters:string[] | null = await uniter_db.read_obj(key_height);
-            const root:string|null = await root_db.read_obj(key_height);
+            const root:string|null = await root_db.get(key_height);
             if(my_key_block==null||finalizes==null||uniters==null||root==null||block.hash===my_key_block.hash) return false;
             const trie = vr.data.trie_ins(trie_db,root);
             if(vr.finalize.verify(block,finalizes,uniters,trie,state_db)) return true;

@@ -26,7 +26,7 @@ exports.post = async (msg, block_db, uniter_db, root_db, trie_db, state_db, fina
         const pre_key_height = pre_key_block.meta.height;
         const pre_finalizes = await finalize_db.read_obj(pre_key_height);
         const pre_uniters = await uniter_db.read_obj(pre_key_height);
-        const pre_root = await root_db.read_obj(pre_key_height);
+        const pre_root = await root_db.get(pre_key_height);
         const pre_trie = pre_root != null ? vr.data.trie_ins(trie_db, pre_root) : null;
         if (pre_finalizes == null || pre_uniters == null || pre_root == null || pre_trie == null || !vr.finalize.verify(pre_key_block, pre_finalizes, pre_uniters, pre_trie, state_db)) {
             throw new Error('previous key block is not finalized yet');
@@ -48,7 +48,9 @@ exports.post = async (msg, block_db, uniter_db, root_db, trie_db, state_db, fina
             throw new Error('invalid address');
         if (!vr.crypto.verify(finalize_hash, sign.data, pub_key))
             throw new Error('invalid sign');
-        await finalize_db.write_obj(data.height, data);
+        const saved_finalize = await finalize_db.read_obj(data.height);
+        const new_finalized = saved_finalize != null && saved_finalize.length >= 1 ? saved_finalize.concat(data) : [data];
+        await finalize_db.write_obj(data.height, new_finalized);
     }
     catch (e) {
         log.info(e);

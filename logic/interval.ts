@@ -240,7 +240,7 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                 if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify([tx,[]])]), conn);
+                pull(pull.values([JSON.stringify([tx,[]]),'end']), conn);
             });
             return false;
         });
@@ -302,7 +302,7 @@ export const refreshing = async (private_key:string,config:any,node:Node,chain_i
             peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
             node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                 if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify(made)]), conn);
+                pull(pull.values([JSON.stringify(made),'end']), conn);
             });
             return false;
         });

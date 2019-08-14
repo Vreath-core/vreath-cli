@@ -194,11 +194,20 @@ export const node_handles  = (node:Node,private_key:string,config:config,chain_i
     })
 
     node.handle(`/vreath/${data.id}/tx/post`, (protocol:string, conn:any)=>{
+        let data:string[] = [];
         pull(
             conn,
             pull.drain((msg:Buffer)=>{
                 try{
-                    tx_routes.post(msg,chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
+                    if(msg!=null&&msg.length>0){
+                        const str = msg.toString('utf-8');
+                        if(str!='end') data.push(str);
+                        else {
+                            const res = data.reduce((json:string,str)=>json+str,'');
+                            tx_routes.post(Buffer.from(res,'utf-8'),chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log);
+                            data = [];
+                        }
+                    }
                 }
                 catch(e){
                     log.info(e);
@@ -358,7 +367,7 @@ export const accept_repl = (node:Node,private_key:string,chain_info_db:vr.db,roo
                 peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
                 node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
                     if (err) { log.info(err) }
-                    pull(pull.values([JSON.stringify([tx,[]])]), conn);
+                    pull(pull.values([JSON.stringify([tx,[]]),'end']), conn);
                 });
                 return false;
             });

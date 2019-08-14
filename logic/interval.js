@@ -259,7 +259,7 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
                 if (err) {
                     log.info(err);
                 }
-                pull(pull.values([JSON.stringify([tx, []])]), conn);
+                pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
             });
             return false;
         });
@@ -327,7 +327,7 @@ exports.refreshing = async (private_key, config, node, chain_info_db, root_db, t
                 if (err) {
                     log.info(err);
                 }
-                pull(pull.values([JSON.stringify(made)]), conn);
+                pull(pull.values([JSON.stringify(made), 'end']), conn);
             });
             return false;
         });
