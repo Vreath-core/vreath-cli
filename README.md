@@ -3,6 +3,8 @@
 ### CLI wallet for Vreath
 ---
 
+![demo](https://github.com/Vreath-core/Documents/blob/master/vreath_demo_node4.gif?raw=true)  
+
 ## Attention
 This is under development.  
 Our main net is not launched yet.  
@@ -81,8 +83,6 @@ A request transaction is published.
 
 ## Demonstration
 You can try a Vreath demonstration!  
-
-![demo](https://github.com/Vreath-core/Documents/blob/master/vreath_demo_node4.gif?raw=true)  
 
 ### Terminal1
 `vreath demo 1`  
