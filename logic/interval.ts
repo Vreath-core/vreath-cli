@@ -55,6 +55,8 @@ export const get_new_chain = async (private_key:string,node:Node,peer_list_db:vr
         peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
+        const syncing = info.syncing;
+        if(syncing) throw new Error('syncing now');
         let got_block:vr.Block|null;
         let chain_hashes:{[key:string]:string} = {};
         let i:BigInteger = bigInt(0);
@@ -84,9 +86,8 @@ export const get_new_chain = async (private_key:string,node:Node,peer_list_db:vr
                         if(str!='end2') data.push(str);
                         else {
                             const res = data.reduce((json:string,str)=>json+str,'');
-                            chain_routes.post(res,block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,private_key,node,log);
+                            chain_routes.post(res,block_db,finalize_db,uniter_db,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db,peer_list_db,private_key,node,stream,log);
                             data = [];
-                            stream.end();
                         }
                     }
                 }
@@ -99,6 +100,13 @@ export const get_new_chain = async (private_key:string,node:Node,peer_list_db:vr
                 log.info(e);
                 stream.end();
             });
+            stream.on('end',()=>{
+                chain_info_db.read_obj<data.chain_info>('00').then((info:data.chain_info|null)=>{
+                    if(info==null) throw new Error('chain_info is empty');
+                    info.syncing = false;
+                    chain_info_db.write_obj("00",info).catch(e=>log.info(e));
+                }).catch(e=>log.info(e));
+            })
         });
     }
     catch(e){
@@ -115,6 +123,8 @@ export const staking = async (private_key:string,node:Node,chain_info_db:vr.db,r
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
         const last_height = info.last_height
+        const syncing = info.syncing;
+        if(syncing) throw new Error('syncing now');
         const root = await root_db.get(last_height);
         if(root==null) throw new Error("root doesn't exist");
         const trie = vr.data.trie_ins(trie_db,root);

@@ -65,7 +65,8 @@ export const test_setup = async ():Promise<setup_data>=>{
         net_id:test_id,
         compatible_version:vr.con.constant.compatible_version,
         last_height:"00",
-        last_hash:gen_hash
+        last_hash:gen_hash,
+        syncing:false
     }
     const gen_peer:peer_info = await set_peer_id('8000');
     const gen_finalize = vr.finalize.sign("00",gen_hash,privKey);

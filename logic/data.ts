@@ -48,6 +48,7 @@ export type chain_info = {
     compatible_version:string;
     last_height:string;
     last_hash:string;
+    syncing:boolean;
 }
 
 export type peer_info = {

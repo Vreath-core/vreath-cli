@@ -73,7 +73,7 @@ exports.get = async (hashes, stream, chain_info_db, block_db, output_db, log) =>
         log.info(e);
     }
 };
-exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, private_key, node, log) => {
+exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, private_key, node, stream, log) => {
     try {
         const parsed = JSON.parse(msg);
         const new_chain = parsed[0];
@@ -118,6 +118,7 @@ exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root
         if (backed_last_block != null) {
             info.last_hash = backed_last_block.hash;
             info.last_height = backed_last_height;
+            info.syncing = true;
         }
         await chain_info_db.write_obj("00", info);
         let block;
@@ -145,6 +146,7 @@ exports.post = async (msg, block_db, finalize_db, uniter_db, chain_info_db, root
             }, []);
             await block_1.post(Buffer.from(JSON.stringify([block, outputs])), chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, finalize_db, uniter_db, private_key, node, log);
         }
+        stream.end();
         return 1;
     }
     catch (e) {

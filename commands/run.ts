@@ -127,6 +127,10 @@ export const run = async (config:config,log:bunyan)=> {
         await peer_list_db.write_obj(Buffer.from(config.peer.id).toString('hex'),peer)
     })
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
+    let info:data.chain_info|null = await chain_info_db.read_obj('00');
+    if(info==null) throw new Error('chain_info is empty');
+    info.syncing = false;
+    await chain_info_db.write_obj(info.last_height,info);
     const node = new Node(peer_info,['spdy','mplex'],peer_address_list);
 
     node.start((err:string)=>{
@@ -236,25 +240,30 @@ export const node_handles  = (node:Node,private_key:string,config:config,chain_i
 
     node.handle(`/vreath/${data.id}/block/post`, (protocol:string, conn:string) => {
         let data:string[] = [];
-        pull(
-            conn,
-            pull.drain((msg:Buffer)=>{
-                try{
-                    if(msg!=null&&msg.length>0){
-                        const str = msg.toString('utf-8');
-                        if(str!='end') data.push(str);
-                        else {
-                            const res = data.reduce((json:string,str)=>json+str,'');
-                            block_routes.post(Buffer.from(res,'utf-8'),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
-                            data = [];
+        chain_info_db.read_obj<data.chain_info>('00').then((info:data.chain_info|null)=>{
+            if(info==null) throw new Error('chain_info is empty');
+            const syncing = info.syncing;
+            if(syncing) throw new Error('syncing now');
+            pull(
+                conn,
+                pull.drain((msg:Buffer)=>{
+                    try{
+                        if(msg!=null&&msg.length>0){
+                            const str = msg.toString('utf-8');
+                            if(str!='end') data.push(str);
+                            else {
+                                const res = data.reduce((json:string,str)=>json+str,'');
+                                block_routes.post(Buffer.from(res,'utf-8'),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
+                                data = [];
+                            }
                         }
                     }
-                }
-                catch(e){
-                    log.info(e);
-                }
-            })
-        )
+                    catch(e){
+                        log.info(e);
+                    }
+                })
+            )
+        }).catch((e)=>{log.info(e)});
     });
 
     node.handle(`/vreath/${data.id}/chain/get`, (protocol:string, conn:any) => {

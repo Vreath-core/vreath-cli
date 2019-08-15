@@ -62,7 +62,7 @@ export const get = async (hashes:{[key:string]:string},stream:any,chain_info_db:
     }
 }
 
-export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,private_key:string,node:Node,log:bunyan)=>{
+export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db:vr.db,chain_info_db:vr.db,root_db:vr.db,trie_db:vr.db,state_db:vr.db,lock_db:vr.db,tx_db:vr.db,peer_list_db:vr.db,private_key:string,node:Node,stream:any,log:bunyan)=>{
     try{
         const parsed:[vr.Block[],{[key:string]:vr.State[]}] = JSON.parse(msg);
         const new_chain = parsed[0];
@@ -99,6 +99,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
         if(backed_last_block!=null){
             info.last_hash = backed_last_block.hash;
             info.last_height = backed_last_height;
+            info.syncing = true;
         }
         await chain_info_db.write_obj("00",info);
         let block:vr.Block;
@@ -122,6 +123,7 @@ export const post = async (msg:string,block_db:vr.db,finalize_db:vr.db,uniter_db
             },[]);
             await block_post(Buffer.from(JSON.stringify([block,outputs])),chain_info_db,root_db,trie_db,block_db,state_db,lock_db,tx_db,peer_list_db,finalize_db,uniter_db,private_key,node,log);
         }
+        stream.end();
         return 1;
     }
     catch(e){

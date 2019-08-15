@@ -63,6 +63,9 @@ exports.get_new_chain = async (private_key, node, peer_list_db, chain_info_db, b
         const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
+        const syncing = info.syncing;
+        if (syncing)
+            throw new Error('syncing now');
         let got_block;
         let chain_hashes = {};
         let i = big_integer_1.default(0);
@@ -93,9 +96,8 @@ exports.get_new_chain = async (private_key, node, peer_list_db, chain_info_db, b
                             data.push(str);
                         else {
                             const res = data.reduce((json, str) => json + str, '');
-                            chain_routes.post(res, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, private_key, node, log);
+                            chain_routes.post(res, block_db, finalize_db, uniter_db, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db, peer_list_db, private_key, node, stream, log);
                             data = [];
-                            stream.end();
                         }
                     }
                 }
@@ -107,6 +109,14 @@ exports.get_new_chain = async (private_key, node, peer_list_db, chain_info_db, b
             stream.on('error', (e) => {
                 log.info(e);
                 stream.end();
+            });
+            stream.on('end', () => {
+                chain_info_db.read_obj('00').then((info) => {
+                    if (info == null)
+                        throw new Error('chain_info is empty');
+                    info.syncing = false;
+                    chain_info_db.write_obj("00", info).catch(e => log.info(e));
+                }).catch(e => log.info(e));
             });
         });
     }
@@ -124,6 +134,9 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
         if (info == null)
             throw new Error("chain_info doesn't exist");
         const last_height = info.last_height;
+        const syncing = info.syncing;
+        if (syncing)
+            throw new Error('syncing now');
         const root = await root_db.get(last_height);
         if (root == null)
             throw new Error("root doesn't exist");
