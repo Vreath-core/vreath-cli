@@ -130,7 +130,7 @@ export const run = async (config:config,log:bunyan)=> {
     let info:data.chain_info|null = await chain_info_db.read_obj('00');
     if(info==null) throw new Error('chain_info is empty');
     info.syncing = false;
-    await chain_info_db.write_obj(info.last_height,info);
+    await chain_info_db.write_obj("00",info);
     const node = new Node(peer_info,['spdy','mplex'],peer_address_list);
 
     node.start((err:string)=>{

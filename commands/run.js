@@ -138,7 +138,7 @@ exports.run = async (config, log) => {
     if (info == null)
         throw new Error('chain_info is empty');
     info.syncing = false;
-    await chain_info_db.write_obj(info.last_height, info);
+    await chain_info_db.write_obj("00", info);
     const node = new Node(peer_info, ['spdy', 'mplex'], peer_address_list);
     node.start((err) => {
         exports.node_handles(node, private_key, config, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, output_db, tx_db, unit_db, peer_list_db, finalize_db, uniter_db, log);
