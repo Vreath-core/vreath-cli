@@ -30,6 +30,7 @@ const path = __importStar(require("path"));
 const repl = __importStar(require("repl"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const crypto_js_1 = __importDefault(require("crypto-js"));
+const P = __importStar(require("p-iteration"));
 const PeerInfo = require('peer-info');
 const PeerId = require('peer-id');
 const Multiaddr = require('multiaddr');
@@ -129,6 +130,9 @@ exports.run = async (config, log) => {
     peer_info.multiaddrs.add(`/ip4/${ip}/tcp/5577`);
     const bootstrapList = JSON.parse(Buffer.from(await util_1.promisify(fs.readFile)(path.join(__dirname, '../genesis_peers.json'), 'utf-8')).toString());
     const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
+    await P.forEach(bootstrapList, async (peer) => {
+        await peer_list_db.write_obj(Buffer.from(config.peer.id).toString('hex'), peer);
+    });
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
     const node = new Node(peer_info, ['spdy', 'mplex'], peer_address_list);
     node.start((err) => {
