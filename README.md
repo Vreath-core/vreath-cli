@@ -10,11 +10,20 @@ This is under development.
 Our main net is not launched yet.  
 As we could reset the blockchain, at present, our token has no value.  
 
-## Requirement
-- node v11.13.0+
-- npm v6.7.0+
+## Requirements
+- nodejs v11.13.0+  
+- npm v6.7.0+  
+    1. Install nvm through https://github.com/nvm-sh/nvm.  
+    2. With nvm install nodejs and npm.  
+       `nvm install (version of nodejs higher than 11.13.0)`
 - yarn 1.17.3+
-- cargo v1.35.0+ (nightly)
+    Install yarn with npm  
+    `npm install -g yarn`  
+- cargo v1.35.0+ (nightly)  
+    1. Install cargo, rustup and rustc through https://doc.rust-lang.org/cargo/getting-started/installation.html.  
+    2. Change the version of rustc into nightly.  
+       `rustup default nightly`  
+
 
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
