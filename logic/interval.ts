@@ -5,6 +5,7 @@ import {Node} from '../commands/run'
 import * as tx_routes from '../app/routes/tx'
 import * as block_routes from '../app/routes/block'
 import * as chain_routes from '../app/routes/chain'
+import  request_tx from '../app/repl/request-tx'
 import * as P from 'p-iteration'
 import bunyan from 'bunyan'
 import * as path from 'path'
@@ -185,6 +186,8 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
         const unit_validator = vr.crypto.generate_address(vr.con.constant.unit,pub_key);
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
+        const requesting = info.manual_requesting.flag;
+        if(requesting) throw new Error("requesting now");
         const root = await root_db.get(info.last_height);
         if(root==null) throw new Error("root doesn't exist");
         const trie = vr.data.trie_ins(trie_db,root);
@@ -237,7 +240,8 @@ export const buying_unit = async (private_key:string,config:any,node:Node,chain_
             if(index.length%2!=0) index = "0"+index;
             return res.concat(unit[0]).concat(index).concat(unit[2]).concat(unit[3]).concat(unit[4]);
         },["00"]);
-        const tx = await works.make_req_tx(0,bases,feeprice,gas,input_raw,"",private_key,trie,state_db,lock_db);
+        const first_state = await vr.data.read_from_trie(trie,state_db,bases[0],0,vr.state.create_state("00",vr.con.constant.unit,unit_validator));
+        const tx = await works.make_req_tx(0,first_state.nonce,bases,feeprice,gas,input_raw,"",private_key,true,trie,state_db,lock_db);
         await tx_routes.post(Buffer.from(JSON.stringify([tx,[]])),chain_info_db,root_db,trie_db,tx_db,block_db,state_db,lock_db,output_db,log)
         await tx_db.write_obj(tx.hash,tx);
         await P.forEach(units, async (unit,i)=>{
@@ -332,6 +336,8 @@ export const making_unit = async (private_key:string,config:any,node:Node,chain_
         const my_unit_address = vr.crypto.generate_address(vr.con.constant.unit,public_key);
         const info:data.chain_info|null = await chain_info_db.read_obj("00");
         if(info==null) throw new Error("chain_info doesn't exist");
+        const requesting = info.manual_requesting.flag;
+        if(requesting) throw new Error("requesting now");
         const last_height = info.last_height;
         const root = await root_db.get(last_height);
         if(root==null) throw new Error("root doesn't exist");

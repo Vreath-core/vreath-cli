@@ -63,7 +63,14 @@
         "compatible_version": "0000",
         "last_height": "00",
         "last_hash": "eab71a108b18741e9ac9e1a28c071820baf7309456b82b769a25fc69b9f712c3",
-        "syncing": false
+        "syncing": false,
+        "manual_requesting":{
+            "flag":false,
+            "failed_times":0,
+            "address":"",
+            "tx_hash":"",
+            "nonce":"00"
+        }
     },
     "peer": {
         "identity": {

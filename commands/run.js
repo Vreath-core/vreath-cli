@@ -131,7 +131,7 @@ exports.run = async (config, log) => {
     const bootstrapList = JSON.parse(Buffer.from(await util_1.promisify(fs.readFile)(path.join(__dirname, '../genesis_peers.json'), 'utf-8')).toString());
     const peer_address_list = bootstrapList.map(peer => `${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
     await P.forEach(bootstrapList, async (peer) => {
-        await peer_list_db.write_obj(Buffer.from(config.peer.id).toString('hex'), peer);
+        await peer_list_db.write_obj(Buffer.from(peer.identity.id).toString('hex'), peer);
     });
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
     let info = await chain_info_db.read_obj('00');
@@ -355,18 +355,22 @@ exports.accept_repl = (node, private_key, chain_info_db, root_db, trie_db, block
         help: 'Create request tx',
         async action(input) {
             const tx = await request_tx_1.default(input, private_key, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
-            await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-                const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
-                const peer_info = new PeerInfo(peer_id);
-                peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
-                node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
-                    if (err) {
-                        log.info(err);
-                    }
-                    pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
+            if (tx == null)
+                console.log('fail to create valid req-tx');
+            else {
+                await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+                    const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+                    const peer_info = new PeerInfo(peer_id);
+                    peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+                    node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
+                        if (err) {
+                            log.info(err);
+                        }
+                        pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
+                    });
+                    return false;
                 });
-                return false;
-            });
+            }
         }
     });
     replServer.defineCommand('balance', {

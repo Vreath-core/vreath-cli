@@ -102,9 +102,6 @@ export const make_block = async (private_key:string,extra:string,block_db:vr.db,
     const pre_key_block = await vr.block.search_key_block(block_db,last_height);
     const pre_micro_blocks = await vr.block.search_micro_block(block_db,pre_key_block,last_height);
     const key_validator = vr.block.get_info_from_block(pre_key_block)[4];
-    /*const unit_address = vr.crypto.generate_address(vr.con.constant.unit,my_pub);
-    const unit_state:vr.State|null = await vr.data.read_from_trie(trie,data.state_db,unit_address,0,vr.state.create_state("00",vr.con.constant.unit,unit_address));
-    if(unit_state!=null) console.log(bigInt(unit_state.amount,16).toString());*/
     if(bigInt(last_height,16).eq(0)&&native_address===key_validator){
         await req_tx_com("-- --0 --0 --0,0 --",private_key,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
     }
@@ -162,13 +159,20 @@ export const make_block = async (private_key:string,extra:string,block_db:vr.db,
     }
 }
 
-export const make_req_tx = async (tyep:vr.TxType,bases:string[],feeprice:string,gas:string,input:string[],log:string,private_key:string,trie:vr.trie,state_db:vr.db,lock_db:vr.db):Promise<vr.Tx>=>{
+export const make_req_tx = async (tyep:vr.TxType,nonce:string,bases:string[],feeprice:string,gas:string,input:string[],log:string,private_key:string,requested_check:boolean,trie:vr.trie,state_db:vr.db,lock_db:vr.db):Promise<vr.Tx>=>{
     const tokens = bases.map(key=>vr.crypto.slice_token_part(key)).filter((val,i,array)=>array.indexOf(val)===i);
     if(tokens.some(t=>bigInt(t,16).notEquals(bigInt(vr.con.constant.native))&&bigInt(t,16).notEquals(bigInt(vr.con.constant.unit)))) throw new Error('unsupported token');
-    const first_state = await vr.data.read_from_trie(trie,state_db,bases[0],0,vr.state.create_state("00",tokens[0],bases[0]));
-    const nonce = first_state.nonce;
+    /*const first_state = await vr.data.read_from_trie(trie,state_db,bases[0],0,vr.state.create_state("00",tokens[0],bases[0]));
+    const my_txs:vr.Tx[] = await tx_db.filter('hex','utf8',(key,tx)=>{
+        if(tx.meta.kind!=0) return false;
+        else if(tx.meta.request.bases.indexOf(my_address)===-1) return false;
+        else return true;
+    });
+    const now_nonce = first_state.nonce;
+    const new_nonce = vr.crypto.bigint2hex(bigInt(now_nonce,16).add(my_txs.length));*/
     const tx = vr.tx.create_req_tx(tyep,nonce,bases,feeprice,gas,input,log,private_key);
-    if(!await vr.tx.verify_req_tx(tx,trie,state_db,lock_db)) throw new Error('fail to create valid request tx');
+    const requested = requested_check ? [6] : [5,6];
+    if(!await vr.tx.verify_req_tx(tx,trie,state_db,lock_db,requested)) throw new Error('fail to create valid request tx');
     return tx;
 }
 
@@ -185,8 +189,9 @@ export const compute_output = async (req_tx:vr.Tx,trie:vr.trie,state_db:vr.db,bl
         else if(bigInt(main_token,16).eq(bigInt(vr.con.constant.unit,16))) return await vr.contracts.unit_prove(bases,base_states,input_data,block_db,req_tx.additional.height);
         else return [];
     })();
-    const success = !output.some(s=>!vr.state.verify_state(s)) ? 1: 0;
-    const return_state = success===1 ? output : [];
+    const state_to_hash = (state:vr.State)=>vr.crypto.array2hash(([state.nonce,state.token,state.owner,state.amount]).concat(state.data))
+    const success = !output.some((s,i)=>!vr.state.verify_state(s)||base_states[i]==null||state_to_hash(s)===state_to_hash(base_states[i])) ? 1: 0;
+    const return_state = success===1 ? output : base_states;
     return [success,return_state];
 }
 
@@ -253,7 +258,9 @@ export const dialog_data = async (chain_info_db:vr.db,root_db:vr.db,trie_db:vr.d
         native_balance:native_amount,
         unit_balance:unit_amount,
         last_height:height,
-        last_hash:info.last_hash
+        last_hash:info.last_hash,
+        syncing:info.syncing,
+        requesting:info.manual_requesting
     }
     return obj;
 }
@@ -266,7 +273,6 @@ export const maintenance = async (node:Node,peer_info:any,height:string,chain_in
             let data:string[] = [];
             stream.write(height);
             stream.on('data',(msg:Buffer)=>{
-                console.log('maintenance')
                 const str = msg.toString('utf-8');
                 if(str!='end') data.push(str);
                 else {
@@ -305,18 +311,6 @@ export const make_finalize = async (private_key:string,block:vr.Block,chain_info
         if(finalize_validators.indexOf(unit_address)===-1) throw new Error('not finalize_validator at the height');
         const finalize = vr.finalize.sign(height,block.hash,private_key);
         return finalize;
-        /*const now_finalize:vr.Finalize[] = await finalize_db.read_obj(height) || [];
-        await finalize_db.write_obj(height,now_finalize.concat(finalize));
-        await peer_list_db.filter('hex','utf8',async (key,peer:data.peer_info)=>{
-            const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
-            const peer_info = new PeerInfo(peer_id);
-            peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
-            node.dialProtocol(peer_info,`/vreath/${data.id}/finalize/post`,(err:string,conn:any) => {
-                if (err) { log.info(err); }
-                pull(pull.values([JSON.stringify(finalize)]), conn);
-            });
-            return false;
-        });*/
     }
     catch(e){
         log.info(e);

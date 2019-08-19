@@ -124,7 +124,7 @@ export const run = async (config:config,log:bunyan)=> {
     const bootstrapList:data.peer_info[] = JSON.parse(Buffer.from(await promisify(fs.readFile)(path.join(__dirname,'../genesis_peers.json'),'utf-8')).toString());
     const peer_address_list = bootstrapList.map(peer=>`${peer.multiaddrs[0]}/p2p/${peer.identity.id}`);
     await P.forEach(bootstrapList, async peer=>{
-        await peer_list_db.write_obj(Buffer.from(config.peer.id).toString('hex'),peer)
+        await peer_list_db.write_obj(Buffer.from(peer.identity.id).toString('hex'),peer)
     })
     await peer_list_db.del(Buffer.from(config.peer.id).toString('hex'));
     let info:data.chain_info|null = await chain_info_db.read_obj('00');
@@ -374,16 +374,19 @@ export const accept_repl = (node:Node,private_key:string,chain_info_db:vr.db,roo
         help: 'Create request tx',
         async action(input){
             const tx = await req_tx_com(input,private_key,chain_info_db,root_db,trie_db,state_db,lock_db,tx_db);
-            await peer_list_db.filter('hex','utf8',async (key:string,peer:data.peer_info)=>{
-                const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
-                const peer_info = new PeerInfo(peer_id);
-                peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
-                node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
-                    if (err) { log.info(err) }
-                    pull(pull.values([JSON.stringify([tx,[]]),'end']), conn);
+            if(tx==null) console.log('fail to create valid req-tx');
+            else{
+                await peer_list_db.filter('hex','utf8',async (key:string,peer:data.peer_info)=>{
+                    const peer_id = await promisify(PeerId.createFromJSON)(peer.identity);
+                    const peer_info = new PeerInfo(peer_id);
+                    peer.multiaddrs.forEach(add=>peer_info.multiaddrs.add(add));
+                    node.dialProtocol(peer_info,`/vreath/${data.id}/tx/post`,(err:string,conn:any) => {
+                        if (err) { log.info(err) }
+                        pull(pull.values([JSON.stringify([tx,[]]),'end']), conn);
+                    });
+                    return false;
                 });
-                return false;
-            });
+            }
         }
     });
 

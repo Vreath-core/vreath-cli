@@ -202,6 +202,9 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
         const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
+        const requesting = info.manual_requesting.flag;
+        if (requesting)
+            throw new Error("requesting now");
         const root = await root_db.get(info.last_height);
         if (root == null)
             throw new Error("root doesn't exist");
@@ -257,7 +260,8 @@ exports.buying_unit = async (private_key, config, node, chain_info_db, root_db, 
                 index = "0" + index;
             return res.concat(unit[0]).concat(index).concat(unit[2]).concat(unit[3]).concat(unit[4]);
         }, ["00"]);
-        const tx = await works.make_req_tx(0, bases, feeprice, gas, input_raw, "", private_key, trie, state_db, lock_db);
+        const first_state = await vr.data.read_from_trie(trie, state_db, bases[0], 0, vr.state.create_state("00", vr.con.constant.unit, unit_validator));
+        const tx = await works.make_req_tx(0, first_state.nonce, bases, feeprice, gas, input_raw, "", private_key, true, trie, state_db, lock_db);
         await tx_routes.post(Buffer.from(JSON.stringify([tx, []])), chain_info_db, root_db, trie_db, tx_db, block_db, state_db, lock_db, output_db, log);
         await tx_db.write_obj(tx.hash, tx);
         await P.forEach(units, async (unit, i) => {
@@ -360,6 +364,9 @@ exports.making_unit = async (private_key, config, node, chain_info_db, root_db, 
         const info = await chain_info_db.read_obj("00");
         if (info == null)
             throw new Error("chain_info doesn't exist");
+        const requesting = info.manual_requesting.flag;
+        if (requesting)
+            throw new Error("requesting now");
         const last_height = info.last_height;
         const root = await root_db.get(last_height);
         if (root == null)

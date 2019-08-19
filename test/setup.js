@@ -63,7 +63,14 @@ exports.test_setup = async () => {
         compatible_version: vr.con.constant.compatible_version,
         last_height: "00",
         last_hash: gen_hash,
-        syncing: false
+        syncing: false,
+        manual_requesting: {
+            flag: false,
+            failed_times: 0,
+            address: '',
+            tx_hash: '',
+            nonce: '00'
+        }
     };
     const gen_peer = await exports.set_peer_id('8000');
     const gen_finalize = vr.finalize.sign("00", gen_hash, privKey);

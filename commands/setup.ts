@@ -46,7 +46,14 @@ export default async ()=>{
         compatible_version:vr.con.constant.compatible_version,
         last_height:"00",
         last_hash:genesis.block.hash,
-        syncing:false
+        syncing:false,
+        manual_requesting:{
+            flag:false,
+            failed_times:0,
+            address:'',
+            tx_hash:'',
+            nonce:'00'
+        }
     }
     await chain_info_db.write_obj("00",info);
     await block_db.write_obj("00",genesis.block);

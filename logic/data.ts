@@ -49,6 +49,13 @@ export type chain_info = {
     last_height:string;
     last_hash:string;
     syncing:boolean;
+    manual_requesting:{
+        flag:boolean,
+        failed_times:number,
+        address:string,
+        tx_hash:string,
+        nonce:string
+    }
 }
 
 export type peer_info = {
