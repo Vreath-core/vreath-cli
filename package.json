@@ -6,7 +6,7 @@
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
   "scripts": {
     "build": "yarn install && cd ./node_modules/vreath/ffi-vreath && yarn install && cd ../../../",
-    //"test": "./node_modules/.bin/mocha --require espower-typescript/guess 'test/main.ts' --max-old-space-size=4096"
+    "test": "./node_modules/.bin/mocha --require espower-typescript/guess 'test/main.ts' --max-old-space-size=4096"
   },
   "dependencies": {
     "@parity/api": "^5.1.11",
