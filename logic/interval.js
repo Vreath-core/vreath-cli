@@ -186,6 +186,26 @@ exports.staking = async (private_key, node, chain_info_db, root_db, trie_db, blo
             });
             return false;
         });
+        if (new_info.manual_requesting.flag) {
+            const managed = await works.manual_request_manager(new_info, block, private_key, trie, state_db, lock_db, tx_db, log);
+            const request_info = managed[0];
+            const new_req_tx = managed[1];
+            await chain_info_db.write_obj("00", request_info);
+            if (new_req_tx != null) {
+                await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+                    const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+                    const peer_info = new PeerInfo(peer_id);
+                    peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+                    node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
+                        if (err) {
+                            log.info(err);
+                        }
+                        pull(pull.values([JSON.stringify([new_req_tx, []]), 'end']), conn);
+                    });
+                    return false;
+                });
+            }
+        }
     }
     catch (e) {
         log.info(e);

@@ -6,9 +6,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const vr = __importStar(require("vreath"));
 const data = __importStar(require("../../logic/data"));
@@ -16,7 +13,6 @@ const works = __importStar(require("../../logic/work"));
 const P = __importStar(require("p-iteration"));
 const finalize_1 = require("./finalize");
 const util_1 = require("util");
-const big_integer_1 = __importDefault(require("big-integer"));
 const PeerId = require('peer-id');
 const PeerInfo = require('peer-info');
 const pull = require('pull-stream');
@@ -105,45 +101,25 @@ exports.post = async (message, chain_info_db, root_db, trie_db, block_db, state_
                 return false;
             });
         }
-        else if (info.manual_requesting) {
-            let request_info = new_info;
-            const exist = block.txs.some(tx => tx.meta.kind === 0 && tx.hash === request_info.manual_requesting.tx_hash);
-            const times = new_info.manual_requesting.failed_times + 1;
-            request_info.manual_requesting.failed_times = times;
-            if (exist || times > 10) {
-                request_info.manual_requesting.flag = false;
-                request_info.manual_requesting.failed_times = 0;
-                request_info.manual_requesting.address = '';
-                request_info.manual_requesting.tx_hash = '';
-                if (!exist)
-                    console.log('fail to send request-tx');
-            }
-            else {
-                const address = request_info.manual_requesting.address;
-                const new_state = await vr.data.read_from_trie(trie, state_db, address, 0, vr.state.create_state("00", vr.crypto.slice_token_part(address), address, "00", []));
-                if (big_integer_1.default(request_info.manual_requesting.nonce, 16).notEquals(big_integer_1.default(new_state.nonce, 16))) {
-                    const new_nonce = new_state.nonce;
-                    const req_tx = await tx_db.read_obj(request_info.manual_requesting.tx_hash);
-                    if (req_tx != null) {
-                        const new_req_tx = await works.make_req_tx(0, new_nonce, req_tx.meta.request.bases, req_tx.meta.request.feeprice, req_tx.meta.request.gas, req_tx.meta.request.input, req_tx.meta.request.log, private_key, false, trie, state_db, lock_db);
-                        request_info.manual_requesting.failed_times = 0;
-                        request_info.manual_requesting.tx_hash = new_req_tx.hash;
-                        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-                            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
-                            const peer_info = new PeerInfo(peer_id);
-                            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
-                            node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
-                                if (err) {
-                                    log.info(err);
-                                }
-                                pull(pull.values([JSON.stringify([new_req_tx, []]), 'end']), conn);
-                            });
-                            return false;
-                        });
-                    }
-                }
-            }
+        else if (new_info.manual_requesting.flag) {
+            const managed = await works.manual_request_manager(new_info, block, private_key, trie, state_db, lock_db, tx_db, log);
+            const request_info = managed[0];
+            const new_req_tx = managed[1];
             await chain_info_db.write_obj("00", request_info);
+            if (new_req_tx != null) {
+                await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+                    const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+                    const peer_info = new PeerInfo(peer_id);
+                    peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+                    node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
+                        if (err) {
+                            log.info(err);
+                        }
+                        pull(pull.values([JSON.stringify([new_req_tx, []]), 'end']), conn);
+                    });
+                    return false;
+                });
+            }
         }
         return 1;
     }

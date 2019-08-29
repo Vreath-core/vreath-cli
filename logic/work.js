@@ -148,14 +148,20 @@ exports.make_block = async (private_key, extra, block_db, chain_info_db, root_db
             const invalid_tx_hashes = await P.reduce(micro_block.txs, async (result, tx) => {
                 if (tx.meta.kind === 0 && !await vr.tx.verify_req_tx(tx, trie, state_db, lock_db, [0, 1, 2, 3, 4, 5])) {
                     result.push(tx.hash);
+                    console.log('invalid req-tx');
+                    console.log(JSON.stringify(tx, null, 4));
                 }
                 if (tx.meta.kind === 1) {
                     const output_for_tx = await output_db.read_obj(tx.hash);
                     if (output_for_tx == null) {
                         result.push(tx.hash);
+                        console.log('invalid ref-tx no output');
+                        console.log(JSON.stringify(tx, null, 4));
                     }
                     if (output_for_tx != null && !await vr.tx.verify_ref_tx(tx, output_for_tx, block_db, trie, state_db, lock_db, last_height, [0, 1, 2, 3, 5, 6, 7])) {
-                        //console.log('invalid');
+                        console.log('output exist');
+                        console.log('invalid ref-tx');
+                        console.log(JSON.stringify(tx, null, 4));
                         result.push(tx.hash);
                     }
                     return result;
@@ -344,5 +350,40 @@ exports.make_finalize = async (private_key, block, chain_info_db, root_db, trie_
     catch (e) {
         log.info(e);
         return null;
+    }
+};
+exports.manual_request_manager = async (request_info, block, private_key, trie, state_db, lock_db, tx_db, log) => {
+    try {
+        const exist = block.txs.some(tx => tx.meta.kind === 0 && tx.hash === request_info.manual_requesting.tx_hash);
+        const times = request_info.manual_requesting.failed_times + 1;
+        request_info.manual_requesting.failed_times = times;
+        if (exist || times > 10) {
+            request_info.manual_requesting.flag = false;
+            request_info.manual_requesting.failed_times = 0;
+            request_info.manual_requesting.address = '';
+            request_info.manual_requesting.tx_hash = '';
+            if (!exist)
+                console.log('fail to send request-tx');
+        }
+        else {
+            const address = request_info.manual_requesting.address;
+            const new_state = await vr.data.read_from_trie(trie, state_db, address, 0, vr.state.create_state("00", vr.crypto.slice_token_part(address), address, "00", []));
+            if (big_integer_1.default(request_info.manual_requesting.nonce, 16).notEquals(big_integer_1.default(new_state.nonce, 16))) {
+                const new_nonce = new_state.nonce;
+                const req_tx = await tx_db.read_obj(request_info.manual_requesting.tx_hash);
+                if (req_tx != null) {
+                    const new_req_tx = await exports.make_req_tx(0, new_nonce, req_tx.meta.request.bases, req_tx.meta.request.feeprice, req_tx.meta.request.gas, req_tx.meta.request.input, req_tx.meta.request.log, private_key, false, trie, state_db, lock_db);
+                    request_info.manual_requesting.failed_times = 0;
+                    request_info.manual_requesting.tx_hash = new_req_tx.hash;
+                    request_info.manual_requesting.nonce = new_nonce;
+                    return [request_info, new_req_tx];
+                }
+            }
+        }
+        return [request_info, null];
+    }
+    catch (e) {
+        log.info(e);
+        return [request_info, null];
     }
 };

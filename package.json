@@ -5,7 +5,7 @@
   "author": "Sora Suegami",
   "bugs": "https://github.com/Vreath-core/vreath-cli/issues",
   "scripts": {
-    "build": "yarn install && cd ./node_modules/vreath/ffi-vreath && yarn install && cd ../../../",
+    "build": "yarn install && cd ./node_modules/vreath/ffi-vreath && yarn install && cd ../../../&& yarn link",
     "test": "./node_modules/.bin/mocha --require espower-typescript/guess 'test/main.ts' --max-old-space-size=4096"
   },
   "dependencies": {

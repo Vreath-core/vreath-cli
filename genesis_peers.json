@@ -1,0 +1,12 @@
+[
+    {
+        "identity": {
+            "id": "Qmaohtom51HsKsbLB8WVPaKhaXd3qF2gayjo8757La4fA6",
+            "privKey": "",
+            "pubKey": "CAASpgIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC6OZzGOTcXG6CwgzCLjiSAjBs1Di7DM0bdxIZfCh1p8XbOHdiTBLKRGp8ZOik3SFAbM7avsxFuqh65Pb7nfGOk3i4LWdGjmx13Oc0Q8CJt9yX+kxJRdEpDovvHp46QEGTRG59WIZ+Sife9mn87LDVfha8mHi06Ird8DEn9ogH9rfdJPfajzLPrTfSznVnMji2AEEr4m14R8zcZQTH/Pp2cNurXPgQemOIhCn4dg0TQxKxg1iDPhmZ1xLdPZK+Kp48p3vFlIekAg3M3/HGHL9NVZR6efTrjV3OZXp5Rt3reyxHtA2yn7V39XLtd5BqKGWq3EZmPSL84X5tYiKLJGdw/AgMBAAE="
+        },
+        "multiaddrs": [
+            "/ip4/133.167.40.208/tcp/5577"
+        ]
+    }
+]

@@ -22,6 +22,7 @@ const get_block_1 = __importDefault(require("../app/repl/get_block"));
 const get_chain_info_1 = __importDefault(require("../app/repl/get_chain_info"));
 const output_chain_1 = __importDefault(require("../app/repl/output_chain"));
 const balance_1 = __importDefault(require("../app/repl/balance"));
+const remittance_1 = __importDefault(require("../app/repl/remittance"));
 const data = __importStar(require("../logic/data"));
 const intervals = __importStar(require("../logic/interval"));
 const util_1 = require("util");
@@ -351,6 +352,20 @@ exports.run_intervals = (node, private_key, config, chain_info_db, root_db, trie
 };
 exports.accept_repl = (node, private_key, chain_info_db, root_db, trie_db, block_db, state_db, lock_db, tx_db, peer_list_db, log) => {
     const replServer = repl.start({ prompt: '>', terminal: true });
+    const send_tx = async (tx) => {
+        await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
+            const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
+            const peer_info = new PeerInfo(peer_id);
+            peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
+            node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
+                if (err) {
+                    log.info(err);
+                }
+                pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
+            });
+            return false;
+        });
+    };
     replServer.defineCommand('request-tx', {
         help: 'Create request tx',
         async action(input) {
@@ -358,18 +373,7 @@ exports.accept_repl = (node, private_key, chain_info_db, root_db, trie_db, block
             if (tx == null)
                 console.log('fail to create valid req-tx');
             else {
-                await peer_list_db.filter('hex', 'utf8', async (key, peer) => {
-                    const peer_id = await util_1.promisify(PeerId.createFromJSON)(peer.identity);
-                    const peer_info = new PeerInfo(peer_id);
-                    peer.multiaddrs.forEach(add => peer_info.multiaddrs.add(add));
-                    node.dialProtocol(peer_info, `/vreath/${data.id}/tx/post`, (err, conn) => {
-                        if (err) {
-                            log.info(err);
-                        }
-                        pull(pull.values([JSON.stringify([tx, []]), 'end']), conn);
-                    });
-                    return false;
-                });
+                await send_tx(tx);
             }
         }
     });
@@ -401,6 +405,17 @@ exports.accept_repl = (node, private_key, chain_info_db, root_db, trie_db, block
         help: 'output chain as zip of json files',
         async action() {
             await output_chain_1.default(chain_info_db, block_db);
+        }
+    });
+    replServer.defineCommand('remittance', {
+        help: 'remit your VRT',
+        async action(input) {
+            const tx = await remittance_1.default(input, private_key, chain_info_db, root_db, trie_db, state_db, lock_db, tx_db);
+            if (tx == null)
+                console.log('fail to remit VRT');
+            else {
+                await send_tx(tx);
+            }
         }
     });
 };

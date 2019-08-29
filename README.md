@@ -11,35 +11,39 @@ Our main net is not launched yet.
 As we could reset the blockchain, at present, our token has no value.  
 
 ## Requirements
-- nodebrew  
-    1. Install nodebrew. (https://github.com/hokaccha/nodebrew)  
-        `curl -L git.io/nodebrew | perl - setup`  
-        `export PATH=$HOME/.nodebrew/current/bin:$PATH`  
-        `source ~/.bash_profile`
-    2. Check nodebrew is installed.  
-        `nodebrew help`  
+1. Docker  
+https://hub.docker.com/r/fujiwaraizuho/vreath-docker  
 
-- nodejs v11.13.0+  
-- npm v6.7.0+  
-    1. Install nodejs and npm with nodebrew.  
-        `nodebrew install latest`  
-    2. Check nodejs and npm is installed.  
-        `node -v`  
-        `npm -v`  
+2. Manual  
+    - nodebrew  
+        1. Install nodebrew. (https://github.com/hokaccha/nodebrew)  
+            `curl -L git.io/nodebrew | perl - setup`  
+            `export PATH=$HOME/.nodebrew/current/bin:$PATH`  
+            `source ~/.bash_profile`
+        2. Check nodebrew is installed.  
+            `nodebrew help`  
 
-- yarn 1.17.3+  
-    1. Install yarn with npm.  
-        `npm install -g yarn`  
-    2. Check yarn is installed.
-        `yarn -v`  
-- cargo v1.35.0+ (nightly)  
-    1. Install cargo, rustup and rustc. (https://doc.rust-lang.org/cargo/getting-started/installation.html)  
-    2. Change the version of rustc into nightly.  
-       `rustup default nightly`  
-    3. Check cargo, rustup and rustc is installed.  
-        `cargo -V`  
-        `rustup -V`  
-        `rustc -V`  
+    - nodejs v11.13.0+  
+    - npm v6.7.0+  
+        1. Install nodejs and npm with nodebrew.  
+            `nodebrew install latest`  
+        2. Check nodejs and npm is installed.  
+            `node -v`  
+            `npm -v`  
+
+    - yarn 1.17.3+  
+        1. Install yarn with npm.  
+            `npm install -g yarn`  
+        2. Check yarn is installed.
+            `yarn -v`  
+    - cargo v1.35.0+ (nightly)  
+        1. Install cargo, rustup and rustc. (https://doc.rust-lang.org/cargo/getting-started/installation.html)  
+        2. Change the version of rustc into nightly.  
+        `rustup default nightly`  
+        3. Check cargo, rustup and rustc is installed.  
+            `cargo -V`  
+            `rustup -V`  
+            `rustc -V`  
 
 ## Installation
 `git clone https://github.com/Vreath-core/vreath-cli.git`  
