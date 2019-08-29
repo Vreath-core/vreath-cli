@@ -55,9 +55,6 @@ Generate private key to use:
 `vreath generate-keys`  
 You have to set new password to encrypt the private key and keep it secretly!  
 
-Decrypt genesis peers:  
-`vreath decrypt-genesis-peers`  
-
 Set your peer info:  
 `vreath set-peer-id`  
 
@@ -109,6 +106,9 @@ Your balance of VRT is displayed.
 
 - .request-tx --(addresses to request) --(feeprice) --(gas) --(input data) --(log data)  
 A request transaction is published.  
+
+- .remittance --(address of destination) --(feeprice) --(gas) --(value) --(log data)  
+A request transaction for remittance is published.
 
 ## Demonstration
 You can try a Vreath demonstration!  
